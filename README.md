@@ -15,3 +15,6 @@ The goal of this project is to probe the privacy properties of LLMs, and to expl
 - https://arxiv.org/abs/1610.05820 Loss based MI attacks (with training shadow models, although this is likely infeasible) 
 - https://arxiv.org/abs/2112.03570 Likelihood Ratio Test based MI 
 - https://arxiv.org/abs/2205.13680 Influence estimation based MI attack 
+
+# Reading List 
+- (Knowledge Unlearning)[https://arxiv.org/pdf/2210.01504.pdf]
