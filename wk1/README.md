@@ -20,6 +20,6 @@ Since getting the data was so hard, I decided not to modularize things until we 
 
 ## Workflow
 - We want to see if a data point is in the training set distribution or not. We're going to test that here by taking N pythia models and computing losses of in distribution (the validation set of the original Pile) vs. test data (our own data that we've scraped that's different from The Pile's categories)
-- We then threshold that and compute an ROC curve.
+- We then threshold those losses (e.g. set T so that loss < T = in-distribution and loss > T = out of distribution) and compute an ROC curve.
 
 Useful Link: [Former notebook](https://colab.research.google.com/drive/1qDnTHUL7EiCw2FbD7GPSmQKfYqqSRb9A?authuser=1#scrollTo=qewZnFO9O-lx)
