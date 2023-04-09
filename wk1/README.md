@@ -9,8 +9,7 @@ Other good options include: GPT-Neo, GPT-Neo-X, and GPT-J.
 - The Pile is a 825 GiB diverse, open source language modelling data set that consists of 22 smaller, high-quality datasets combined together.
     - 0.01% of it is validation/test, or about 1GB randomly sampled from the original.
     - Per Page 6, the validation and testing components each contain 0.1% of the data, sampled uniformly at random. It's worth noting that "while efforts have been made to deduplicate documents within The Pile (see Section D.2), it is still possible that some documents are duplicated across the train/validation/test splits."
-- Our intention: fine-tune Pythia on The Pile validation, and run MIA. 
-- There is no way to access The Pile right now except a bit torrent and a HuggingFace method that only lets you load the entire dataset at once, so I had to go under the hood and modify their HuggingFace source code to make it work. See `the_pile.py`. 
+- There is no way to access The Pile right now except a bit torrent and a HuggingFace method that only lets you load the entire dataset at once, so I had to go under the hood and modify their HuggingFace source code to make it work. See `the_pile_val.py`. 
 
 ## Repo Setup
 
