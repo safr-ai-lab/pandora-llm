@@ -12,11 +12,11 @@ from transformers import GPTNeoXForCausalLM, AutoTokenizer
 from transformers.optimization import AdamW
 
 # %%
-model_title = "pythia-410M-deduped"
+model_title = "pythia-6.9B-deduped"
 bs = 8 ## batch size
-nbatches = 200 ## Number of batches to gather data on. Number of data points is bs * nbatches
-samplelength = 10 ## How long are the sequences we take from the training and validation sets.
-
+nbatches = 500 ## Number of batches to gather data on. Number of data points is bs * nbatches
+samplelength = 25 ## How long are the sequences we take from the training and validation sets.
+print(model_title, bs, nbatches, samplelength)
 ####################################################################################
 # %%
 ## Memory statistics. I had to be careful with cuda memory 
@@ -179,6 +179,10 @@ import numpy as np
 with torch.no_grad():
     valuestraining   = torch.flatten(training_sum_perplexity) 
     valuesvalidation = torch.flatten(validation_sum_perplexity)
+
+torch.save(torch.vstack((valuestraining, valuesvalidation)), 
+model_title + " (Training, Validation) data: bs=" + str(bs)+", nbatches="+str(nbatches)+", length="+str(samplelength)+").pt")
+
 
 valuestraining[valuestraining <= -1000] = -1000
 valuesvalidation[valuesvalidation <= -1000] = -1000
