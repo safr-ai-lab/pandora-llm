@@ -15,7 +15,7 @@ from transformers.optimization import AdamW
 model_title = "pythia-6.9B-deduped"
 bs = 8 ## batch size
 nbatches = 500 ## Number of batches to gather data on. Number of data points is bs * nbatches
-samplelength = 25 ## How long are the sequences we take from the training and validation sets.
+samplelength = 50 ## How long are the sequences we take from the training and validation sets.
 print(model_title, bs, nbatches, samplelength)
 ####################################################################################
 # %%
@@ -85,91 +85,61 @@ mem_stats()
 
 # %%
 ## Training dataset information
-training_sum_perplexity = torch.zeros((nbatches, bs))
-for batchno, training_x in enumerate(training_dataloader):
-    if batchno >= nbatches:
-        break
-    with torch.no_grad():       
-        ## Get predictions on training data                       
-        training_x = training_x[:,:samplelength].to(device).detach()
-        mask  = (training_x>0).detach()                                     
+from torch.nn import CrossEntropyLoss
+def compute_input_ids_cross_entropy(model, input_ids):
+  mask  = (input_ids > 0).detach()                                     
 
-        model.train(False)
-        logits_training = model(input_ids=training_x.int(), attention_mask = mask)
+  model.train(False)
 
-        ## Find sum of log likelihood of each sequence
-        for batch in range(bs):
-            seq_logits = torch.zeros((len(training_x[0])))
-            
-            ## Find sum of log likelihood of each sequence
-            for idx, w in enumerate(training_x[batch,]):
-                if training_x[batch,idx] == 0:
-                    break
-                seq_logits[idx] = logits_training.logits[batch,idx,w]
-            
-            ## Case for when we reach the end of the sequence
-            if training_x[batch,idx] != 0:
-                idx += 1
+  with torch.no_grad():
+    outputs = model(input_ids=input_ids.to(torch.long), attention_mask = mask)
+    logits = outputs.logits
 
-            ## Compute perplexity
-            training_sum_perplexity[batchno, batch]= torch.sum(seq_logits[:idx]-torch.log(1+torch.exp(seq_logits[:idx])))/idx
+  loss_fn = CrossEntropyLoss()
+  input_len = input_ids.shape[-1] - 1
+  input_ids_without_first_token = input_ids[:, 1:].long()
+  logits_without_last_token = logits[:, :-1, :]
 
-            ## Clean up 
-            del seq_logits
-            torch.cuda.empty_cache()
-            torch.cuda.synchronize()
+  # print(input_ids_without_first_token)
+  ans = []
+  for i in range(len(logits_without_last_token)):
+    length = len(input_ids_without_first_token[i,:])
+    if len(torch.where(input_ids_without_first_token[i,:] == 0)[0]) > 0:
+      length = torch.where(input_ids_without_first_token[i,:] == 0)[0].min()
+    # print(logits_without_last_token[i, :length].shape)
+    # print(input_ids_without_first_token[i, :length].shape)
+    # print(loss_fn(logits_without_last_token[i, :length], input_ids_without_first_token[i, :length]))
+    ce_loss = loss_fn(logits_without_last_token[i, :length], input_ids_without_first_token[i, :length])
+    ans.append(ce_loss/length)
 
-        ## Cleaning up
-        del training_x, mask, logits_training
-        torch.cuda.empty_cache()
-        torch.cuda.synchronize()
-    if batchno % 100 == 0:
-        print("Training batch no. ", batchno)  
-        print("Memory")
-        mem_stats()
-        print()
+  ## Clean up 
+  del outputs, logits, input_ids_without_first_token, logits_without_last_token
+  torch.cuda.empty_cache()
+  torch.cuda.synchronize()
 
-# %%
-validation_sum_perplexity = torch.zeros((nbatches, bs))
-for batchno, validation_x in enumerate(validation_dataloader):
-    if batchno >= nbatches:
-        break
-    with torch.no_grad():               
-        ## Get predictions on validation data                 
-        validation_x = validation_x[:,:samplelength].to(device).detach()
-        mask  = (validation_x>0).detach()                                     
+  return torch.Tensor(ans)
 
-        model.train(False)
-        logits_validation = model(input_ids=validation_x.int(), attention_mask = mask)
+def compute_cross_entropy(dataloader, nbatches, bs, device, model, samplelength):    
+    cross_entropy = torch.zeros((nbatches, bs))
+    for batchno, data_x in enumerate(dataloader):
+        if batchno >= nbatches:
+            break
+        with torch.no_grad():       
+            ## Get predictions on training data                       
+            data_x = data_x[:,:samplelength].to(device).detach()
+   
+            ## Compute average log likelihood
+            cross_entropy[batchno, :] = compute_input_ids_cross_entropy(model, data_x)
 
-        ## Find sum of log likelihood of each sequence
-        for batch in range(bs):
-            seq_logits = torch.zeros((len(validation_x[0])))
+        if batchno % 50 == 0:
+            print("batch no. ", batchno)  
+            print("Memory after training")
+            mem_stats()
+            print()
+    return cross_entropy
 
-            ## Find logits of each word in the sequence
-            for idx, w in enumerate(validation_x[batch,]):
-                if validation_x[batch,idx] == 0:
-                    break
-                seq_logits[idx] = logits_validation.logits[batch,idx,torch.Tensor.int(w)]
-            if validation_x[batch,idx] != 0:
-                idx += 1
-            validation_sum_perplexity[batchno, batch]= torch.sum(seq_logits[:idx]-torch.log(1+torch.exp(seq_logits[:idx])))/idx
-
-            ## Clean up 
-            del seq_logits
-            torch.cuda.empty_cache()
-            torch.cuda.synchronize()
-
-
-        ## Cleaning up
-        del validation_x, mask, logits_validation
-        torch.cuda.empty_cache()
-        torch.cuda.synchronize()
-    if batchno % 100 == 0:
-        print("Validation batch no. ", batchno)  
-        print("Memory")
-        mem_stats()
-        print()
+train_cross_entropy = compute_cross_entropy(training_dataloader, nbatches, bs, device, model, samplelength)
+val_cross_entropy = compute_cross_entropy(validation_dataloader, nbatches, bs, device, model, samplelength)
 
 # %%
 import matplotlib.pyplot as plt
@@ -177,21 +147,19 @@ import numpy as np
 
 # generate two sets of random values
 with torch.no_grad():
-    valuestraining   = torch.flatten(training_sum_perplexity) 
-    valuesvalidation = torch.flatten(validation_sum_perplexity)
+    valuestraining   = torch.flatten(train_cross_entropy) 
+    valuesvalidation = torch.flatten(val_cross_entropy)
 
+notnan = torch.logical_and(~valuestraining.isnan(), ~valuesvalidation.isnan())
+valuestraining = valuestraining[notnan]
+valuesvalidation = valuesvalidation[notnan]
+
+    
 torch.save(torch.vstack((valuestraining, valuesvalidation)), 
 model_title + " (Training, Validation) data: bs=" + str(bs)+", nbatches="+str(nbatches)+", length="+str(samplelength)+").pt")
 
-
-valuestraining[valuestraining <= -1000] = -1000
-valuesvalidation[valuesvalidation <= -1000] = -1000
-not_nan = torch.logical_not(torch.logical_or( torch.isnan(valuestraining),torch.isnan(valuesvalidation)))
-
-valuestraining = valuestraining[not_nan]
-valuesvalidation = valuesvalidation[not_nan]
-
 # create a figure and axis object
+plt.figure()
 fig, ax = plt.subplots()
 
 # plot a histogram of the first set of values with 20 bins
@@ -211,6 +179,7 @@ ax.set_title(model_title + " Histogram (bs=" + str(bs)+", nbatches="+str(nbatche
 # show the plot
 
 plt.savefig(model_title + " Histogram (bs=" + str(bs)+", nbatches="+str(nbatches)+", length="+str(samplelength)+").png")
+
 
 # %%
 from sklearn.metrics import roc_curve, auc
@@ -232,6 +201,7 @@ fpr, tpr, thresholds = roc_curve(y_true, y_scores)
 roc_auc = auc(fpr, tpr)
 
 # Plot the ROC curve
+plt.figure()
 plt.plot(fpr, tpr, color='darkorange', label='ROC curve (area = %0.2f)' % roc_auc)
 plt.plot([0, 1], [0, 1], color='navy', linestyle='--')
 plt.xlim([0.0, 1.0])
