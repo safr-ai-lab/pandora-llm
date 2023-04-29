@@ -17,7 +17,7 @@ from common_code import *
 # In[2]:
 
 
-model_title = "pythia-160M-deduped"
+model_title = "pythia-70M-deduped"
 
 n_new_models = 5 
 noise_variance =  0.01
@@ -131,8 +131,8 @@ validation = compare_models(model, n_new_models, noise_variance, validation_data
 train_flat = training.flatten(start_dim=1)
 valid_flat = validation.flatten(start_dim=1)
 
-train_diff = train_flat[0,:]-train_flat[1:,:].mean(dim=0)#/train_flat[1:,:].std(dim=0)
-valid_diff = valid_flat[0,:]-valid_flat[1:,:].mean(dim=0)#/ valid_flat[1:,:].std(dim=0)
+train_diff = train_flat[0,:]-train_flat[1:,:].mean(dim=0)
+valid_diff = valid_flat[0,:]-valid_flat[1:,:].mean(dim=0)
 
 
 # In[11]:
