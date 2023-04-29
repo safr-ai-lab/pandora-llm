@@ -17,24 +17,6 @@ def mem_stats():
           f"Allocated Memory: {a:.2f} GB ({(100*(a/t)):.2f}%)\n"
           f"Percent of Reserved Allocated: {(100*(a+1e-9)/(r+1e-9)):.2f}%\n")
 
-
-## Collate functions for loading dataset
-def collate_fn(batch):
-    tokens = [tokenizer.encode(example["text"], return_tensors="pt", truncation=True) for example in batch]
-    max_length = max([t.size(1) for t in tokens])
-    tokens_padded = [torch.cat([t, t.new_zeros(t.size(0), max_length - t.size(1))], dim=1) for t in tokens]
-    tokens_padded = torch.cat(tokens_padded, dim=0)
-    return tokens_padded
-
-def collate_already_encoded(batch):
-    tokens = batch
-    max_length = max([len(t['tokens']) for t in tokens])
-    tokens_padded = torch.zeros((len(tokens),max_length),dtype=torch.int)
-    for i in range(len(tokens)):
-        tokens_padded[i,:] = torch.Tensor(tokens[i]['tokens'])
-    return tokens_padded
-
-
 def compute_input_ids_cross_entropy(model, input_ids):
   mask  = (input_ids > 0).detach()                                     
 
@@ -87,44 +69,6 @@ def compute_dataloader_cross_entropy(dataloader, nbatches, bs, device, model, sa
             print()
     return cross_entropy
 
-
-
-def plot_histogram(train_perplexity, val_perplexity, show_plot = True, save_plot=False, plot_name="plot.png"):
-    
-    # generate two sets of random values
-    with torch.no_grad():
-        valuestraining   = torch.flatten(train_perplexity) 
-        valuesvalidation = torch.flatten(val_perplexity)
-
-    ## Remove nan values (usually in validation set, i.e. really low prob)
-    notnan = torch.logical_and(~valuestraining.isnan(), ~valuesvalidation.isnan())
-    valuestraining = valuestraining[notnan]
-    valuesvalidation = valuesvalidation[notnan]
-
-    # create a figure and axis object
-    fig, ax = plt.subplots()
-
-    # plot a histogram of the first set of values with 20 bins
-    ax.hist(valuestraining, bins=20, alpha=0.5, label='training')
-
-    # plot a histogram of the second set of values with 20 bins
-    ax.hist(valuesvalidation, bins=20, alpha=0.5, label='validation')
-
-    # add a legend to the plot
-    ax.legend(loc='upper right')
-
-    # add labels and a title to the plot
-    ax.set_xlabel('Value')
-    ax.set_ylabel('Frequency')
-    ax.set_title('Histogram of Two Classes of Values')
-
-    # show the plot
-    if show_plot:
-        plt.show()
-    if save_plot:
-        plt.savefig(plot_name)
-
-
 def plot_hist(train_perplexity, val_perplexity, show_plot = True, save_plot=False, plot_title = "Histogram", plot_name="hist.png"):
     
     # generate two sets of random values
@@ -155,12 +99,12 @@ def plot_hist(train_perplexity, val_perplexity, show_plot = True, save_plot=Fals
     ax.set_title(plot_title)
 
     # show the plot
-    if show_plot:
-        plt.show()
     if save_plot:
         plt.savefig(plot_name)
+    if show_plot:
+        plt.show()
 
-def plot_ROC(train_perplexity, val_perplexity, show_plot = True, save_plot = False, log_scale = False, plot_title = "ROC plot", plot_name = "ROC curve.png"):
+def plot_ROC(train_diff, valid_diff, show_plot = True, save_plot = False, log_scale = False, plot_title = "ROC plot", plot_name = "ROC curve.png"):
     import matplotlib.pyplot as plt
     import numpy as np
 
@@ -191,7 +135,7 @@ def plot_ROC(train_perplexity, val_perplexity, show_plot = True, save_plot = Fal
     # Plot the ROC curve
     plt.figure()
     if log_scale:
-        plot.loglog(fpr, tpr, color='darkorange', label='ROC curve (area = %0.2f)' % roc_auc)
+        plt.loglog(fpr, tpr, color='darkorange', label='ROC curve (area = %0.2f)' % roc_auc)
     else:
         plt.plot(fpr, tpr, color='darkorange', label='ROC curve (area = %0.2f)' % roc_auc)
 
@@ -203,7 +147,7 @@ def plot_ROC(train_perplexity, val_perplexity, show_plot = True, save_plot = Fal
     plt.legend(loc="lower right")
     plt.title(plot_title)
 
-    if show_plot:
-        plt.show()
     if save_plot:
         plt.savefig(plot_name)
+    if show_plot:
+        plt.show()
