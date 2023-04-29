@@ -71,15 +71,14 @@ mem_stats()
 
 # %%
 ## Dataloader 
-torch.manual_seed(124)
-training_dataloader = DataLoader(training_dataset, batch_size = bs, collate_fn=collate_already_encoded, shuffle = True)
-validation_dataloader = DataLoader(validation_dataset, batch_size = bs, collate_fn=collate_fn, shuffle = True)
+training_dataloader = DataLoader(training_dataset, batch_size = bs, collate_fn=collate_already_encoded)
+validation_dataloader = DataLoader(validation_dataset, batch_size = bs, collate_fn=collate_fn)
 mem_stats()
 
 # %%
 train_cross_entropy = compute_dataloader_cross_entropy(training_dataloader, nbatches, bs, device, model, samplelength)
 val_cross_entropy = compute_dataloader_cross_entropy(validation_dataloader, nbatches, bs, device, model, samplelength)
-
+mem_stats()
 
 ## Save outputs
 with torch.no_grad():
@@ -100,7 +99,7 @@ plot_hist(train_cross_entropy, val_cross_entropy, show_plot = True,
             plot_title = model_title + " Histogram (bs=" + str(bs)+", nbatches="+str(nbatches)+", length="+str(samplelength)+")",
             plot_name=model_title + " Histogram (bs=" + str(bs)+", nbatches="+str(nbatches)+", length="+str(samplelength)+").png")
 
-plot_ROC(train_cross_entropy, val_cross_entropy, show_plot = True, save_plot = False, log_scale = False, 
+plot_ROC(train_cross_entropy, val_cross_entropy, show_plot = True, save_plot = True, log_scale = False, 
         plot_title =model_title + " ROC (bs=" + str(bs)+", nbatches="+str(nbatches)+", length="+str(samplelength)+")", 
         plot_name = model_title + " ROC (bs=" + str(bs)+", nbatches="+str(nbatches)+", length="+str(samplelength)+").png")
 
