@@ -69,6 +69,28 @@ def compute_dataloader_cross_entropy(dataloader, nbatches, bs, device, model, sa
             print()
     return cross_entropy
 
+def compute_dataloader_cross_entropy_v2(model, dataloader, device, nbatches=None, bs=1, samplelength=None):    
+    model = model.to(device)
+    if nbatches is None:
+        cross_entropy = torch.zeros((len(dataloader), bs))
+    else:
+        cross_entropy = torch.zeros((nbatches, bs))
+    for batchno, data_x in enumerate(dataloader):
+        if nbatches is not None and batchno >= nbatches:
+            break
+        with torch.no_grad():       
+            ## Get predictions on training data 
+            data_x = data_x["input_ids"]
+            if samplelength is None:
+                data_x = data_x.to(device).detach()                  
+            else:
+                data_x = data_x[:,:samplelength].to(device).detach()
+   
+            ## Compute average log likelihood
+            cross_entropy[batchno, :] = compute_input_ids_cross_entropy(model, data_x)
+    return cross_entropy
+
+
 def plot_hist(train_perplexity, val_perplexity, show_plot = True, save_plot=False, plot_title = "Histogram", plot_name="hist.png"):
     
     # generate two sets of random values
