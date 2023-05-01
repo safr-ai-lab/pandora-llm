@@ -41,7 +41,7 @@ def compute_input_ids_cross_entropy(model, input_ids):
     # print(input_ids_without_first_token[i, :length].shape)
     # print(loss_fn(logits_without_last_token[i, :length], input_ids_without_first_token[i, :length]))
     ce_loss = loss_fn(logits_without_last_token[i, :length], input_ids_without_first_token[i, :length])
-    ans.append(ce_loss/length)
+    ans.append(ce_loss)
 
   ## Clean up 
   del outputs, logits, input_ids_without_first_token, logits_without_last_token

@@ -15,7 +15,7 @@ from common_code import *
 # %%
 model_title = "pythia-6.9B-deduped"
 bs = 8 ## batch size
-nbatches = 500 ## Number of batches to gather data on. Number of data points is bs * nbatches
+nbatches = 1000 ## Number of batches to gather data on. Number of data points is bs * nbatches
 samplelength = 50 ## How long are the sequences we take from the training and validation sets.
 print(model_title, bs, nbatches, samplelength)
 ####################################################################################
