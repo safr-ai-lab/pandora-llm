@@ -101,6 +101,36 @@ def compare_models(new_model, n_new_models, noise_variance,
       print(ind_model)
       mem_stats()
   return ans 
+  
+def compare_models_train_valid(new_model, n_new_models, noise_variance, 
+                   train_dataloader, valid_dataloader, nbatches, bs, samplelength, device):
+  
+  new_model.eval()
+  new_model.to(device)
+  train = torch.zeros((n_new_models+1, nbatches, bs))  
+  valid = torch.zeros((n_new_models+1, nbatches, bs))  
+  
+  train[0,:,:] = compute_dataloader_cross_entropy(train_dataloader, nbatches, bs, device, new_model, samplelength)
+  valid[0,:,:] = compute_dataloader_cross_entropy(valid_dataloader, nbatches, bs, device, new_model, samplelength)
+
+  for ind_model in range(1,n_new_models+1):
+    prevseed = torch.seed()
+    with torch.no_grad():
+      for param in new_model.parameters():
+          param.add_((torch.randn(param.size()) * noise_variance).to(device))
+    
+    train[ind_model,:,:] = compute_dataloader_cross_entropy(train_dataloader, nbatches, bs, device, new_model, samplelength)
+    valid[ind_model,:,:] = compute_dataloader_cross_entropy(valid_dataloader, nbatches, bs, device, new_model, samplelength)
+
+    torch.manual_seed(prevseed)
+    with torch.no_grad():
+      for param in new_model.parameters():
+          param.add_(-(torch.randn(param.size()) * noise_variance).to(device))
+
+    if ind_model % 5 == 0:
+      print(ind_model)
+      mem_stats()
+  return train, valid
 
 
 # In[6]:
@@ -119,9 +149,7 @@ validation_dataloader = DataLoader(validation_dataset, batch_size = bs, collate_
 
 # In[8]:
 
-
-training = compare_models(model, n_new_models, noise_variance, training_dataloader, nbatches, bs, samplelength, device)
-validation = compare_models(model, n_new_models, noise_variance, validation_dataloader, nbatches, bs, samplelength, device)
+training, validation = compare_models_train_valid(model, n_new_models, noise_variance, training_dataloader, validation_dataloader, nbatches, bs, samplelength, device)
 
 
 # In[10]:
