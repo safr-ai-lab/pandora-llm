@@ -10,13 +10,14 @@ import pickle
 import copy
 
 class MIA:
-    def __init__(self, model_path, model_revision=None, cache_dir=None):
+    def __init__(self, model_name, model_path, model_revision=None, cache_dir=None):
         """
         Base class for all membership inference attacks. Contains a "base" model image. 
             model_path: path to the model to be attacked
             model_revision: revision of the model to be attacked
             cache_dir: directory to cache the model
         """
+        self.model_name = model_name
         self.model_path = model_path
         self.model_revision = model_revision
         self.cache_dir = cache_dir
@@ -26,7 +27,7 @@ class LOSS(MIA):
     LOSS thresholding attack (vs. pre-training)
     """
     def __init__(self,**kwargs):
-        super().__init__(kwargs)
+        super().__init__(**kwargs)
         self.train_cross_entropy = None
         self.val_cross_entropy = None
 
@@ -67,14 +68,15 @@ class LOSS(MIA):
 
 class MoPe(MIA):
     """
-    LOSS thresholding attack (vs. pre-training)
+    Model Perturbation attack thresholding attack (vs. pre-training)
     """
     def __init__(self,**kwargs):
-        super().__init__(kwargs)
-        self.model = GPTNeoXForCausalLM.from_pretrained(model_path=self.model_path, revision=self.model_revision, cache_dir=self.cache_dir)
+        super().__init__(**kwargs)
+        self.model = GPTNeoXForCausalLM.from_pretrained(self.model_name, revision=self.model_revision, cache_dir=self.cache_dir)
+        tokenizer = AutoTokenizer.from_pretrained(self.model_name, revision=self.model_revision, cache_dir=self.cache_dir)
+
         self.model.half()
         self.model.eval()
-
         self.new_models = []
 
     def delete_new_models(self):
@@ -89,28 +91,28 @@ class MoPe(MIA):
         mem_stats()
 
     def generate_new_models(self):
-        dummy_model = copy.deepcopy(model)
-        dummy_model.to(device)        
+        dummy_model = copy.deepcopy(self.model)
+        dummy_model.to(self.device)        
         self.new_models = []
 
         with torch.no_grad():
-            for ind_model in range(0, self.config_dict["n_new_models"]):        
+            for ind_model in range(0, self.n_new_models):        
                 ## Perturbed model
                 prevseed = torch.seed()
                 for param in dummy_model.parameters():
-                    param.add_((torch.randn(param.size()) * self.config_dict["noise_variance"]).to(self.config_dict["device"]))
+                    param.add_((torch.randn(param.size()) * self.noise_variance).to(self.device))
                 
                 ## Move to cpu and add it
                 dummy_model.to("cpu")
-                self.new_models.append(copy.deepcopy(dummy_model.copy()))
-                dummy_model.to(self.config_dict["device"])
+                self.new_models.append(copy.deepcopy(dummy_model))
+                dummy_model.to(self.device)
 
                 ## Undo changes to model
                 torch.manual_seed(prevseed)
                 for param in dummy_model.parameters():
-                    param.add_(-(torch.randn(param.size()) * self.config_dict["noise_variance"]).to(self.config_dict["device"]))
+                    param.add_(-(torch.randn(param.size()) * self.noise_variance).to(self.device))
                 
-                print("Memory usage after creating new model #%d", ind_model)
+                print("Memory usage after creating new model #%d" % ind_model)
                 mem_stats()
         
         del dummy_model 
@@ -134,14 +136,14 @@ class MoPe(MIA):
         self.training_dl = config_dict["training_dl"]
         self.validation_dl = config_dict["validation_dl"]
         self.n_new_models = config_dict["n_new_models"]
-        self.noise_variance = config_dict["noises_variance"]
+        self.noise_variance = config_dict["noise_variance"]
         self.bs = config_dict["bs"]
         self.samplelength = config_dict["samplelength"]
         self.nbatches = config_dict["nbatches"]
         self.device = config_dict["device"]
 
         ## Delete new models if we are supplied with noise_variance and n_new_models
-        if self.n_new_models != None and self.noise_variance != None:
+        if self.noise_variance != None and self.n_new_models != None:
             self.delete_new_models()
             self.generate_new_models()
 
@@ -217,7 +219,7 @@ class LoRa(MIA):
 
 class LiRa(MIA):
     def __init__(self,**kwargs):
-        super().__init__(kwargs)
+        super().__init__(**kwargs)
 
     def inference_ft(self, config_dict): # LiRa with fine-tuning
         pass

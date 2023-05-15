@@ -15,14 +15,14 @@ def load_val_pile(percentage=0.025, seed=229, num_splits=2):
 
     return splits
 
-def collate_fn_marvin(batch):
+def collate_fn_mope(tokenizer, batch):
     tokens = [tokenizer.encode(example["text"], return_tensors="pt", truncation=True) for example in batch]
     max_length = max([t.size(1) for t in tokens])
     tokens_padded = [torch.cat([t, t.new_zeros(t.size(0), max_length - t.size(1))], dim=1) for t in tokens]
     tokens_padded = torch.cat(tokens_padded, dim=0)
     return tokens_padded
 
-def collate_already_encoded_marvin(batch):
+def collate_already_encoded_mope(tokenizer, batch):
     tokens = batch
     max_length = max([len(t['tokens']) for t in tokens])
     tokens_padded = torch.zeros((len(tokens),max_length),dtype=torch.int)
