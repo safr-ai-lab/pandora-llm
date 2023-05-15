@@ -10,13 +10,15 @@ from attack_utils import *
 from dataset_utils import *
 from Attack import *
 
+# LOSS
+
+# Model Init 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
-
 mod_size = "70m"
-
 model_title = f"pythia-{mod_size}-deduped"
 model_name = "EleutherAI/" + model_title
+save_path = "./"+ model_title + "_LOSS"
 model_revision = "step143000"
 model_cache_dir = "./"+ model_title +"/"+model_revision
 
@@ -29,52 +31,27 @@ model.half()
 model.eval()
 model.to(device)
 
-model.save_pretrained()
+model.save_pretrained(save_path)
 
-LoRa()
+# Data Init
+training_dataset = load_dataset("EleutherAI/pile-deduped-pythia-random-sampled", split="train")
+validation_dataset = load_val_pile(percentage=0.025, seed=229, num_splits=1)
 
+training_dataloader = DataLoader(training_dataset, batch_size = bs, collate_fn=collate_already_encoded_marvin)
+validation_dataloader = DataLoader(validation_dataset, batch_size = bs, collate_fn=collate_fn_marvin)
+mem_stats()
 
-tokenizer = AutoTokenizer.from_pretrained(
-  model_name,
-  revision=model_revision,
-  cache_dir=model_cache_dir,
-)
+LOSSer = LOSS(model_path=save_path, model_revision=model_revision, cache_dir=model_cache_dir)
+configs = {
+    "training_dl": training_dataloader,
+    "validation_dl": validation_dataloader,
+    "bs" : 8,
+    "nbatches": 1000,
+    "samplelength": 50,
+    "device": device
+}
 
-train_dataset, val_dataset = load_val_pile(percentage=0.025,seed=229,num_splits=2)
+LOSSer.inference(configs)
 
-## Collate functions for loading dataset
-def collate_fn(batch):
-    tokens = [tokenizer.encode(example, return_tensors="pt", truncation=True,max_length=model.config.max_position_embeddings) for example in batch]
-    max_length = max([t.size(1) for t in tokens])
-    tokens_padded = [torch.cat([t, t.new_zeros(t.size(0), max_length - t.size(1))], dim=1) for t in tokens]
-    tokens_padded = torch.cat(tokens_padded, dim=0)
-    return {
-        "input_ids":tokens_padded,
-        "labels":tokens_padded,
-        "attention_mask": torch.tensor(tokens_padded>0,dtype=int)
-    }
-def train(model, train_dataset, val_dataset, collate_fn, batch_size, epochs):
-    model.config.use_cache = False
-    training_args = TrainingArguments(output_dir="fine-tuning",
-                                        do_train=True,
-                                        do_eval=True,
-                                        num_train_epochs=epochs,
-                                        per_device_train_batch_size=batch_size,
-                                        per_device_eval_batch_size=batch_size,
-                                        evaluation_strategy="epoch",
-                                        logging_strategy="epoch",
-                                        save_strategy="epoch",
-                                        gradient_accumulation_steps=1,
-                                        gradient_checkpointing=False,
-                                        load_best_model_at_end = True,
-                                        optim="adafactor",
-                                        )
-    trainer = Trainer(model=model,
-                    args=training_args,
-                    train_dataset=train_dataset,
-                    eval_dataset=val_dataset,
-                    tokenizer=tokenizer,
-                    data_collator=collate_fn,
-                    )
-    trainer.train()
-    return model
+plot_ROC(LOSSer.train_cross_entropy, LOSSer.val_cross_entropy, show_plot = True, save_plot = True, log_scale = False, 
+        plot_title = "LOSS Test", plot_name = "LOSS_test", plot_dir = "./", plot_format = "png")

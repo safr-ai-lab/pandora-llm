@@ -92,6 +92,32 @@ def compute_dataloader_cross_entropy_v2(model, dataloader, device, nbatches=None
             cross_entropy[batchno, :] = compute_input_ids_cross_entropy(model, data_x)
     return cross_entropy
 
+def compare_models(new_model, n_new_models, noise_variance, 
+                   dataloader, nbatches, bs, samplelength, device):
+  
+    new_model.eval()
+    new_model.to(device)
+    ans = torch.zeros((n_new_models+1, nbatches, bs))  
+  
+    ans[0,:,:] = compute_dataloader_cross_entropy(dataloader, nbatches, bs, device, new_model, samplelength)
+
+    for ind_model in range(1,n_new_models+1):
+        prevseed = torch.seed()
+        with torch.no_grad():
+            for param in new_model.parameters():
+                param.add_((torch.randn(param.size()) * noise_variance).to(device))
+    
+    ans[ind_model,:,:] = compute_dataloader_cross_entropy(dataloader, nbatches, bs, device, new_model, samplelength)
+
+    torch.manual_seed(prevseed)
+    with torch.no_grad():
+        for param in new_model.parameters():
+            param.add_(-(torch.randn(param.size()) * noise_variance).to(device))
+
+    if ind_model % 5 == 0:
+        print(ind_model)
+        mem_stats()
+    return ans 
 
 def plot_hist(train_perplexity, val_perplexity, show_plot = True, save_plot=False, plot_title = "Histogram", plot_name="hist.png"):
     
