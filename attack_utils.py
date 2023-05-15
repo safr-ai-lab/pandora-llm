@@ -52,35 +52,13 @@ def compute_input_ids_cross_entropy(model, input_ids):
 
   return torch.Tensor(ans)
 
-def compute_dataloader_cross_entropy(model, dataloader, nbatches, bs, device, samplelength):    
-    model.to(device)
-    model.half()
-    model.eval()
-
-    cross_entropy = torch.zeros((nbatches, bs))
-    for batchno, batch in enumerate(dataloader):
-        data_x = batch["input_ids"]
-        if batchno >= nbatches:
-            break
-        with torch.no_grad():       
-            ## Get predictions on training data                       
-            data_x = data_x[:,:samplelength].to(device).detach()
-   
-            ## Compute average log likelihood
-            cross_entropy[batchno, :] = compute_input_ids_cross_entropy(model, data_x)
-
-        if batchno % 50 == 0:
-            print("batch no. ", batchno)  
-            print("Memory after evaluation")
-            mem_stats()
-            print()
-    return cross_entropy
-
-def compute_dataloader_cross_entropy_v2(model, dataloader, device, nbatches=None, bs=1, samplelength=None):    
+def compute_dataloader_cross_entropy(model, dataloader, device, nbatches=None, bs=1, samplelength=None):    
     '''
     Computes dataloader cross entropy with additional support for specifying the full data loader and full sample length
     '''
     model = model.to(device)
+    model.half()
+    model.eval()
     if nbatches is None:
         cross_entropy = torch.zeros((len(dataloader), bs))
     else:
