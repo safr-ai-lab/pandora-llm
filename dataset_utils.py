@@ -78,14 +78,3 @@ def collate_already_encoded_mope(tokenizer, batch):
     for i in range(len(tokens)):
         tokens_padded[i,:] = torch.Tensor(tokens[i]['tokens'])
     return tokens_padded
-
-# def collate_fn(batch):
-#     tokens = [tokenizer.encode(example, return_tensors="pt", truncation=True,max_length=model.config.max_position_embeddings) for example in batch]
-#     max_length = max([t.size(1) for t in tokens])
-#     tokens_padded = [torch.cat([t, t.new_zeros(t.size(0), max_length - t.size(1))], dim=1) for t in tokens]
-#     tokens_padded = torch.cat(tokens_padded, dim=0)
-#     return {
-#         "input_ids":tokens_padded,
-#         "labels":tokens_padded,
-#         "attention_mask": torch.tensor(tokens_padded>0,dtype=int)
-#     }
