@@ -76,6 +76,9 @@ def compute_dataloader_cross_entropy(model, dataloader, nbatches, bs, device, sa
     return cross_entropy
 
 def compute_dataloader_cross_entropy_v2(model, dataloader, device, nbatches=None, bs=1, samplelength=None):    
+    '''
+    Computes dataloader cross entropy with additional support for specifying the full data loader and full sample length
+    '''
     model = model.to(device)
     if nbatches is None:
         cross_entropy = torch.zeros((len(dataloader), bs))
