@@ -52,7 +52,11 @@ def compute_input_ids_cross_entropy(model, input_ids):
 
   return torch.Tensor(ans)
 
-def compute_dataloader_cross_entropy(dataloader, nbatches, bs, device, model, samplelength):    
+def compute_dataloader_cross_entropy(model, dataloader, nbatches, bs, device, samplelength):    
+    model.to(device)
+    model.half()
+    model.eval()
+
     cross_entropy = torch.zeros((nbatches, bs))
     for batchno, data_x in enumerate(dataloader):
         if batchno >= nbatches:
@@ -107,12 +111,12 @@ def compare_models(new_model, n_new_models, noise_variance,
             for param in new_model.parameters():
                 param.add_((torch.randn(param.size()) * noise_variance).to(device))
     
-    ans[ind_model,:,:] = compute_dataloader_cross_entropy(dataloader, nbatches, bs, device, new_model, samplelength)
+        ans[ind_model,:,:] = compute_dataloader_cross_entropy(dataloader, nbatches, bs, device, new_model, samplelength)
 
-    torch.manual_seed(prevseed)
-    with torch.no_grad():
-        for param in new_model.parameters():
-            param.add_(-(torch.randn(param.size()) * noise_variance).to(device))
+        torch.manual_seed(prevseed)
+        with torch.no_grad():
+            for param in new_model.parameters():
+                param.add_(-(torch.randn(param.size()) * noise_variance).to(device))
 
     if ind_model % 5 == 0:
         print(ind_model)

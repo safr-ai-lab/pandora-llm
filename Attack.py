@@ -7,6 +7,7 @@ from typing import Any, Callable, List, Optional, Tuple, Union
 from dataset_utils import *
 from attack_utils import *
 import pickle
+import copy
 
 class MIA:
     def __init__(self, model_path, model_revision=None, cache_dir=None):
@@ -45,8 +46,8 @@ class LOSS(MIA):
         validation_dl = config_dict["validation_dl"]
         model = GPTNeoXForCausalLM.from_pretrained(model_path=self.model_path, revision=self.model_revision, cache_dir=self.cache_dir).to(config_dict["device"])
         
-        self.train_cross_entropy = compute_dataloader_cross_entropy(self.config_dict["training_dl"], config_dict["nbatches"], config_dict["bs"], config_dict["device"], model, config_dict["samplelength"]) 
-        self.val_cross_entropy = compute_dataloader_cross_entropy(self.config_dict["validation_dl"], config_dict["nbatches"], config_dict["bs"], config_dict["device"], model, config_dict["samplelength"]) 
+        self.train_cross_entropy = compute_dataloader_cross_entropy(model, self.config_dict["training_dl"], config_dict["nbatches"], config_dict["bs"], config_dict["device"], config_dict["samplelength"]) 
+        self.val_cross_entropy = compute_dataloader_cross_entropy(model, self.config_dict["validation_dl"], config_dict["nbatches"], config_dict["bs"], config_dict["device"], config_dict["samplelength"]) 
 
     # def plot_roc already in attack_utils.py
 
@@ -70,7 +71,52 @@ class MoPe(MIA):
     """
     def __init__(self,**kwargs):
         super().__init__(kwargs)
-    
+        self.model = GPTNeoXForCausalLM.from_pretrained(model_path=self.model_path, revision=self.model_revision, cache_dir=self.cache_dir)
+        self.model.half()
+        self.model.eval()
+
+        self.new_models = []
+
+    def delete_new_models(self):
+        print("Memory usage before cleaning:")
+        mem_stats()
+        for new_model in self.new_models:
+            del new_model
+        torch.cuda.empty_cache()
+        torch.cuda.synchronize()
+        
+        print("Memory usage after cleaning:")
+        mem_stats()
+
+    def generate_new_models(self):
+        dummy_model = copy.deepcopy(model)
+        dummy_model.to(device)        
+        self.new_models = []
+
+        with torch.no_grad():
+            for ind_model in range(0, self.config_dict["n_new_models"]):        
+                ## Perturbed model
+                prevseed = torch.seed()
+                for param in dummy_model.parameters():
+                    param.add_((torch.randn(param.size()) * self.config_dict["noise_variance"]).to(self.config_dict["device"]))
+                
+                ## Move to cpu and add it
+                dummy_model.to("cpu")
+                self.new_models.append(copy.deepcopy(dummy_model.copy()))
+                dummy_model.to(self.config_dict["device"])
+
+                ## Undo changes to model
+                torch.manual_seed(prevseed)
+                for param in dummy_model.parameters():
+                    param.add_(-(torch.randn(param.size()) * self.config_dict["noise_variance"]).to(self.config_dict["device"]))
+                
+                print("Memory usage after creating new model #%d", ind_model)
+                mem_stats()
+        
+        del dummy_model 
+        torch.cuda.empty_cache()
+        torch.cuda.synchronize()
+
     def inference(self, config_dict):
         """
         Perform MIA
@@ -82,15 +128,37 @@ class MoPe(MIA):
                 bs
                 samplelength
                 nbatches
+                device
         """
         self.config_dict = config_dict
-        model = GPTNeoXForCausalLM.from_pretrained(model_path=self.model_path, revision=self.model_revision, cache_dir=self.cache_dir).to(config_dict["device"])
+        self.training_dl = config_dict["training_dl"]
+        self.validation_dl = config_dict["validation_dl"]
+        self.n_new_models = config_dict["n_new_models"]
+        self.noise_variance = config_dict["noises_variance"]
+        self.bs = config_dict["bs"]
+        self.samplelength = config_dict["samplelength"]
+        self.nbatches = config_dict["nbatches"]
+        self.device = config_dict["device"]
 
-        self.training_res = compare_models(model, self.config_dict["n_new_models"], self.config_dict["noise_variance"], 
-                                       self.config_dict["training_dl"], config_dict["nbatches"], config_dict["bs"], config_dict["samplelength"], config_dict["device"])
-        self.validation_res = compare_models(model, self.config_dict["n_new_models"], self.config_dict["noise_variance"],
-                                            self.config_dict["validation_dl"], config_dict["nbatches"], config_dict["bs"], config_dict["samplelength"], config_dict["device"])
+        ## Delete new models if we are supplied with noise_variance and n_new_models
+        if self.n_new_models != None and self.noise_variance != None:
+            self.delete_new_models()
+            self.generate_new_models()
+
+        ## Get results from training and validation batchloaders        
+        self.training_res = torch.zeros((self.n_new_models + 1, self.nbatches, self.bs))  
+        self.validation_res = torch.zeros((self.n_new_models + 1, self.nbatches, self.bs))  
         
+        args = [self.nbatches, self.bs, self.device, self.samplelength]
+
+        self.training_res[0,:,:] = compute_dataloader_cross_entropy(*([self.model, self.training_dl] + args))
+        self.validation_res[0,:,:] = compute_dataloader_cross_entropy(*([self.model, self.validation_dl] + args))
+
+        for ind_model in range(1,n_new_models+1):
+            self.training_res[ind_model,:,:] = compute_dataloader_cross_entropy(*([self.new_models[ind_model-1], self.training_dl] + args))
+            self.validation_res[ind_model,:,:] = compute_dataloader_cross_entropy(*([self.new_models[ind_model-1], self.validation_dl] + args))
+
+
     def save(self, title):
         train_flat = self.training_res.flatten(start_dim=1)
         valid_flat = self.validation_res.flatten(start_dim=1)
@@ -104,6 +172,8 @@ class MoPe(MIA):
                                       + ", bs=" + str(self.config_dict["bs"])
                                       +", nbatches="+str(self.config_dict["nbatches"])
                                       +", length="+str(self.config_dict["samplelength"])+").pt")
+
+
 
 class LoRa(MIA):
     def __init__(self,**kwargs):
