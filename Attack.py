@@ -26,15 +26,15 @@ class LOSS(MIA):
     """
     LOSS thresholding attack (vs. pre-training)
     """
-    def __init__(self,**kwargs):
-        super().__init__(**kwargs)
+    def __init__(self,*args,**kwargs):
+        super().__init__(*args, **kwargs)
         self.train_cross_entropy = None
         self.val_cross_entropy = None
 
-    def inference(self, config_dict):
+    def inference(self, config):
         """
         Perform MIA
-            config_dict: dictionary of configuration parameters
+            config: dictionary of configuration parameters
                 training_dl
                 validation_dl
                 bs
@@ -42,13 +42,12 @@ class LOSS(MIA):
                 samplelength
                 nbatches
         """
-        self.config = config_dict
-        training_dl = config_dict["training_dl"]
-        validation_dl = config_dict["validation_dl"]
-        model = GPTNeoXForCausalLM.from_pretrained(model_path=self.model_path, revision=self.model_revision, cache_dir=self.cache_dir).to(config_dict["device"])
+        self.config = config
+        print(self.model_path,self.model_revision,self.cache_dir)
+        model = GPTNeoXForCausalLM.from_pretrained(self.model_path, revision=self.model_revision, cache_dir=self.cache_dir).to(config["device"])
         
-        self.train_cross_entropy = compute_dataloader_cross_entropy(model, self.config_dict["training_dl"], config_dict["nbatches"], config_dict["bs"], config_dict["device"], config_dict["samplelength"]) 
-        self.val_cross_entropy = compute_dataloader_cross_entropy(model, self.config_dict["validation_dl"], config_dict["nbatches"], config_dict["bs"], config_dict["device"], config_dict["samplelength"]) 
+        self.train_cross_entropy = compute_dataloader_cross_entropy(self.config_dict["training_dl"], config_dict["nbatches"], config_dict["bs"], config_dict["device"], model, config_dict["samplelength"]) 
+        self.val_cross_entropy = compute_dataloader_cross_entropy(self.config_dict["validation_dl"], config_dict["nbatches"], config_dict["bs"], config_dict["device"], model, config_dict["samplelength"]) 
 
     # def plot_roc already in attack_utils.py
 
@@ -156,7 +155,7 @@ class MoPe(MIA):
         self.training_res[0,:,:] = compute_dataloader_cross_entropy(*([self.model, self.training_dl] + args))
         self.validation_res[0,:,:] = compute_dataloader_cross_entropy(*([self.model, self.validation_dl] + args))
 
-        for ind_model in range(1,n_new_models+1):
+        for ind_model in range(1,self.n_new_models+1):
             self.training_res[ind_model,:,:] = compute_dataloader_cross_entropy(*([self.new_models[ind_model-1], self.training_dl] + args))
             self.validation_res[ind_model,:,:] = compute_dataloader_cross_entropy(*([self.new_models[ind_model-1], self.validation_dl] + args))
 
