@@ -44,20 +44,10 @@ class LOSS(MIA):
                 nbatches
         """
         self.config = config
-<<<<<<< HEAD
-        self.model.to(config["device"])
-
-        args = [self.config["device"], self.config["nbatches"], self.config["bs"], self.config["samplelength"]]
-
-        self.train_cross_entropy = compute_dataloader_cross_entropy(*([self.model,  self.config["training_dl"]] + args))
-        self.val_cross_entropy = compute_dataloader_cross_entropy(*([self.model, self.config["validation_dl"]] + args))
-        self.model.to("cpu")
-=======
         model = GPTNeoXForCausalLM.from_pretrained(self.model_path, revision=self.model_revision, cache_dir=self.cache_dir).to(config["device"])
         
         self.train_cross_entropy = compute_dataloader_cross_entropy(model,self.config["training_dl"], self.config["device"], self.config["nbatches"], self.config["bs"], self.config["samplelength"]) 
         self.val_cross_entropy = compute_dataloader_cross_entropy(model, self.config["validation_dl"], self.config["device"], self.config["nbatches"], self.config["bs"], self.config["samplelength"]) 
->>>>>>> ca3880c8c9f4377b0b4eef888d3157b6f1abad3b
 
     # def plot_roc already in attack_utils.py
 
@@ -79,11 +69,6 @@ class MoPe(MIA):
     """
     Model Perturbation attack thresholding attack (vs. pre-training)
     """
-<<<<<<< HEAD
-    def __init__(self,**kwargs):
-        super().__init__(**kwargs)
-        
-=======
     def __init__(self,*args,**kwargs):
         super().__init__(*args, **kwargs)
         self.model = GPTNeoXForCausalLM.from_pretrained(self.model_name, revision=self.model_revision, cache_dir=self.cache_dir)
@@ -91,7 +76,6 @@ class MoPe(MIA):
 
         self.model.half()
         self.model.eval()
->>>>>>> ca3880c8c9f4377b0b4eef888d3157b6f1abad3b
         self.new_models = []
 
     def delete_new_models(self):
