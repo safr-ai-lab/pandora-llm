@@ -10,14 +10,13 @@ import pickle
 import copy
 
 class MIA:
-    def __init__(self, model_name, model_path, model_revision=None, cache_dir=None):
+    def __init__(self, model_path, model_revision=None, cache_dir=None):
         """
         Base class for all membership inference attacks. Contains a "base" model image. 
             model_path: path to the model to be attacked
             model_revision: revision of the model to be attacked
             cache_dir: directory to cache the model
         """
-        self.model_name = model_name
         self.model_path = model_path
         self.model_revision = model_revision
         self.cache_dir = cache_dir
@@ -31,6 +30,8 @@ class LOSS(MIA):
         self.train_cross_entropy = None
         self.val_cross_entropy = None
 
+        self.model = GPTNeoXForCausalLM.from_pretrained(self.model_path, revision=self.model_revision, cache_dir=self.cache_dir)
+
     def inference(self, config):
         """
         Perform MIA
@@ -43,10 +44,13 @@ class LOSS(MIA):
                 nbatches
         """
         self.config = config
-        model = GPTNeoXForCausalLM.from_pretrained(self.model_path, revision=self.model_revision, cache_dir=self.cache_dir).to(config["device"])
-        
-        self.train_cross_entropy = compute_dataloader_cross_entropy(self.config["training_dl"], self.config["nbatches"], self.config["bs"], self.config["device"], model, self.config["samplelength"]) 
-        self.val_cross_entropy = compute_dataloader_cross_entropy(self.config["validation_dl"], self.config["nbatches"], self.config["bs"], self.config["device"], model, self.config["samplelength"]) 
+        self.model.to(config["device"])
+
+        args = [self.config["device"], self.config["nbatches"], self.config["bs"], self.config["samplelength"]]
+
+        self.train_cross_entropy = compute_dataloader_cross_entropy(*([self.model,  self.config["training_dl"]] + args))
+        self.val_cross_entropy = compute_dataloader_cross_entropy(*([self.model, self.config["validation_dl"]] + args))
+        self.model.to("cpu")
 
     # def plot_roc already in attack_utils.py
 
@@ -70,11 +74,7 @@ class MoPe(MIA):
     """
     def __init__(self,**kwargs):
         super().__init__(**kwargs)
-        self.model = GPTNeoXForCausalLM.from_pretrained(self.model_name, revision=self.model_revision, cache_dir=self.cache_dir)
-        tokenizer = AutoTokenizer.from_pretrained(self.model_name, revision=self.model_revision, cache_dir=self.cache_dir)
-
-        self.model.half()
-        self.model.eval()
+        
         self.new_models = []
 
     def delete_new_models(self):
@@ -140,6 +140,12 @@ class MoPe(MIA):
         self.nbatches = config_dict["nbatches"]
         self.device = config_dict["device"]
 
+        if self.model == None:
+            self.model = GPTNeoXForCausalLM.from_pretrained(self.model_path, revision=self.model_revision, cache_dir=self.cache_dir)
+        
+        self.model.half()
+        self.model.eval()
+
         ## Delete new models if we are supplied with noise_variance and n_new_models
         if self.noise_variance != None and self.n_new_models != None:
             self.delete_new_models()
@@ -149,7 +155,7 @@ class MoPe(MIA):
         self.training_res = torch.zeros((self.n_new_models + 1, self.nbatches, self.bs))  
         self.validation_res = torch.zeros((self.n_new_models + 1, self.nbatches, self.bs))  
         
-        args = [self.nbatches, self.bs, self.device, self.samplelength]
+        args = [self.device, self.nbatches, self.bs, self.samplelength]
 
         self.training_res[0,:,:] = compute_dataloader_cross_entropy(*([self.model, self.training_dl] + args))
         self.validation_res[0,:,:] = compute_dataloader_cross_entropy(*([self.model, self.validation_dl] + args))
