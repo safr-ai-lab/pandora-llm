@@ -9,29 +9,17 @@ from transformers.optimization import AdamW
 from attack_utils import *
 from dataset_utils import *
 from Attack import *
+device = "cuda" if torch.cuda.is_available() else "cpu"
 
 # LOSS
 
 # Model Init 
-device = "cuda" if torch.cuda.is_available() else "cpu"
 
 mod_size = "70m"
 model_title = f"pythia-{mod_size}-deduped"
 model_name = "EleutherAI/" + model_title
-save_path = "./"+ model_title + "_LOSS"
 model_revision = "step143000"
 model_cache_dir = "./"+ model_title +"/"+model_revision
-
-model = GPTNeoXForCausalLM.from_pretrained(
-  model_name,
-  revision=model_revision,
-  cache_dir=model_cache_dir,
-)
-model.half()
-model.eval()
-model.to(device)
-
-model.save_pretrained(save_path)
 
 # Data Init
 training_dataset = load_dataset("EleutherAI/pile-deduped-pythia-random-sampled", split="train")

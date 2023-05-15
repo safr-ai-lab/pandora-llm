@@ -1,16 +1,54 @@
 from datasets import load_dataset
 import torch
+from transformers import AutoTokenizer
 
-def load_val_pile(percentage=0.025, seed=229, num_splits=2):
+def load_train_pile_random(number=1000, percentage=None, seed=229, num_splits=2):
+    '''
+    Loads the random sample from training pile
+    '''
+    if num_splits % 2 !=0:
+        print(f"Warning! Shadow models requires an even number of splits! You specified {num_splits} splits.")
+
+    dataset = load_dataset("EleutherAI/pile-deduped-pythia-random-sampled",split="train").shuffle(seed=seed)
+    clip_len = number if percentage is None else int(len(dataset)*percentage)
+    if not (1<=clip_len<=len(dataset)):
+        raise IndexError(f"Number or percentage out of bounds. You specified {clip_len} samples but there are only {len(dataset)} samples.")
+    dataset = dataset.select(range(clip_len))
+    tokenizer = AutoTokenizer.from_pretrained("EleutherAI/pythia-70m-deduped")
+    dataset = dataset.map(lambda x: {"text": tokenizer.decode(x["tokens"])},remove_columns=["index","tokens","is_memorized"])["text"]
+    splits = [dataset[i * len(dataset)//num_splits : (i+1) * len(dataset) // num_splits] for i in range(num_splits)]
+
+    return splits
+
+def load_train_pile_ordered(number=1000, percentage=None, seed=229, num_splits=2):
+    '''
+    Loads sample from training pile ordered as seen by Pythia
+    '''
+    if num_splits % 2 !=0:
+        print(f"Warning! If using shadow models, use an even number of splits! You specified {num_splits} splits.")
+    
+    raise NotImplementedError()
+
+    # dataset = load_dataset("EleutherAI/pile-deduped-pythia-random-sampled", split=f"train[:{percentage*100}%]")
+
+    # dataset = list(dict.fromkeys(entry["text"] for entry in dataset))
+    # splits = [dataset[i * len(dataset)//num_splits : (i+1) * len(dataset) // num_splits] for i in range(num_splits)]
+
+    # return splits
+
+
+def load_val_pile(number=1000, percentage=None, seed=229, num_splits=2):
     '''
     Loads the validation pile (NOT deduped), does an exact match deduplication and shuffling, and returns the specified number of splits
     '''
     if num_splits % 2 !=0:
-        print(f"Warning! Shadow models requires an even number of splits! You specified {num_splits} splits.")
+        print(f"Warning! If using shadow models, use an even number of splits! You specified {num_splits} splits.")
     
-    dataset = load_dataset("the_pile_val.py", split="validation")
-
-    dataset = list(dict.fromkeys(entry["text"] for entry in dataset))[:int(100 * percentage)]
+    dataset = load_dataset("the_pile_val.py", split="validation").shuffle(seed=seed)
+    clip_len = number if percentage is None else int(len(dataset)*percentage)
+    if not (1<=clip_len<=len(dataset)):
+        raise IndexError(f"Number or percentage out of bounds. You specified {clip_len} samples but there are only {len(dataset)} samples.")
+    dataset = list(dict.fromkeys(entry["text"] for entry in dataset))[:clip_len]
     splits = [dataset[i * len(dataset)//num_splits : (i+1) * len(dataset) // num_splits] for i in range(num_splits)]
 
     return splits
