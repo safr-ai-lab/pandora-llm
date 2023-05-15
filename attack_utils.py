@@ -58,7 +58,8 @@ def compute_dataloader_cross_entropy(model, dataloader, nbatches, bs, device, sa
     model.eval()
 
     cross_entropy = torch.zeros((nbatches, bs))
-    for batchno, data_x in enumerate(dataloader):
+    for batchno, batch in enumerate(dataloader):
+        data_x = batch["input_ids"]
         if batchno >= nbatches:
             break
         with torch.no_grad():       

@@ -53,7 +53,18 @@ def load_val_pile(number=1000, percentage=None, seed=229, num_splits=2):
 
     return splits
 
-def collate_fn_mope(tokenizer, batch):
+def collate_fn(batch,tokenizer,length):
+    tokens = [tokenizer.encode(example, return_tensors="pt", truncation=True, max_length=length) for example in batch]
+    max_length = max([t.size(1) for t in tokens])
+    tokens_padded = [torch.cat([t, t.new_zeros(t.size(0), max_length - t.size(1))], dim=1) for t in tokens]
+    tokens_padded = torch.cat(tokens_padded, dim=0)
+    return {
+        "input_ids":tokens_padded,
+        "labels":tokens_padded,
+        "attention_mask": torch.tensor(tokens_padded>0,dtype=int)
+    }
+
+def collate_fn_marvin(batch):
     tokens = [tokenizer.encode(example["text"], return_tensors="pt", truncation=True) for example in batch]
     max_length = max([t.size(1) for t in tokens])
     tokens_padded = [torch.cat([t, t.new_zeros(t.size(0), max_length - t.size(1))], dim=1) for t in tokens]

@@ -43,11 +43,10 @@ class LOSS(MIA):
                 nbatches
         """
         self.config = config
-        print(self.model_path,self.model_revision,self.cache_dir)
         model = GPTNeoXForCausalLM.from_pretrained(self.model_path, revision=self.model_revision, cache_dir=self.cache_dir).to(config["device"])
         
-        self.train_cross_entropy = compute_dataloader_cross_entropy(self.config_dict["training_dl"], config_dict["nbatches"], config_dict["bs"], config_dict["device"], model, config_dict["samplelength"]) 
-        self.val_cross_entropy = compute_dataloader_cross_entropy(self.config_dict["validation_dl"], config_dict["nbatches"], config_dict["bs"], config_dict["device"], model, config_dict["samplelength"]) 
+        self.train_cross_entropy = compute_dataloader_cross_entropy(self.config["training_dl"], self.config["nbatches"], self.config["bs"], self.config["device"], model, self.config["samplelength"]) 
+        self.val_cross_entropy = compute_dataloader_cross_entropy(self.config["validation_dl"], self.config["nbatches"], self.config["bs"], self.config["device"], model, self.config["samplelength"]) 
 
     # def plot_roc already in attack_utils.py
 
@@ -177,8 +176,8 @@ class MoPe(MIA):
 
 
 class LoRa(MIA):
-    def __init__(self,**kwargs):
-        super().__init__(kwargs)
+    def __init__(self,*args,**kwargs):
+        super().__init__(*args, **kwargs)
     
     def inference_ft(self, config_dict, trainer): # running LoRa with fine-tuning (trainer is Trainer HF object)
         """
@@ -217,8 +216,8 @@ class LoRa(MIA):
         pass
 
 class LiRa(MIA):
-    def __init__(self,**kwargs):
-        super().__init__(**kwargs)
+    def __init__(self,*args,**kwargs):
+        super().__init__(*args, **kwargs)
 
     def inference_ft(self, config_dict): # LiRa with fine-tuning
         pass
