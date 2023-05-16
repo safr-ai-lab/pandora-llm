@@ -30,8 +30,6 @@ class LOSS(MIA):
         self.train_cross_entropy = None
         self.val_cross_entropy = None
 
-        self.model = GPTNeoXForCausalLM.from_pretrained(self.model_path, revision=self.model_revision, cache_dir=self.cache_dir)
-
     def inference(self, config):
         """
         Perform MIA
@@ -71,11 +69,7 @@ class MoPe(MIA):
     """
     def __init__(self,*args,**kwargs):
         super().__init__(*args, **kwargs)
-        self.model = GPTNeoXForCausalLM.from_pretrained(self.model_name, revision=self.model_revision, cache_dir=self.cache_dir)
-        tokenizer = AutoTokenizer.from_pretrained(self.model_name, revision=self.model_revision, cache_dir=self.cache_dir)
-
-        self.model.half()
-        self.model.eval()
+        self.model = None
         self.new_models = []
 
     def delete_new_models(self):
@@ -164,16 +158,21 @@ class MoPe(MIA):
         for ind_model in range(1,self.n_new_models+1):
             self.training_res[ind_model,:,:] = compute_dataloader_cross_entropy(*([self.new_models[ind_model-1], self.training_dl] + args))
             self.validation_res[ind_model,:,:] = compute_dataloader_cross_entropy(*([self.new_models[ind_model-1], self.validation_dl] + args))
+        self.get_values()
+
+    def get_values(self):
+        self.train_flat = self.training_res.flatten(start_dim=1)
+        self.valid_flat = self.validation_res.flatten(start_dim=1)
+
+        self.train_diff = self.train_flat[0,:]-self.train_flat[1:,:].mean(dim=0)
+        self.valid_diff = self.valid_flat[0,:]-self.valid_flat[1:,:].mean(dim=0)
+
+        return self.train_diff, self.valid_diff
 
 
     def save(self, title):
-        train_flat = self.training_res.flatten(start_dim=1)
-        valid_flat = self.validation_res.flatten(start_dim=1)
-
-        train_diff = train_flat[0,:]-train_flat[1:,:].mean(dim=0)
-        valid_diff = valid_flat[0,:]-valid_flat[1:,:].mean(dim=0)
-    
-        torch.save(torch.vstack((train_flat, valid_flat)), 
+        self.get_values()
+        torch.save(torch.vstack((self.train_flat, self.valid_flat)), 
             title + " Perturbation attack (#new models="+str(self.config_dict["n_new_models"])
                                       +", noise_var="+str(self.config_dict["noise_variance"])
                                       + ", bs=" + str(self.config_dict["bs"])
