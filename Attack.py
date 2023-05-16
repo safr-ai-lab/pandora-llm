@@ -47,8 +47,6 @@ class LOSS(MIA):
         self.train_cross_entropy = compute_dataloader_cross_entropy(model,self.config["training_dl"], self.config["device"], self.config["nbatches"], self.config["bs"], self.config["samplelength"]) 
         self.val_cross_entropy = compute_dataloader_cross_entropy(model, self.config["validation_dl"], self.config["device"], self.config["nbatches"], self.config["bs"], self.config["samplelength"]) 
 
-    # def plot_roc already in attack_utils.py
-
     def save(self, title):
         ## Save outputs
         with torch.no_grad():
@@ -197,11 +195,11 @@ class LoRa(MIA):
         base_model = GPTNeoXForCausalLM.from_pretrained(model_path=self.model_path, revision=self.model_revision, cache_dir=self.cache_dir).to(config_dict["device"])
         trainer.train()
 
-        train_result_ft = compute_dataloader_cross_entropy_v2(config_dict["model"], config_dict["training_dl"], config_dict["device"])
-        val_result_ft = compute_dataloader_cross_entropy_v2(config_dict["model"], config_dict["validation_dl"], config_dict["device"])
+        train_result_ft = compute_dataloader_cross_entropy(config_dict["model"], config_dict["training_dl"], config_dict["device"])
+        val_result_ft = compute_dataloader_cross_entropy(config_dict["model"], config_dict["validation_dl"], config_dict["device"])
 
-        train_result_base = compute_dataloader_cross_entropy_v2(base_model, config_dict["training_dl"], config_dict["device"])
-        val_result_base = compute_dataloader_cross_entropy_v2(base_model, config_dict["validation_dl"], config_dict["device"])
+        train_result_base = compute_dataloader_cross_entropy(base_model, config_dict["training_dl"], config_dict["device"])
+        val_result_base = compute_dataloader_cross_entropy(base_model, config_dict["validation_dl"], config_dict["device"])
 
         self.train_ratios = (train_result_ft/train_result_base)[~torch.any((train_result_ft/train_result_base).isnan(),dim=1)]
         self.val_ratios = (val_result_ft/val_result_base)[~torch.any((val_result_ft/val_result_base).isnan(),dim=1)]

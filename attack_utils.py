@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.metrics import roc_curve, auc
 from torch.nn import CrossEntropyLoss
+from tqdm import tqdm
 
 
 def mem_stats():
@@ -54,16 +55,19 @@ def compute_input_ids_cross_entropy(model, input_ids):
 
 def compute_dataloader_cross_entropy(model, dataloader, device, nbatches=None, bs=1, samplelength=None):    
     '''
-    Computes dataloader cross entropy with additional support for specifying the full data loader and full sample length
+    Computes dataloader cross entropy with additional support for specifying the full data loader and full sample length.
+    Warning: using samplelength is discouraged
     '''
     model = model.to(device)
     model.half()
     model.eval()
-    if nbatches is None:
-        cross_entropy = torch.zeros((len(dataloader), bs))
-    else:
-        cross_entropy = torch.zeros((nbatches, bs))
-    for batchno, data_x in enumerate(dataloader):
+    if samplelength is not None:
+        print("Warning: using sample length is discouraged. Please avoid using this parameter.")
+    model = model.to(device)
+    model.half()
+    model.eval()
+    losses = []
+    for batchno, data_x in tqdm(enumerate(dataloader),total=len(dataloader)):
         if nbatches is not None and batchno >= nbatches:
             break
         with torch.no_grad():       
@@ -75,8 +79,8 @@ def compute_dataloader_cross_entropy(model, dataloader, device, nbatches=None, b
                 data_x = data_x[:,:samplelength].to(device).detach()
    
             ## Compute average log likelihood
-            cross_entropy[batchno, :] = compute_input_ids_cross_entropy(model, data_x)
-    return cross_entropy
+            losses.append(compute_input_ids_cross_entropy(model, data_x))
+    return torch.tensor(losses)
 
 
 def plot_hist(train_perplexity, val_perplexity, show_plot = True, save_plot=False, plot_title = "Histogram", plot_name="hist.png"):
@@ -114,50 +118,29 @@ def plot_hist(train_perplexity, val_perplexity, show_plot = True, save_plot=Fals
     if show_plot:
         plt.show()
 
-def plot_ROC(train_diff, valid_diff, show_plot = True, save_plot = False, log_scale = False, plot_title = "ROC plot", plot_name = "ROC curve.png"):
-    import matplotlib.pyplot as plt
-    import numpy as np
+def plot_ROC(train_statistic,val_statistic,title,log_scale=False,show_plot=True,save_name=None):
+    '''
+    Plots ROC with train and validation test statistics. Note that we assume train statistic < test statistic. Negate before using if otherwise.
+    '''
+    train_statistic = torch.tensor(train_statistic).flatten()
+    train_statistic = train_statistic[~train_statistic.isnan()]
+    val_statistic = torch.tensor(val_statistic).flatten()
+    val_statistic = val_statistic[~val_statistic.isnan()]
 
-    # generate two sets of random values
-    with torch.no_grad():
-        valuestraining   = torch.flatten(train_diff) 
-        valuesvalidation = torch.flatten(valid_diff)
-
-    notnan = torch.logical_and(~valuestraining.isnan(), ~valuesvalidation.isnan())
-    valuestraining = valuestraining[notnan]
-    valuesvalidation = valuesvalidation[notnan]
-
-    ## Scale all values to be between 0 and 1
-    st = min(valuestraining.min(),valuesvalidation.min())
-    end = max(valuestraining.max(),valuesvalidation.max())
-    print(st,end)
-
-    y_scores =  torch.cat((valuestraining, valuesvalidation))
-    y_scores = y_scores-min(y_scores)
-    y_scores = y_scores/max(y_scores)
-    y_true   = [1 for _ in range(len(valuestraining))] + [0 for _ in range(len(valuesvalidation))]
-
-    fpr, tpr, thresholds = roc_curve(y_true, y_scores)
-
-    # Calculate the area under the ROC curve (AUC)
+    fpr, tpr, thresholds = roc_curve(torch.cat((torch.zeros_like(train_statistic),torch.ones_like(val_statistic))).flatten(),
+                                    torch.cat((train_statistic,val_statistic)).flatten())
     roc_auc = auc(fpr, tpr)
-
-    # Plot the ROC curve
     plt.figure()
-    if log_scale:
-        plt.loglog(fpr, tpr, color='darkorange', label='ROC curve (area = %0.2f)' % roc_auc)
+    if not log_scale:
+        plt.plot(fpr, tpr, color='darkorange', label='ROC curve (area = %0.4f)' % roc_auc)
     else:
-        plt.plot(fpr, tpr, color='darkorange', label='ROC curve (area = %0.2f)' % roc_auc)
-
+        plt.loglog(fpr, tpr, color='darkorange', label='ROC curve (area = %0.4f)' % roc_auc)
     plt.plot([0, 1], [0, 1], color='navy', linestyle='--')
-    plt.xlim([0.0, 1.0])
-    plt.ylim([0.0, 1.05])
+    plt.title(title)
+    plt.legend(loc="lower right")
     plt.xlabel('False Positive Rate')
     plt.ylabel('True Positive Rate')
-    plt.legend(loc="lower right")
-    plt.title(plot_title)
-
-    if save_plot:
-        plt.savefig(plot_name)
+    if save_name is not None:
+        plt.savefig(save_name)
     if show_plot:
         plt.show()
