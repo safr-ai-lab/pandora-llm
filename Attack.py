@@ -17,9 +17,16 @@ class MIA:
             model_revision: revision of the model to be attacked
             cache_dir: directory to cache the model
         """
-        self.model_path = model_path
-        self.model_revision = model_revision
-        self.cache_dir = cache_dir
+        self.model_path      = model_path
+        self.model_revision  = model_revision
+        self.cache_dir       = cache_dir
+    
+    def get_statistics(self):
+        pass
+
+    def attack_plot_ROC(self, title, log_scale=False,show_plot=True,save_name=None):
+        train_statistics, val_statistics = self.get_statistics()
+        plot_ROC(train_statistics, val_statistics, title, log_scale, show_plot, save_name)
 
 class LOSS(MIA):
     """
@@ -46,6 +53,9 @@ class LOSS(MIA):
         
         self.train_cross_entropy = compute_dataloader_cross_entropy(model,self.config["training_dl"], self.config["device"], self.config["nbatches"], self.config["bs"], self.config["samplelength"]) 
         self.val_cross_entropy = compute_dataloader_cross_entropy(model, self.config["validation_dl"], self.config["device"], self.config["nbatches"], self.config["bs"], self.config["samplelength"]) 
+
+    def get_statistics(self):
+        return self.train_cross_entropy, self.val_cross_entropy
 
     def save(self, title):
         ## Save outputs
@@ -150,12 +160,12 @@ class MoPe(MIA):
         
         args = [self.device, self.nbatches, self.bs, self.samplelength]
 
-        self.training_res[0,:,:] = compute_dataloader_cross_entropy(*([self.model, self.training_dl] + args))
-        self.validation_res[0,:,:] = compute_dataloader_cross_entropy(*([self.model, self.validation_dl] + args))
+        self.training_res[0,:,:] = compute_dataloader_cross_entropy(*([self.model, self.training_dl] + args)).reshape(-1,1)
+        self.validation_res[0,:,:] = compute_dataloader_cross_entropy(*([self.model, self.validation_dl] + args)).reshape(-1,1)
 
         for ind_model in range(1,self.n_new_models+1):
-            self.training_res[ind_model,:,:] = compute_dataloader_cross_entropy(*([self.new_models[ind_model-1], self.training_dl] + args))
-            self.validation_res[ind_model,:,:] = compute_dataloader_cross_entropy(*([self.new_models[ind_model-1], self.validation_dl] + args))
+            self.training_res[ind_model,:,:] = compute_dataloader_cross_entropy(*([self.new_models[ind_model-1], self.training_dl] + args)).reshape(-1,1)
+            self.validation_res[ind_model,:,:] = compute_dataloader_cross_entropy(*([self.new_models[ind_model-1], self.validation_dl] + args)).reshape(-1,1)
         self.get_values()
 
     def get_values(self):
@@ -167,6 +177,8 @@ class MoPe(MIA):
 
         return self.train_diff, self.valid_diff
 
+    def get_statistics(self):
+        return self.get_values()
 
     def save(self, title):
         self.get_values()

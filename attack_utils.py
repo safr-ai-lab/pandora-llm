@@ -34,15 +34,11 @@ def compute_input_ids_cross_entropy(model, input_ids):
   input_ids_without_first_token = input_ids[:, 1:].long()
   logits_without_last_token = logits[:, :-1, :]
 
-  # print(input_ids_without_first_token)
   ans = []
   for i in range(len(logits_without_last_token)):
     length = len(input_ids_without_first_token[i,:])
     if len(torch.where(input_ids_without_first_token[i,:] == 0)[0]) > 0:
       length = torch.where(input_ids_without_first_token[i,:] == 0)[0].min()
-    # print(logits_without_last_token[i, :length].shape)
-    # print(input_ids_without_first_token[i, :length].shape)
-    # print(loss_fn(logits_without_last_token[i, :length], input_ids_without_first_token[i, :length]))
     ce_loss = loss_fn(logits_without_last_token[i, :length], input_ids_without_first_token[i, :length])
     ans.append(ce_loss)
 
