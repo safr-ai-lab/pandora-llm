@@ -247,14 +247,32 @@ class LoRa(MIA):
 
     # can use plot_ROC to plot ROC
 
-    def inference_pt(self, config_dict): # running LoRa in checkpoint setting
-        pass
+    def inference_pt(self, config_dict): 
+        """
+        Running LoRa in checkpoint setting.
+            config_dict: dictionary of configuration parameters
+                checkpoint_val (model to be attacked)
+                checkpoint_train (model without some of the data)
+                training_dl (dataloader from target chunk)
+                validation_dl (other data)
+                device
+        """
+        self.config_dict = config_dict
+        checkpoint_ft = config_dict["checkpoint_val"]
+        checkpoint_base = config_dict["checkpoint_train"]
+        device = config_dict["device"]
 
-class LiRa(MIA):
-    def __init__(self,*args,**kwargs):
-        super().__init__(*args, **kwargs)
+        base_model = GPTNeoXForCausalLM.from_pretrained(self.model_path, revision=checkpoint_base, cache_dir=self.cache_dir).to(device)
+        ft_model = GPTNeoXForCausalLM.from_pretrained(self.model_path, revision=checkpoint_ft, cache_dir=self.cache_dir).to(device)
 
-    def inference_ft(self, config_dict): # LiRa with fine-tuning
+        self.get_ratios(base_model, ft_model, config_dict["training_dl"], config_dict["checkpoint_val"], device)
+    
+    def get_ft_data(self): 
+        """
+        Sample data for ft'ing. 
+        - sampling from a dataloader is easy
+        - sampling from between checkpoints is harder - first test dataset_viewer.py in pythia repo (jeffrey TODO)
+        """
         pass
 
 
