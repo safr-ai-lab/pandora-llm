@@ -115,10 +115,9 @@ class MoPe(MIA):
                 for param in dummy_model.parameters():
                     param.add_((torch.randn(param.size()) * self.noise_variance).to(self.device))
                 
-                ## Move to cpu and add it
-                dummy_model.to("cpu")
-                self.new_models.append(copy.deepcopy(dummy_model))
-                dummy_model.to(self.device)
+                # Move to disk 
+                dummy_model.save_pretrained(f"MoPe/pythia-{self.mod_size}-{ind_model}", from_pt=True) 
+                self.new_models.append(f"MoPe/pythia-{self.mod_size}-{ind_model}")
 
                 ## Undo changes to model
                 torch.manual_seed(prevseed)
@@ -154,6 +153,7 @@ class MoPe(MIA):
         self.samplelength = config_dict["samplelength"]
         self.nbatches = config_dict["nbatches"]
         self.device = config_dict["device"]
+        self.mod_size = config_dict["mod_size"]
 
         if self.model == None:
             self.model = GPTNeoXForCausalLM.from_pretrained(self.model_path, revision=self.model_revision, cache_dir=self.cache_dir)
@@ -173,13 +173,18 @@ class MoPe(MIA):
         args = [self.device, self.nbatches, self.bs, self.samplelength]
 
         # Compute losses for base model
-        self.training_res[0,:,:] = compute_dataloader_cross_entropy(*([self.model, self.training_dl] + args)).reshape(-1,1)
+        self.training_res[0,:,:] = compute_dataloader_cross_entropy(*([self.model, self.training_dl] + args)).reshape(-1,1) # model gets moved to device in this method
         self.validation_res[0,:,:] = compute_dataloader_cross_entropy(*([self.model, self.validation_dl] + args)).reshape(-1,1)
 
         # Compute loss for each perturbed model
         for ind_model in range(1,self.n_new_models+1):
-            self.training_res[ind_model,:,:] = compute_dataloader_cross_entropy(*([self.new_models[ind_model-1], self.training_dl] + args)).reshape(-1,1)
-            self.validation_res[ind_model,:,:] = compute_dataloader_cross_entropy(*([self.new_models[ind_model-1], self.validation_dl] + args)).reshape(-1,1)
+            t_model = GPTNeoXForCausalLM.from_pretrained(self.new_models[ind_model-1]).to(self.device)
+            self.training_res[ind_model,:,:] = compute_dataloader_cross_entropy(*([t_model, self.training_dl] + args)).reshape(-1,1)
+            self.validation_res[ind_model,:,:] = compute_dataloader_cross_entropy(*([t_model, self.validation_dl] + args)).reshape(-1,1)
+            del t_model
+            torch.cuda.empty_cache()
+            torch.cuda.synchronize()
+
         self.get_values()
 
     def get_values(self):
