@@ -20,12 +20,14 @@ class MoPe(MIA):
         torch.cuda.synchronize()
 
     def generate_new_models(self):
-        dummy_model = copy.deepcopy(self.model)
-        dummy_model.to(self.device)        
+        # dummy_model = copy.deepcopy(self.model)    
         self.new_model_paths = []
 
         with torch.no_grad():
             for ind_model in range(0, self.n_new_models):        
+                dummy_model = copy.deepcopy(self.model)
+                dummy_model.to(self.device)    
+
                 ## Perturbed model
                 prev_seed = torch.seed()
                 print("Seed",prev_seed)
@@ -36,11 +38,11 @@ class MoPe(MIA):
                 dummy_model.save_pretrained(f"MoPe/{self.model_name}-{ind_model}", from_pt=True) 
                 self.new_model_paths.append(f"MoPe/{self.model_name}-{ind_model}")
 
-                ## Undo changes to model
-                torch.manual_seed(prev_seed)
-                for param in dummy_model.parameters():
-                    param.add_(-(torch.randn(param.size()) * self.noise_variance).to(self.device))
-                
+                # Delete model from GPU
+                del dummy_model
+                torch.cuda.empty_cache()
+                torch.cuda.synchronize()
+
                 print("Memory usage after creating new model #%d" % ind_model)
                 mem_stats()
         
