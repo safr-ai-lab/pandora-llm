@@ -24,8 +24,15 @@ class MIA:
     def get_statistics(self):
         pass
 
-    def attack_plot_ROC(self, title, log_scale=False,show_plot=True,save_name=None):
+    def get_default_title(self):
+        pass
+
+    def attack_plot_ROC(self, title, log_scale=False, show_plot=True, save_name=None):
         train_statistics, val_statistics = self.get_statistics()
+        if title == None:
+            title = self.get_default_title()
+        if save_name == None:
+            save_name = self.get_default_title() + " log.png" if log_scale else ".png"
         plot_ROC(train_statistics, val_statistics, title, log_scale, show_plot, save_name)
 
 class LOSS(MIA):
@@ -57,7 +64,13 @@ class LOSS(MIA):
     def get_statistics(self):
         return self.train_cross_entropy, self.val_cross_entropy
 
-    def save(self, title):
+    def get_default_title(self):
+        return "LOSS threshold (Train, Validation) data: bs=" + str(self.config["bs"])+", nbatches="+str(self.config["nbatches"])+", length="+str(self.config["samplelength"])+""
+
+    def save(self, title = None):
+        if title == None:
+            title = self.get_default_title()
+
         ## Save outputs
         with torch.no_grad():
             valuestraining   = torch.flatten(self.train_cross_entropy) 
@@ -68,8 +81,7 @@ class LOSS(MIA):
         valuesvalidation = valuesvalidation[notnan]
 
         ## save as pt file
-        torch.save(torch.vstack((valuestraining, valuesvalidation)), title + 
-                   " (Training, Validation) data: bs=" + str(self.config["bs"])+", nbatches="+str(self.config["nbatches"])+", length="+str(self.config["samplelength"])+").pt")
+        torch.save(torch.vstack((valuestraining, valuesvalidation)), title+".pt")
 
 class MoPe(MIA):
     """
@@ -180,14 +192,21 @@ class MoPe(MIA):
     def get_statistics(self):
         return self.get_values()
 
-    def save(self, title):
+    def get_default_title(self):
+        return "Perturb attack: model=" + self.model_path  
+                + ", revision=" + self.model_revision
+                + ", new_models="+ str(self.n_new_models)
+                +", noise_var="+str(self.noise_var)
+                + ", bs=" + str(self.bs)
+                +", nbatches="+str(self.nbatches)
+                +", length="+str(self.samplelength)+")"
+        
+    def save(self, title = None):
         self.get_values()
+        if title == None:
+            title = self.get_default_title()
         torch.save(torch.vstack((self.train_flat, self.valid_flat)), 
-            title + " Perturbation attack (#new models="+str(self.config_dict["n_new_models"])
-                                      +", noise_var="+str(self.config_dict["noise_variance"])
-                                      + ", bs=" + str(self.config_dict["bs"])
-                                      +", nbatches="+str(self.config_dict["nbatches"])
-                                      +", length="+str(self.config_dict["samplelength"])+").pt")
+            title + ".pt")
 
 
 
