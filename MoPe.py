@@ -46,7 +46,6 @@ class MoPe(MIA):
                 print("Memory usage after creating new model #%d" % ind_model)
                 mem_stats()
         
-        del dummy_model 
         torch.cuda.empty_cache()
         torch.cuda.synchronize()
 
