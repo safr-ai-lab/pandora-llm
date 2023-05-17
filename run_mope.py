@@ -56,7 +56,7 @@ config_mope = {
     "n_new_models": n_new_models,
     "noise_variance": noise_variance,
     "bs" : 1,
-    "nbatches": None,
+    "nbatches": nsamples,
     "samplelength": None,
     "device": device
 }

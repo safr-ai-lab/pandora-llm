@@ -18,6 +18,7 @@ class MIA:
             cache_dir: directory to cache the model
         """
         self.model_path      = model_path
+        self.model_name     = self.model_path.split("/")[-1]
         self.model_revision  = model_revision
         self.cache_dir       = cache_dir
     
@@ -32,7 +33,8 @@ class MIA:
         if title == None:
             title = self.get_default_title()
         if save_name == None:
-            save_name = self.get_default_title() + " log.png" if log_scale else ".png"
+            save_name = self.get_default_title() + (" log.png" if log_scale else ".png")
+        print(save_name)
         plot_ROC(train_statistics, val_statistics, title, log_scale, show_plot, save_name)
 
 class LOSS(MIA):
@@ -116,8 +118,8 @@ class MoPe(MIA):
                     param.add_((torch.randn(param.size()) * self.noise_variance).to(self.device))
                 
                 # Move to disk 
-                dummy_model.save_pretrained(f"MoPe/pythia-{self.mod_size}-{ind_model}", from_pt=True) 
-                self.new_models.append(f"MoPe/pythia-{self.mod_size}-{ind_model}")
+                dummy_model.save_pretrained(f"MoPe/pythia-{self.model_name}-{ind_model}", from_pt=True) 
+                self.new_models.append(f"MoPe/pythia-{self.model_name}-{ind_model}")
 
                 ## Undo changes to model
                 torch.manual_seed(prevseed)
@@ -153,7 +155,6 @@ class MoPe(MIA):
         self.samplelength = config_dict["samplelength"]
         self.nbatches = config_dict["nbatches"]
         self.device = config_dict["device"]
-        self.mod_size = config_dict["mod_size"]
 
         if self.model == None:
             self.model = GPTNeoXForCausalLM.from_pretrained(self.model_path, revision=self.model_revision, cache_dir=self.cache_dir)
@@ -203,15 +204,15 @@ class MoPe(MIA):
         return self.get_values()
 
     def get_default_title(self):
-            title = "Perturb attack: model=" + self.model_path  
-            title +=  ", revision=" + self.model_revision
-            title +=  ", new_models=" + str(self.n_new_models)
-            title +=  ", noise_var=" + str(self.noise_var)
-            title +=  ", bs=" + str(self.bs)
-            title += ", nbatches=" + str(self.nbatches)
-            title += ", length="+str(self.samplelength)+")"
-            return title        
-
+        title = "Perturb attack: model=" + self.model_name 
+        title +=  ", revision=" + self.model_revision
+        title +=  ", new_models=" + str(self.n_new_models)
+        title +=  ", noise_var=" + str(self.noise_variance)
+        title +=  ", bs=" + str(self.bs)
+        title += ", nbatches=" + str(self.nbatches)
+        title += ", length="+str(self.samplelength)+")"
+        return title
+        
     def save(self, title = None):
         """
         Save differences in cross entropy between base model and perturbed models
