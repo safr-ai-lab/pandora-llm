@@ -1,15 +1,11 @@
 import sys
 import torch
 from torch.utils.data import DataLoader
-import json
-from datasets import load_dataset
 from transformers import GPTNeoXForCausalLM, AutoTokenizer
-from transformers import Trainer, TrainingArguments, EarlyStoppingCallback
-from transformers.optimization import AdamW
 from tqdm import tqdm
 from attack_utils import *
 from dataset_utils import *
-from Attack import *
+from MoPe import MoPe
 import time
 
 """

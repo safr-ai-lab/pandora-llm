@@ -2,6 +2,17 @@ from datasets import load_dataset
 import torch
 from transformers import AutoTokenizer
 
+def collate_fn(batch,tokenizer,length):
+    tokens = [tokenizer.encode(example, return_tensors="pt", truncation=True, max_length=length) for example in batch]
+    max_length = max([t.size(1) for t in tokens])
+    tokens_padded = [torch.cat([t, t.new_zeros(t.size(0), max_length - t.size(1))], dim=1) for t in tokens]
+    tokens_padded = torch.cat(tokens_padded, dim=0)
+    return {
+        "input_ids":tokens_padded,
+        "labels":tokens_padded,
+        "attention_mask": torch.tensor(tokens_padded>0,dtype=int)
+    }
+
 def load_train_pile_random(number=1000, percentage=None, seed=229, num_splits=2):
     '''
     Loads the random sample from training pile
@@ -52,29 +63,3 @@ def load_val_pile(number=1000, percentage=None, seed=229, num_splits=2):
     splits = [dataset[i * len(dataset)//num_splits : (i+1) * len(dataset) // num_splits] for i in range(num_splits)]
 
     return splits
-
-def collate_fn(batch,tokenizer,length):
-    tokens = [tokenizer.encode(example, return_tensors="pt", truncation=True, max_length=length) for example in batch]
-    max_length = max([t.size(1) for t in tokens])
-    tokens_padded = [torch.cat([t, t.new_zeros(t.size(0), max_length - t.size(1))], dim=1) for t in tokens]
-    tokens_padded = torch.cat(tokens_padded, dim=0)
-    return {
-        "input_ids":tokens_padded,
-        "labels":tokens_padded,
-        "attention_mask": torch.tensor(tokens_padded>0,dtype=int)
-    }
-
-def collate_fn_marvin(batch):
-    tokens = [tokenizer.encode(example["text"], return_tensors="pt", truncation=True) for example in batch]
-    max_length = max([t.size(1) for t in tokens])
-    tokens_padded = [torch.cat([t, t.new_zeros(t.size(0), max_length - t.size(1))], dim=1) for t in tokens]
-    tokens_padded = torch.cat(tokens_padded, dim=0)
-    return tokens_padded
-
-def collate_already_encoded_mope(tokenizer, batch):
-    tokens = batch
-    max_length = max([len(t['tokens']) for t in tokens])
-    tokens_padded = torch.zeros((len(tokens),max_length),dtype=torch.int)
-    for i in range(len(tokens)):
-        tokens_padded[i,:] = torch.Tensor(tokens[i]['tokens'])
-    return tokens_padded
