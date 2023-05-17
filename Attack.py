@@ -166,21 +166,26 @@ class MoPe(MIA):
             self.delete_new_models()
             self.generate_new_models()
 
-        ## Get results from training and validation batchloaders        
+        ## Initialize train/val result arrays      
         self.training_res = torch.zeros((self.n_new_models + 1, self.nbatches, self.bs))  
         self.validation_res = torch.zeros((self.n_new_models + 1, self.nbatches, self.bs))  
         
         args = [self.device, self.nbatches, self.bs, self.samplelength]
 
+        # Compute losses for base model
         self.training_res[0,:,:] = compute_dataloader_cross_entropy(*([self.model, self.training_dl] + args)).reshape(-1,1)
         self.validation_res[0,:,:] = compute_dataloader_cross_entropy(*([self.model, self.validation_dl] + args)).reshape(-1,1)
 
+        # Compute loss for each perturbed model
         for ind_model in range(1,self.n_new_models+1):
             self.training_res[ind_model,:,:] = compute_dataloader_cross_entropy(*([self.new_models[ind_model-1], self.training_dl] + args)).reshape(-1,1)
             self.validation_res[ind_model,:,:] = compute_dataloader_cross_entropy(*([self.new_models[ind_model-1], self.validation_dl] + args)).reshape(-1,1)
         self.get_values()
 
     def get_values(self):
+        """
+        Compute the difference between the base model and the perturbed models
+        """
         self.train_flat = self.training_res.flatten(start_dim=1)
         self.valid_flat = self.validation_res.flatten(start_dim=1)
 
@@ -202,6 +207,9 @@ class MoPe(MIA):
                 +", length="+str(self.samplelength)+")"
         
     def save(self, title = None):
+        """
+        Save differences in cross entropy between base model and perturbed models
+        """
         self.get_values()
         if title == None:
             title = self.get_default_title()
