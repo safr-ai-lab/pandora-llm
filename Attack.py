@@ -203,14 +203,15 @@ class MoPe(MIA):
         return self.get_values()
 
     def get_default_title(self):
-        return "Perturb attack: model=" + self.model_path  
-                + ", revision=" + self.model_revision
-                + ", new_models="+ str(self.n_new_models)
-                +", noise_var="+str(self.noise_var)
-                + ", bs=" + str(self.bs)
-                +", nbatches="+str(self.nbatches)
-                +", length="+str(self.samplelength)+")"
-        
+            title = "Perturb attack: model=" + self.model_path  
+            title +=  ", revision=" + self.model_revision
+            title +=  ", new_models=" + str(self.n_new_models)
+            title +=  ", noise_var=" + str(self.noise_var)
+            title +=  ", bs=" + str(self.bs)
+            title += ", nbatches=" + str(self.nbatches)
+            title += ", length="+str(self.samplelength)+")"
+            return title        
+
     def save(self, title = None):
         """
         Save differences in cross entropy between base model and perturbed models
