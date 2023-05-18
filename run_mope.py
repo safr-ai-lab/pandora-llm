@@ -18,6 +18,7 @@ mod_size = sys.argv[1]
 n_new_models = int(sys.argv[2])
 noise_variance = float(sys.argv[3])
 nsamples = int(sys.argv[4])
+title = sys.argv[5]
 
 ## Other parameters
 model_revision = "step98000"
@@ -67,7 +68,7 @@ MoPer = MoPe(model_name, model_revision=model_revision, cache_dir=model_cache_di
 MoPer.inference(config_mope)
 
 MoPer.attack_plot_ROC(mod_size + " " +str(noise_variance), show_plot = True, save_name = None, log_scale = False)
-MoPer.save(None) # TODO - specify name of experiment
+MoPer.save(title) # TODO - specify name of experiment
 
 end = time.time()
 print(f"- MoPe at {mod_size} and {n_new_models} new models took {end-start} seconds.")
