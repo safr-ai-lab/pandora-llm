@@ -7,18 +7,19 @@ from attack_utils import *
 from dataset_utils import *
 from MoPe import MoPe
 import time
+import argparse
 
 """
 Sample command line prompt:
-python run_mope.py 70m 10 0.1 1000
+python run_mope.py --mod_size "70m" --n_models 15 --n_samples 1000 --sigma 0.001
 """
 
-## Command line prompts
-mod_size = sys.argv[1]
-n_new_models = int(sys.argv[2])
-noise_variance = float(sys.argv[3])
-nsamples = int(sys.argv[4])
-title = sys.argv[5]
+parser = argparse.ArgumentParser()
+parser.add_argument('--mod_size', action="store", type=str, required=True, help='Pythia Model Size')
+parser.add_argument('--n_models', action="store", type=int, required=True, help='Number of new models')
+parser.add_argument('--n_samples', action="store", type=int, required=True, help='Number of samples')
+parser.add_argument('--sigma', action="store", type=float, required=True, help='Noise standard deviation')
+args = parser.parse_args()
 
 ## Other parameters
 model_revision = "step98000"
@@ -30,17 +31,19 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 ## Stopwatch for testing timing
 start = time.time()
 
-model_title = f"pythia-{mod_size}-deduped"
+model_title = f"pythia-{args.mod_size}-deduped"
 model_name = "EleutherAI/" + model_title
 model_cache_dir = "./"+ model_title +"/"+model_revision
 
+print("Initializing Base Model")
 model = GPTNeoXForCausalLM.from_pretrained(model_name,revision=model_revision,cache_dir=model_cache_dir)
 max_length = model.config.max_position_embeddings
 del model
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 
-training_dataset = load_train_pile_random(number=nsamples,seed=seed,num_splits=1)[0] # TODO - replace w/ sequence at some point
-validation_dataset = load_val_pile(number=nsamples, seed=seed, num_splits=1)[0]
+print("Loading Data")
+training_dataset = load_train_pile_random(number=args.n_samples,seed=seed,num_splits=1)[0] # TODO - replace w/ sequence at some point
+validation_dataset = load_val_pile(number=args.n_samples, seed=seed, num_splits=1)[0]
 
 training_dataloader = DataLoader(training_dataset, batch_size = 1, collate_fn=lambda batch: collate_fn(batch, tokenizer=tokenizer, length=max_length))
 validation_dataloader = DataLoader(validation_dataset, batch_size = 1, collate_fn=lambda batch: collate_fn(batch, tokenizer=tokenizer, length=max_length))
@@ -50,10 +53,10 @@ validation_dataloader = DataLoader(validation_dataset, batch_size = 1, collate_f
 config_mope = {
     "training_dl": training_dataloader,
     "validation_dl": validation_dataloader,
-    "n_new_models": n_new_models,
-    "noise_variance": noise_variance,
+    "n_new_models": args.n_models,
+    "noise_stdev": args.sigma,
     "bs" : 1,
-    "nbatches": nsamples,
+    "nbatches": args.n_samples,
     "samplelength": None,
     "device": device
 }
@@ -67,8 +70,9 @@ start = time.time()
 MoPer = MoPe(model_name, model_revision=model_revision, cache_dir=model_cache_dir)
 MoPer.inference(config_mope)
 
-MoPer.attack_plot_ROC(mod_size + " " +str(noise_variance), show_plot = True, save_name = None, log_scale = False)
-MoPer.save(title) # TODO - specify name of experiment
+MoPer.attack_plot_ROC(log_scale = False, show_plot=False)
+MoPer.attack_plot_ROC(log_scale = True, show_plot=False)
+MoPer.save()
 
 end = time.time()
-print(f"- MoPe at {mod_size} and {n_new_models} new models took {end-start} seconds.")
+print(f"- MoPe at {args.mod_size} and {args.n_models} new models took {end-start} seconds.")

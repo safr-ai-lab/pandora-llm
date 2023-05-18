@@ -17,7 +17,9 @@ class MoPe(MIA):
         self.new_model_paths = []
 
         with torch.no_grad():
-            for ind_model in range(0, self.n_new_models):        
+            for ind_model in range(0, self.n_new_models):  
+                print(f"Loading Perturbed Model {ind_model+1}/{self.n_new_models}")      
+                
                 dummy_model = copy.deepcopy(self.model)
                 dummy_model.to(self.device)    
 
@@ -63,8 +65,9 @@ class MoPe(MIA):
 
         ## If model has not been created (i.e., first call)
         if self.model == None:
+            print("Loading Base Model")
             self.model = GPTNeoXForCausalLM.from_pretrained(self.model_path, revision=self.model_revision, cache_dir=self.cache_dir)
-        
+
         self.model.half()
         self.model.eval()
 
@@ -72,18 +75,20 @@ class MoPe(MIA):
         if self.noise_stdev != None and self.n_new_models != None:
             self.generate_new_models()
 
-        ## Initialize train/val result arrays      
+        ## Initialize train/val result arrays (Model Index (0=Base), Number Batches, Batch Size)   
         self.training_res = torch.zeros((self.n_new_models + 1, self.nbatches, self.bs))  
         self.validation_res = torch.zeros((self.n_new_models + 1, self.nbatches, self.bs))  
         
         args = [self.device, self.nbatches, self.bs, self.samplelength]
 
         # Compute losses for base model
+        print("Evaluating Base Model")
         self.training_res[0,:,:] = compute_dataloader_cross_entropy(*([self.model, self.training_dl] + args)).reshape(-1,1) # model gets moved to device in this method
         self.validation_res[0,:,:] = compute_dataloader_cross_entropy(*([self.model, self.validation_dl] + args)).reshape(-1,1)
 
         # Compute loss for each perturbed model
         for ind_model in range(1,self.n_new_models+1):
+            print(f"Evaluating Perturbed Model {ind_model}/{self.n_new_models}")
             t_model = GPTNeoXForCausalLM.from_pretrained(self.new_model_paths[ind_model-1]).to(self.device)
             self.training_res[ind_model,:,:] = compute_dataloader_cross_entropy(*([t_model, self.training_dl] + args)).reshape(-1,1)
             self.validation_res[ind_model,:,:] = compute_dataloader_cross_entropy(*([t_model, self.validation_dl] + args)).reshape(-1,1)

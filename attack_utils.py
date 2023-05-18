@@ -30,7 +30,6 @@ def compute_input_ids_cross_entropy(model, input_ids):
     logits = outputs.logits
 
   loss_fn = CrossEntropyLoss()
-  input_len = input_ids.shape[-1] - 1
   input_ids_without_first_token = input_ids[:, 1:].long()
   logits_without_last_token = logits[:, :-1, :]
 
