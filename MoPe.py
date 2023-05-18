@@ -13,14 +13,7 @@ class MoPe(MIA):
         self.model = None
         self.new_model_paths = []
 
-    def delete_new_models(self):
-        for new_model in self.new_model_paths:
-            del new_model
-        torch.cuda.empty_cache()
-        torch.cuda.synchronize()
-
     def generate_new_models(self):
-        # dummy_model = copy.deepcopy(self.model)    
         self.new_model_paths = []
 
         with torch.no_grad():
@@ -29,10 +22,9 @@ class MoPe(MIA):
                 dummy_model.to(self.device)    
 
                 ## Perturbed model
-                prev_seed = torch.seed()
-                print("Seed",prev_seed)
-                for param in dummy_model.parameters():
-                    param.add_((torch.randn(param.size()) * self.noise_variance).to(self.device))
+                for name, param in dummy_model.named_parameters():
+                    noise = torch.randn(param.size()) * self.noise_stdev
+                    param.add_(noise.to(self.device))
                 
                 # Move to disk 
                 dummy_model.save_pretrained(f"MoPe/{self.model_name}-{ind_model}", from_pt=True) 
@@ -42,9 +34,6 @@ class MoPe(MIA):
                 del dummy_model
                 torch.cuda.empty_cache()
                 torch.cuda.synchronize()
-
-                print("Memory usage after creating new model #%d" % ind_model)
-                mem_stats()
         
         torch.cuda.empty_cache()
         torch.cuda.synchronize()
@@ -56,7 +45,7 @@ class MoPe(MIA):
                 training_dl
                 validation_dl
                 n_new_models
-                noise_variance
+                noise_stdev
                 bs
                 samplelength
                 nbatches
@@ -66,21 +55,21 @@ class MoPe(MIA):
         self.training_dl = config["training_dl"]
         self.validation_dl = config["validation_dl"]
         self.n_new_models = config["n_new_models"]
-        self.noise_variance = config["noise_variance"]
+        self.noise_stdev = config["noise_stdev"]
         self.bs = config["bs"]
         self.samplelength = config["samplelength"]
         self.nbatches = config["nbatches"]
         self.device = config["device"]
 
+        ## If model has not been created (i.e., first call)
         if self.model == None:
             self.model = GPTNeoXForCausalLM.from_pretrained(self.model_path, revision=self.model_revision, cache_dir=self.cache_dir)
         
         self.model.half()
         self.model.eval()
 
-        ## Delete new models if we are supplied with noise_variance and n_new_models
-        if self.noise_variance != None and self.n_new_models != None:
-            self.delete_new_models()
+        ## Generate new models if we are supplied with noise_stdev and n_new_models
+        if self.noise_stdev != None and self.n_new_models != None:
             self.generate_new_models()
 
         ## Initialize train/val result arrays      
@@ -121,7 +110,7 @@ class MoPe(MIA):
             self.model_path.replace("/","-"),
             self.model_revision.replace("/","-"),
             self.n_new_models,
-            self.noise_variance,
+            self.noise_stdev,
             self.config["bs"],
             self.config["nbatches"]
         )
