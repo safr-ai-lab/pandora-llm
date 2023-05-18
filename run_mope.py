@@ -11,7 +11,7 @@ import argparse
 
 """
 Sample command line prompt:
-python run_mope.py --mod_size "70m" --n_models 15 --n_samples 1000 --sigma 0.001
+python run_mope.py --mod_size 70m --n_models 15 --n_samples 1000 --sigma 0.001
 """
 
 parser = argparse.ArgumentParser()

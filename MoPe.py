@@ -29,8 +29,8 @@ class MoPe(MIA):
                     param.add_(noise.to(self.device))
                 
                 # Move to disk 
-                dummy_model.save_pretrained(f"MoPe/{self.model_name}-{str(self.noise_stdev)}-{ind_model}", from_pt=True) 
-                self.new_model_paths.append(f"MoPe/{self.model_name}-{str(self.noise_stdev)}-{ind_model}")
+                dummy_model.save_pretrained(f"MoPe/{self.model_name}-{ind_model}", from_pt=True) 
+                self.new_model_paths.append(f"MoPe/{self.model_name}-{ind_model}")
 
                 # Delete model from GPU
                 del dummy_model
