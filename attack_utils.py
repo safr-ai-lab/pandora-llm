@@ -23,11 +23,14 @@ def mem_stats():
 def compute_input_ids_cross_entropy(model, input_ids):
   mask  = (input_ids > 0).detach()                                     
 
-  model.train(False)
+  model.eval()
 
   with torch.no_grad():
     outputs = model(input_ids=input_ids.to(torch.long), attention_mask = mask)
     logits = outputs.logits
+    del outputs
+    torch.cuda.empty_cache()
+    torch.cuda.synchronize()
 
   loss_fn = CrossEntropyLoss()
   input_ids_without_first_token = input_ids[:, 1:].long()
@@ -42,7 +45,7 @@ def compute_input_ids_cross_entropy(model, input_ids):
     ans.append(ce_loss)
 
   ## Clean up 
-  del outputs, logits, input_ids_without_first_token, logits_without_last_token
+  del logits, input_ids_without_first_token, logits_without_last_token
   torch.cuda.empty_cache()
   torch.cuda.synchronize()
 
@@ -53,28 +56,29 @@ def compute_dataloader_cross_entropy(model, dataloader, device, nbatches=None, b
     Computes dataloader cross entropy with additional support for specifying the full data loader and full sample length.
     Warning: using samplelength is discouraged
     '''
-    model = model.to(device)
     model.half()
     model.eval()
+    model.to(device)
     if samplelength is not None:
         print("Warning: using sample length is discouraged. Please avoid using this parameter.")
-    model = model.to(device)
-    model.half()
-    model.eval()
     losses = []
     for batchno, data_x in tqdm(enumerate(dataloader),total=len(dataloader)):
         if nbatches is not None and batchno >= nbatches:
             break
-        with torch.no_grad():       
+        with torch.no_grad():    
             ## Get predictions on training data 
             data_x = data_x["input_ids"]
             if samplelength is None:
-                data_x = data_x.to(device).detach()                  
+                data_x = data_x.detach().to(device)                 
             else:
-                data_x = data_x[:,:samplelength].to(device).detach()
+                data_x = data_x[:,:samplelength].detach().to(device)
    
             ## Compute average log likelihood
             losses.append(compute_input_ids_cross_entropy(model, data_x))
+
+            del data_x
+            torch.cuda.empty_cache()
+            torch.cuda.synchronize()
     return torch.tensor(losses)
 
 

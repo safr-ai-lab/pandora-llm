@@ -13,6 +13,13 @@ TODO
 
 TODO
 
+AWS PyTorch 2.0.0 AMI
+```
+pip install transformers
+pip install datasets
+pip install zstandard
+```
+
 ### Usage
 
 TODO
