@@ -4,20 +4,18 @@ from transformers import GPTNeoXForCausalLM, AutoTokenizer
 from tqdm import tqdm
 from attack_utils import *
 from dataset_utils import *
-from MoPe import MoPe
+from LOSS import LOSS
 import time
 import argparse
 
 """
 Sample command line prompt:
-python run_mope.py --mod_size 70m --n_models 15 --n_samples 1000 --sigma 0.001
+python run_loss.py --mod_size 70m --n_samples 1000
 """
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--mod_size', action="store", type=str, required=True, help='Pythia Model Size')
-parser.add_argument('--n_models', action="store", type=int, required=True, help='Number of new models')
 parser.add_argument('--n_samples', action="store", type=int, required=True, help='Number of samples')
-parser.add_argument('--sigma', action="store", type=float, required=True, help='Noise standard deviation')
 args = parser.parse_args()
 
 ## Other parameters
@@ -47,13 +45,11 @@ validation_dataset = load_val_pile(number=args.n_samples, seed=seed, num_splits=
 training_dataloader = DataLoader(training_dataset, batch_size = 1, collate_fn=lambda batch: collate_fn(batch, tokenizer=tokenizer, length=max_length))
 validation_dataloader = DataLoader(validation_dataset, batch_size = 1, collate_fn=lambda batch: collate_fn(batch, tokenizer=tokenizer, length=max_length))
 
-## Run MoPe attack
+## Run LOSS attack
 
-config_mope = {
+config_loss = {
     "training_dl": training_dataloader,
     "validation_dl": validation_dataloader,
-    "n_new_models": args.n_models,
-    "noise_stdev": args.sigma,
     "bs" : 1,
     "nbatches": args.n_samples,
     "samplelength": None,
@@ -66,12 +62,13 @@ print(f"- Code initialization time was {end-start} seconds.")
 
 start = time.time()
 
-MoPer = MoPe(model_name, model_revision=model_revision, cache_dir=model_cache_dir)
-MoPer.inference(config_mope)
+LOSSer = LOSS(model_name, model_revision=model_revision, cache_dir=model_cache_dir)
 
-MoPer.attack_plot_ROC(log_scale = False, show_plot=False)
-MoPer.attack_plot_ROC(log_scale = True, show_plot=False)
-MoPer.save()
+LOSSer.inference(config_loss)
+
+LOSSer.attack_plot_ROC(log_scale = False, show_plot=False)
+LOSSer.attack_plot_ROC(log_scale = True, show_plot=False)
+LOSSer.save()
 
 end = time.time()
-print(f"- MoPe at {args.mod_size} and {args.n_models} new models took {end-start} seconds.")
+print(f"- LOSS at {args.mod_size} and {args.n_samples} samples took {end-start} seconds.")
