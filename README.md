@@ -87,6 +87,8 @@ Sample command line prompt (with acceleration)
 accelerate launch run_loss.py --mod_size 70m --n_samples 1000 --accelerate
 ```
 
+NOTE: for MoPe with acceleration, use `python run_mope.py` instead of `accelerate launch`. Refer to the python file header for individualized usage directions.
+
 ### FAQ
 
 TODO
