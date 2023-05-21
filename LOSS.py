@@ -22,6 +22,7 @@ class LOSS(MIA):
                 device
                 samplelength
                 nbatches
+                accelerator
         """
         self.config = config
         model = GPTNeoXForCausalLM.from_pretrained(self.model_path, revision=self.model_revision, cache_dir=self.cache_dir)
@@ -29,8 +30,8 @@ class LOSS(MIA):
         if self.config["accelerator"] is not None:
             model, self.config["training_dl"], self.config["validation_dl"]  = self.config["accelerator"].prepare(model, self.config["training_dl"], self.config["validation_dl"])
 
-        self.train_cross_entropy = compute_dataloader_cross_entropy(model, self.config["training_dl"], self.config["device"], self.config["nbatches"], self.config["bs"], self.config["samplelength"], self.config["accelerator"]).cpu() 
-        self.val_cross_entropy = compute_dataloader_cross_entropy(model, self.config["validation_dl"], self.config["device"], self.config["nbatches"], self.config["bs"], self.config["samplelength"], self.config["accelerator"]).cpu()
+        self.train_cross_entropy = compute_dataloader_cross_entropy(model, self.config["training_dl"], self.config["device"], self.config["nbatches"], self.config["samplelength"], self.config["accelerator"]).cpu() 
+        self.val_cross_entropy = compute_dataloader_cross_entropy(model, self.config["validation_dl"], self.config["device"], self.config["nbatches"], self.config["samplelength"], self.config["accelerator"]).cpu()
 
     def get_statistics(self):
         return self.train_cross_entropy, self.val_cross_entropy

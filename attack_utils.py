@@ -50,7 +50,7 @@ def compute_input_ids_cross_entropy(model, input_ids, return_pt=True):
 
   return torch.tensor(ans) if return_pt else ans 
 
-def compute_dataloader_cross_entropy(model, dataloader, device, nbatches=None, bs=1, samplelength=None, accelerator=None):    
+def compute_dataloader_cross_entropy(model, dataloader, device=None, nbatches=None, samplelength=None, accelerator=None):    
     '''
     Computes dataloader cross entropy with additional support for specifying the full data loader and full sample length.
     Warning: using samplelength is discouraged

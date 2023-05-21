@@ -3,6 +3,8 @@ from attack_utils import *
 from transformers import GPTNeoXForCausalLM
 import torch
 import copy
+import subprocess
+import time
 
 class MoPe(MIA):
     """
@@ -13,30 +15,38 @@ class MoPe(MIA):
         self.model = None
         self.new_model_paths = []
 
-    def generate_new_models(self):
+    def perturb_model(self,ind_model):
+        dummy_model = copy.deepcopy(self.model)
+        ## Perturb model
+        with torch.no_grad():
+            for name, param in dummy_model.named_parameters():
+                noise = torch.randn(param.size()) * self.noise_stdev
+                param.add_(noise)
+        
+        # Move to disk 
+        dummy_model.save_pretrained(f"MoPe/{self.model_name}-{ind_model}", from_pt=True) 
+        self.new_model_paths.append(f"MoPe/{self.model_name}-{ind_model}")
+        
+    def generate_new_models(self,tokenizer):
         self.new_model_paths = []
 
         with torch.no_grad():
-            for ind_model in range(0, self.n_new_models):  
-                print(f"Loading Perturbed Model {ind_model+1}/{self.n_new_models}")      
+            for ind_model in range(1, self.n_new_models+1):  
+                print(f"Loading Perturbed Model {ind_model}/{self.n_new_models}")      
                 
                 dummy_model = copy.deepcopy(self.model)
-                dummy_model.to(self.device)    
 
                 ## Perturbed model
                 for name, param in dummy_model.named_parameters():
                     noise = torch.randn(param.size()) * self.noise_stdev
-                    param.add_(noise.to(self.device))
+                    param.add_(noise)
                 
                 # Move to disk 
                 dummy_model.save_pretrained(f"MoPe/{self.model_name}-{ind_model}", from_pt=True) 
+                tokenizer.save_pretrained(f"MoPe/{self.model_name}-{ind_model}")
                 self.new_model_paths.append(f"MoPe/{self.model_name}-{ind_model}")
 
-                # Delete model from GPU
-                del dummy_model
-                torch.cuda.empty_cache()
-                torch.cuda.synchronize()
-        
+        del dummy_model
         torch.cuda.empty_cache()
         torch.cuda.synchronize()
 
@@ -52,6 +62,7 @@ class MoPe(MIA):
                 samplelength
                 nbatches
                 device
+                accelerate
         """
         self.config = config
         self.training_dl = config["training_dl"]
@@ -62,6 +73,8 @@ class MoPe(MIA):
         self.samplelength = config["samplelength"]
         self.nbatches = config["nbatches"]
         self.device = config["device"]
+        self.accelerate = config["accelerate"]
+        self.tokenizer = config["tokenizer"]
 
         ## If model has not been created (i.e., first call)
         if self.model == None:
@@ -73,7 +86,10 @@ class MoPe(MIA):
 
         ## Generate new models if we are supplied with noise_stdev and n_new_models
         if self.noise_stdev != None and self.n_new_models != None:
-            self.generate_new_models()
+            start = time.perf_counter()
+            self.generate_new_models(self.tokenizer)
+            end = time.perf_counter()
+            print(f"Perturbing Models took {end-start} seconds!")
 
         ## Initialize train/val result arrays (Model Index (0=Base), Number Batches, Batch Size)   
         self.training_res = torch.zeros((self.n_new_models + 1, self.nbatches, self.bs))  
@@ -81,22 +97,79 @@ class MoPe(MIA):
         
         args = [self.device, self.nbatches, self.bs, self.samplelength]
 
-        # Compute losses for base model
-        print("Evaluating Base Model")
-        self.training_res[0,:,:] = compute_dataloader_cross_entropy(*([self.model, self.training_dl] + args)).reshape(-1,1) # model gets moved to device in this method
-        self.validation_res[0,:,:] = compute_dataloader_cross_entropy(*([self.model, self.validation_dl] + args)).reshape(-1,1)
+        if not self.accelerate:
+            # Compute losses for base model
+            print("Evaluating Base Model")
+            self.training_res[0,:,:] = compute_dataloader_cross_entropy(self.model, self.training_dl, device=self.device, nbatches=self.nbatches, samplelength=self.samplelength).reshape(-1,1) # model gets moved to device in this method
+            self.validation_res[0,:,:] = compute_dataloader_cross_entropy(self.model, self.validation_dl, device=self.device, nbatches=self.nbatches, samplelength=self.samplelength).reshape(-1,1)
 
-        # Compute loss for each perturbed model
-        for ind_model in range(1,self.n_new_models+1):
-            print(f"Evaluating Perturbed Model {ind_model}/{self.n_new_models}")
-            t_model = GPTNeoXForCausalLM.from_pretrained(self.new_model_paths[ind_model-1]).to(self.device)
-            self.training_res[ind_model,:,:] = compute_dataloader_cross_entropy(*([t_model, self.training_dl] + args)).reshape(-1,1)
-            self.validation_res[ind_model,:,:] = compute_dataloader_cross_entropy(*([t_model, self.validation_dl] + args)).reshape(-1,1)
-            del t_model
-            torch.cuda.empty_cache()
-            torch.cuda.synchronize()
+            # Compute loss for each perturbed model
+            for ind_model in range(1,self.n_new_models+1):
+                print(f"Evaluating Perturbed Model {ind_model}/{self.n_new_models}")
+                t_model = GPTNeoXForCausalLM.from_pretrained(self.new_model_paths[ind_model-1])
+                self.training_res[ind_model,:,:] = compute_dataloader_cross_entropy(t_model, self.training_dl, device=self.device, nbatches=self.nbatches, samplelength=self.samplelength).reshape(-1,1)
+                self.validation_res[ind_model,:,:] = compute_dataloader_cross_entropy(t_model, self.validation_dl, device=self.device, nbatches=self.nbatches, samplelength=self.samplelength).reshape(-1,1)
+                del t_model
+                torch.cuda.empty_cache()
+                torch.cuda.synchronize()
 
-        self.get_statistics()
+        else:
+            # Compute losses for base model
+            print("Evaluating Base Model")
+            subprocess.run(["accelerate", "launch", "model_inference.py",
+                "--model_path", self.model_path,
+                "--model_revision", self.model_revision,
+                "--cache_dir", self.cache_dir,
+                "--dataset_path", "train_data.pt",
+                "--n_samples", str(self.nbatches),
+                "--bs", str(self.bs),
+                "--save_path", "MoPe/train_0.pt",
+                "--accelerate",
+                ]
+            )
+            subprocess.run(["accelerate", "launch", "model_inference.py",
+                "--model_path", self.model_path,
+                "--model_revision", self.model_revision,
+                "--cache_dir", self.cache_dir,
+                "--dataset_path", "val_data.pt",
+                "--n_samples", str(self.nbatches),
+                "--bs", str(self.bs),
+                "--save_path", "MoPe/val_0.pt",
+                "--accelerate",
+                ]
+            )
+            self.training_res[0,:,:] = torch.load("MoPe/train_0.pt").reshape(-1,1)
+            self.validation_res[0,:,:] = torch.load("MoPe/val_0.pt").reshape(-1,1)
+
+            # Compute loss for each perturbed model
+            for ind_model in range(1,self.n_new_models+1):
+                print(f"Evaluating Perturbed Model {ind_model}/{self.n_new_models}")
+                subprocess.call(["accelerate", "launch", "model_inference.py",
+                    "--model_path", f"MoPe/{self.model_name}-{ind_model}",
+                    "--model_revision", self.model_revision,
+                    "--cache_dir", self.cache_dir,
+                    "--dataset_path", "train_data.pt",
+                    "--n_samples", str(self.nbatches),
+                    "--bs", str(self.bs),
+                    "--save_path", f"MoPe/train_{ind_model}.pt",
+                    "--accelerate",
+                    ]
+                )
+                subprocess.call(["accelerate", "launch", "model_inference.py",
+                    "--model_path", f"MoPe/{self.model_name}-{ind_model}",
+                    "--model_revision", self.model_revision,
+                    "--cache_dir", self.cache_dir,
+                    "--dataset_path", "val_data.pt",
+                    "--n_samples", str(self.nbatches),
+                    "--bs", str(self.bs),
+                    "--save_path", f"MoPe/val_{ind_model}.pt",
+                    "--accelerate",
+                    ]
+                )
+                self.training_res[ind_model,:,:] = torch.load(f"MoPe/train_{ind_model}.pt").reshape(-1,1)
+                self.validation_res[ind_model,:,:] = torch.load(f"MoPe/val_{ind_model}.pt").reshape(-1,1)
+
+        return self.get_statistics()
 
     def get_statistics(self):
         """
