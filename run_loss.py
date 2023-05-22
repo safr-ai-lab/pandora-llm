@@ -37,7 +37,7 @@ def main():
     ## Stopwatch for testing timing
     start = time.time()
 
-    model_title = f"pythia-{args.mod_size}-deduped"
+    model_title = f"pythia-{args.mod_size}"
     model_name = "EleutherAI/" + model_title
     model_cache_dir = "./"+ model_title +"/"+model_revision
 
@@ -50,7 +50,7 @@ def main():
 
     if accelerator is None or accelerator.is_main_process:
         print("Loading Data")
-    training_dataset = load_train_pile_random(number=args.n_samples,seed=seed,num_splits=1)[0] # TODO - replace w/ sequence at some point
+    training_dataset = load_train_pile_random_duped(number=args.n_samples,seed=seed,num_splits=1)[0] # TODO - replace w/ sequence at some point
     validation_dataset = load_val_pile(number=args.n_samples, seed=seed, num_splits=1)[0]
 
     training_dataloader = DataLoader(training_dataset, batch_size = 1, collate_fn=lambda batch: collate_fn(batch, tokenizer=tokenizer, length=max_length))

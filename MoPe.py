@@ -184,7 +184,7 @@ class MoPe(MIA):
         return self.train_diff, self.valid_diff
 
     def get_default_title(self):
-        return "MoPe_{}_{}_N={}_var={}_bs={}_nbatches={}".format(
+        return "MoPe/MoPe_{}_{}_N={}_var={}_bs={}_nbatches={}".format(
             self.model_path.replace("/","-"),
             self.model_revision.replace("/","-"),
             self.n_new_models,

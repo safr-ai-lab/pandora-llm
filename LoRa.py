@@ -33,10 +33,10 @@ class LoRa(MIA):
         self.val_result_ft = val_result_ft[~torch.any(val_result_ft.isnan(),dim=1)]
 
     def save(self, title):
-        with open(f"LoRa_{title}_loss.pickle","wb") as f:
+        with open(f"LoRa/LoRa_{title}_loss.pickle","wb") as f:
             pickle.dump((self.train_result_ft, self.val_result_ft),f)
 
-        with open(f"LoRa_{title}_ratios.pickle","wb") as f:
+        with open(f"LoRa/LoRa_{title}_ratios.pickle","wb") as f:
             pickle.dump((self.train_ratios, self.val_ratios),f)
 
     # can use plot_ROC to plot ROC

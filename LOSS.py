@@ -37,7 +37,7 @@ class LOSS(MIA):
         return self.train_cross_entropy, self.val_cross_entropy
 
     def get_default_title(self):
-        return "LOSS_{}_{}_bs={}_nbatches={}".format(
+        return "LOSS/LOSS_{}_{}_bs={}_nbatches={}".format(
             self.model_path.replace("/","-"),
             self.model_revision.replace("/","-"),
             self.config["bs"],
