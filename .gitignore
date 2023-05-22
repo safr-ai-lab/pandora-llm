@@ -9,7 +9,10 @@ pythia-70m-deduped/
 pythia-160m-deduped/
 pythia-410m-deduped/
 pythia-1b-deduped/
+pythia-1.4b-deduped/
 pythia-2.8b-deduped/
 pythia-6.9b-deduped/
 pythia-12b-deduped/
 roc_perturb_threshold/
+LOSS_**.png
+LOSS_**.pt

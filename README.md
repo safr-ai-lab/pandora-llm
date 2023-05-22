@@ -22,6 +22,16 @@ pip install deepspeed
 pip install accelerate
 ```
 
+### File Structure
+
+MIA Algorithms: `Attack.py`, `LOSS.py`, `MoPe.py`, `LoRa.py`, `LiRa.py`
+
+Common Attack Functions: `attack_utils.py`
+
+Dataset Functions: `dataset_utils.py`
+
+Run Experiment Scripts: `run_{attack}.py`
+
 ### Usage
 
 We use accelerate's zero3 inference to enable multi-GPU inference.
