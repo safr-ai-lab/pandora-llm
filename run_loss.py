@@ -22,6 +22,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--mod_size', action="store", type=str, required=True, help='Pythia Model Size')
     parser.add_argument('--n_samples', action="store", type=int, required=True, help='Number of samples')
+    parser.add_argument('--sample_length', action="store", type=int, required=False, help='Number of tokens to calculate loss for')
     parser.add_argument('--accelerate', action="store_true", required=False, help='Use accelerate')
     args = parser.parse_args()
 
@@ -63,7 +64,7 @@ def main():
         "validation_dl": validation_dataloader,
         "bs" : 1,
         "nbatches": args.n_samples,
-        "samplelength": None,
+        "samplelength": args.sample_length,
         "device": device,
         "accelerator": accelerator
     }

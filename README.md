@@ -20,6 +20,7 @@ pip install datasets
 pip install zstandard
 pip install deepspeed
 pip install accelerate
+pip install mpi4py
 ```
 
 ### File Structure

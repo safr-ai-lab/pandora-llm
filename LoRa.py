@@ -3,43 +3,120 @@ from attack_utils import *
 from transformers import GPTNeoXForCausalLM
 import torch
 import pickle
+import subprocess
 
 class LoRa(MIA):
     def __init__(self,*args,**kwargs):
         super().__init__(*args, **kwargs)
     
-    def inference_ft(self, config, trainer): # running LoRa with fine-tuning (trainer is Trainer HF object)
+    def inference(self, config):
         """
         Perform MIA. Here, the model we attack is the fine-tuned one. 
             config: dictionary of configuration parameters
+                trainer
                 training_dl
                 validation_dl
-                model - same one used in trainer (object reference)
+                tokenizer
                 device
+                n_batches
+                n_samples
+                bs
+                accelerate
         """
-        base_model = GPTNeoXForCausalLM.from_pretrained(model_path=self.model_path, revision=self.model_revision, cache_dir=self.cache_dir).to(config["device"])
-        trainer.train()
+        self.config = config
 
-        train_result_ft = compute_dataloader_cross_entropy(config["model"], config["training_dl"], config["device"])
-        val_result_ft = compute_dataloader_cross_entropy(config["model"], config["validation_dl"], config["device"])
+        if not self.config["accelerate"]:
 
-        train_result_base = compute_dataloader_cross_entropy(base_model, config["training_dl"], config["device"])
-        val_result_base = compute_dataloader_cross_entropy(base_model, config["validation_dl"], config["device"])
+            self.train_result_base = compute_dataloader_cross_entropy(self.config["trainer"].model, self.config["training_dl"], device=self.config["device"], nbatches=self.config["n_batches"], samplelength=self.config["n_samples"]).reshape(-1,1)
+            self.val_result_base = compute_dataloader_cross_entropy(self.config["trainer"].model, self.config["validation_dl"], device=self.config["device"], nbatches=self.config["n_batches"], samplelength=self.config["n_samples"]).reshape(-1,1)
+            
+            config["trainer"].train()
 
-        self.train_ratios = (train_result_ft/train_result_base)[~torch.any((train_result_ft/train_result_base).isnan(),dim=1)]
-        self.val_ratios = (val_result_ft/val_result_base)[~torch.any((val_result_ft/val_result_base).isnan(),dim=1)]
+            self.train_result_ft = compute_dataloader_cross_entropy(self.config["trainer"].model, self.config["training_dl"], device=self.config["device"], nbatches=self.config["n_batches"], samplelength=self.config["n_samples"]).reshape(-1,1)
+            self.val_result_ft = compute_dataloader_cross_entropy(self.config["trainer"].model, self.config["validation_dl"], device=self.config["device"], nbatches=self.config["n_batches"], samplelength=self.config["n_samples"]).reshape(-1,1)
 
-        self.train_result_ft = train_result_ft[~torch.any(train_result_ft.isnan(),dim=1)]
-        self.val_result_ft = val_result_ft[~torch.any(val_result_ft.isnan(),dim=1)]
+            self.train_ratios = (self.train_result_ft/self.train_result_base)[~torch.any((self.train_result_ft/self.train_result_base).isnan(),dim=1)]
+            self.val_ratios = (self.val_result_ft/self.val_result_base)[~torch.any((self.val_result_ft/self.val_result_base).isnan(),dim=1)]
 
-    def save(self, title):
-        with open(f"LoRa/LoRa_{title}_loss.pickle","wb") as f:
-            pickle.dump((self.train_result_ft, self.val_result_ft),f)
+        else:
+            subprocess.call(["accelerate", "launch", "model_inference.py",
+                "--model_path", self.model_path,
+                "--model_revision", self.model_revision,
+                "--cache_dir", self.cache_dir,
+                "--dataset_path", "train_data.pt",
+                "--n_samples", str(self.config["n_batches"]),
+                "--bs", str(self.config["bs"]),
+                "--save_path", "LoRa/base_train.pt",
+                "--accelerate",
+                ]
+            )
+            subprocess.call(["accelerate", "launch", "model_inference.py",
+                "--model_path", self.model_path,
+                "--model_revision", self.model_revision,
+                "--cache_dir", self.cache_dir,
+                "--dataset_path", "val_data.pt",
+                "--n_samples", str(self.config["n_batches"]),
+                "--bs", str(self.config["bs"]),
+                "--save_path", "LoRa/base_val.pt",
+                "--accelerate",
+                ]
+            )
+            self.train_result_base = torch.load("LoRa/base_train.pt").reshape(-1,1)
+            self.val_result_base = torch.load("LoRa/base_val.pt").reshape(-1,1)
+                        
+            self.config["trainer"].train()
 
-        with open(f"LoRa/LoRa_{title}_ratios.pickle","wb") as f:
+            self.config["trainer"].save_model(f"LoRa/{self.model_name}-ft")
+            self.config["tokenizer"].save_pretrained(f"LoRa/{self.model_name}-ft")
+
+            subprocess.call(["accelerate", "launch", "model_inference.py",
+                "--model_path", f"LoRa/{self.model_name}-ft",
+                "--model_revision", self.model_revision,
+                "--cache_dir", self.cache_dir,
+                "--dataset_path", "train_data.pt",
+                "--n_samples", str(self.config["n_batches"]),
+                "--bs", str(self.config["bs"]),
+                "--save_path", "LoRa/ft_train.pt",
+                "--accelerate",
+                ]
+            )
+            subprocess.call(["accelerate", "launch", "model_inference.py",
+                "--model_path", f"LoRa/{self.model_name}-ft",
+                "--model_revision", self.model_revision,
+                "--cache_dir", self.cache_dir,
+                "--dataset_path", "val_data.pt",
+                "--n_samples", str(self.config["n_batches"]),
+                "--bs", str(self.config["bs"]),
+                "--save_path", "LoRa/ft_val.pt",
+                "--accelerate",
+                ]
+            )
+
+            self.train_result_ft = torch.load("LoRa/ft_train.pt").reshape(-1,1)
+            self.val_result_ft = torch.load("LoRa/ft_train.pt").reshape(-1,1)
+
+            self.train_ratios = (self.train_result_ft/self.train_result_base)[~torch.any((self.train_result_ft/self.train_result_base).isnan(),dim=1)]
+            self.val_ratios = (self.val_result_ft/self.val_result_base)[~torch.any((self.val_result_ft/self.val_result_base).isnan(),dim=1)]
+
+
+    def get_statistics(self):
+        return self.train_ratios, self.val_ratios
+    
+    def get_default_title(self):
+        return "LoRa/LoRa_{}_{}_bs={}_nbatches={}".format(
+            self.model_path.replace("/","-"),
+            self.model_revision.replace("/","-"),
+            self.config["bs"],
+            self.config["n_batches"]
+        )
+
+    def save(self, title = None):
+        if title == None:
+            title = self.get_default_title()
+        with open(f"{title}_loss.pickle","wb") as f:
+            pickle.dump((self.train_result_base, self.val_result_base, self.train_result_ft, self.val_result_ft),f)
+        with open(f"{title}_ratios.pickle","wb") as f:
             pickle.dump((self.train_ratios, self.val_ratios),f)
-
-    # can use plot_ROC to plot ROC
 
     def inference_pt(self, config): 
         """

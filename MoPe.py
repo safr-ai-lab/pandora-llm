@@ -116,7 +116,7 @@ class MoPe(MIA):
         else:
             # Compute losses for base model
             print("Evaluating Base Model")
-            subprocess.run(["accelerate", "launch", "model_inference.py",
+            subprocess.call(["accelerate", "launch", "model_inference.py",
                 "--model_path", self.model_path,
                 "--model_revision", self.model_revision,
                 "--cache_dir", self.cache_dir,
@@ -127,7 +127,7 @@ class MoPe(MIA):
                 "--accelerate",
                 ]
             )
-            subprocess.run(["accelerate", "launch", "model_inference.py",
+            subprocess.call(["accelerate", "launch", "model_inference.py",
                 "--model_path", self.model_path,
                 "--model_revision", self.model_revision,
                 "--cache_dir", self.cache_dir,

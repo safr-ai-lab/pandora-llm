@@ -34,7 +34,7 @@ def main():
     if accelerator is not None:
         model, dataloader = accelerator.prepare(model, dataloader)
 
-    loss = compute_dataloader_cross_entropy(model, dataloader, device=args.device, nbatches=args.n_samples, accelerator=accelerator)
+    loss = compute_dataloader_cross_entropy(model, dataloader, device=args.device, nbatches=args.n_samples, accelerator=accelerator).detach().cpu()
 
     if accelerator is None or accelerator.is_main_process:
         torch.save(loss,args.save_path)
