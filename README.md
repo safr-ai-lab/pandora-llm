@@ -21,17 +21,19 @@ pip install zstandard
 pip install deepspeed
 pip install accelerate
 pip install mpi4py
+pip install scikit-learn # for ROC curves
+pip install matplotlib # for plotting
 ```
 
 ### File Structure
 
-MIA Algorithms: `Attack.py`, `LOSS.py`, `MoPe.py`, `LoRa.py`, `LiRa.py`
+`Attack.py` is the base class. The following MIA algorithm classes inherit from it: `LOSS.py`, `MoPe.py`, `LoRa.py`, `LiRa.py`
 
 Common Attack Functions: `attack_utils.py`
 
 Dataset Functions: `dataset_utils.py`
 
-Run Experiment Scripts: `run_{attack}.py`
+Run Experiment Scripts: `run_{attack}.py` (`.ipynb` notebooks also provided)
 
 ### Usage
 
