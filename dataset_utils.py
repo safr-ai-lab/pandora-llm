@@ -14,6 +14,15 @@ def collate_fn(batch,tokenizer,length):
         "attention_mask": torch.tensor(tokens_padded>0,dtype=int)
     }
 
+def collate_fn_new(batch):
+    tokens = torch.tensor(batch)
+    mask = torch.ones(len(tokens))
+    return {
+        "input_ids": tokens,
+        "labels": tokens,
+        "attention_mask": mask
+    }
+
 def load_train_pile_random_deduped(number=1000, percentage=None, seed=229, num_splits=2):
     '''
     Loads the random sample from training pile
