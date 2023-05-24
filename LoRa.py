@@ -114,12 +114,11 @@ class LoRa(MIA):
         )
 
     def save(self, title = None):
-        if title == None:
+        if title is None:
             title = self.get_default_title()
-        with open(f"{title}_loss.pickle","wb") as f:
-            pickle.dump((self.train_result_base, self.val_result_base, self.train_result_ft, self.val_result_ft),f)
-        with open(f"{title}_ratios.pickle","wb") as f:
-            pickle.dump((self.train_ratios, self.val_ratios),f)
+        
+        torch.save(self.get_statistics(),title+".pt")
+        torch.save((self.train_result_base, self.val_result_base, self.train_result_ft, self.val_result_ft),title+"_full.pt")
 
     def inference_pt(self, config): 
         """

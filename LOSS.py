@@ -51,14 +51,16 @@ class LOSS(MIA):
         if title == None:
             title = self.get_default_title()
 
-        ## Save outputs
-        with torch.no_grad():
-            valuestraining   = torch.flatten(self.train_cross_entropy) 
-            valuesvalidation = torch.flatten(self.val_cross_entropy)
+        torch.save(self.get_statistics(),title+".pt")
 
-        notnan = torch.logical_and(~valuestraining.isnan(), ~valuesvalidation.isnan())
-        valuestraining = valuestraining[notnan]
-        valuesvalidation = valuesvalidation[notnan]
+        # ## Save outputs
+        # with torch.no_grad():
+        #     valuestraining   = torch.flatten(self.train_cross_entropy) 
+        #     valuesvalidation = torch.flatten(self.val_cross_entropy)
 
-        ## save as pt file
-        torch.save(torch.vstack((valuestraining, valuesvalidation)), title+".pt")
+        # notnan = torch.logical_and(~valuestraining.isnan(), ~valuesvalidation.isnan())
+        # valuestraining = valuestraining[notnan]
+        # valuesvalidation = valuesvalidation[notnan]
+
+        # ## save as pt file
+        # torch.save(torch.vstack((valuestraining, valuesvalidation)), title+".pt")

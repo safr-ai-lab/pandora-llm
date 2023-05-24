@@ -154,3 +154,45 @@ def plot_ROC(train_statistic,val_statistic,title,log_scale=False,show_plot=True,
         plt.savefig(save_name, bbox_inches="tight")
     if show_plot:
         plt.show()
+
+def plot_ROC_multiple(train_statistics,val_statistics,title,labels,log_scale=False,show_plot=True,save_name=None):
+    '''
+    Plots multiple ROC curves in a single plot
+    '''
+    plt.figure()
+    plt.plot([0, 1], [0, 1], linestyle='--')
+    for train_statistic, val_statistic, label in zip(train_statistics, val_statistics,labels):
+        train_statistic = torch.tensor(train_statistic).flatten()
+        train_statistic = train_statistic[~train_statistic.isnan()]
+        val_statistic = torch.tensor(val_statistic).flatten()
+        val_statistic = val_statistic[~val_statistic.isnan()]
+
+        fpr, tpr, thresholds = roc_curve(torch.cat((torch.zeros_like(train_statistic),torch.ones_like(val_statistic))).flatten(),
+                                        torch.cat((train_statistic,val_statistic)).flatten())
+        roc_auc = auc(fpr, tpr)
+        if not log_scale:
+            plt.plot(fpr, tpr, label=f'{label} (AUC = {roc_auc:0.4f})')
+        else:
+            plt.loglog(fpr, tpr, label=f'{label} (AUC = {roc_auc:0.4f})')
+    plt.title(title)
+    plt.legend(loc="lower right")
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    if save_name is not None:
+        plt.savefig(save_name, bbox_inches="tight")
+    if show_plot:
+        plt.show()
+
+def plot_ROC_files(files,title,labels=None,log_scale=False,show_plot=True,save_name=None):
+    '''
+    Plots ROCs from saved statistic .pt files
+    '''
+    train_statistics = []
+    val_statistics = []
+    for file in files:
+        t_stat, v_stat = torch.load(file)
+        train_statistics.append(t_stat)
+        val_statistics.append(v_stat)
+    if labels is None:
+        labels = files
+    plot_ROC_multiple(train_statistics,val_statistics,title,labels,log_scale=log_scale,show_plot=show_plot,save_name=save_name)
