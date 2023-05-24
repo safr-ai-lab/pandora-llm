@@ -23,6 +23,8 @@ def main():
     parser.add_argument('--n_samples', action="store", type=int, required=True, help='Number of samples')
     parser.add_argument('--sigma', action="store", type=float, required=True, help='Noise standard deviation')
     parser.add_argument('--accelerate', action="store_true", required=False, help='Use accelerate')
+    parser.add_argument('--train_dl', action="store", required=False, help='.pt file of train dataloader')
+    parser.add_argument('--val_dl', action="store", required=False, help='.pt file of val dataloader')
     args = parser.parse_args()
 
     ## Other parameters
@@ -46,15 +48,28 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(model_name)
 
     print("Loading Data")
-    training_dataset = load_train_pile_random(number=args.n_samples,seed=seed,num_splits=1)[0] # TODO - replace w/ sequence at some point
-    validation_dataset = load_val_pile(number=args.n_samples, seed=seed, num_splits=1)[0]
 
-    if args.accelerate:
+    if args.val_dl:
+        fixed_input = args.val_dl + ".pt" if not args.val_dl.endswith(".pt") else args.val_dl
+        print("You are using a self-specified validation dataloader. Verify that it has the batching/window lengths you intend.")
+        validation_dataloader = torch.load(fixed_input)
+        print("Val Done!")
+    else:
+        validation_dataset = load_val_pile(number=args.n_samples, seed=seed, num_splits=1)[0]
+        validation_dataloader = DataLoader(validation_dataset, batch_size = 1, collate_fn=lambda batch: collate_fn(batch, tokenizer=tokenizer, length=max_length))
+
+    if args.train_dl:
+        print("You are using a self-specified training dataloader. Verify that it has the batching/window lengths you intend.")
+        fixed_input = args.train_dl + ".pt" if not args.train_dl.endswith(".pt") else args.train_dl
+        training_dataloader = torch.load(fixed_input)
+        print("Train Done!")
+    else:
+        training_dataset = load_train_pile_random(number=args.n_samples,seed=seed,num_splits=1)[0] # TODO - replace w/ sequence at some point
+        training_dataloader = DataLoader(training_dataset, batch_size = 1, collate_fn=lambda batch: collate_fn(batch, tokenizer=tokenizer, length=max_length))
+
+    if args.accelerate and (args.val_dl is None and args.train_dl is None):
         torch.save(training_dataset,"train_data.pt")
         torch.save(validation_dataset,"val_data.pt")
-
-    training_dataloader = DataLoader(training_dataset, batch_size = 1, collate_fn=lambda batch: collate_fn(batch, tokenizer=tokenizer, length=max_length))
-    validation_dataloader = DataLoader(validation_dataset, batch_size = 1, collate_fn=lambda batch: collate_fn(batch, tokenizer=tokenizer, length=max_length))
 
     ## Run MoPe attack
 
