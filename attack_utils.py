@@ -137,8 +137,8 @@ def plot_ROC(train_statistic,val_statistic,title,log_scale=False,show_plot=True,
     val_statistic = torch.tensor(val_statistic).flatten()
     val_statistic = val_statistic[~val_statistic.isnan()]
 
-    fpr, tpr, thresholds = roc_curve(torch.cat((torch.zeros_like(train_statistic),torch.ones_like(val_statistic))).flatten(),
-                                    torch.cat((train_statistic,val_statistic)).flatten())
+    fpr, tpr, thresholds = roc_curve(torch.cat((torch.ones_like(train_statistic),torch.zeros_like(val_statistic))).flatten(),
+                                    torch.cat((-train_statistic,-val_statistic)).flatten())
     roc_auc = auc(fpr, tpr)
     plt.figure()
     if not log_scale:
@@ -167,8 +167,8 @@ def plot_ROC_multiple(train_statistics,val_statistics,title,labels,log_scale=Fal
         val_statistic = torch.tensor(val_statistic).flatten()
         val_statistic = val_statistic[~val_statistic.isnan()]
 
-        fpr, tpr, thresholds = roc_curve(torch.cat((torch.zeros_like(train_statistic),torch.ones_like(val_statistic))).flatten(),
-                                        torch.cat((train_statistic,val_statistic)).flatten())
+        fpr, tpr, thresholds = roc_curve(torch.cat((torch.ones_like(train_statistic),torch.zeros_like(val_statistic))).flatten(),
+                                        torch.cat((-train_statistic,-val_statistic)).flatten())
         roc_auc = auc(fpr, tpr)
         if not log_scale:
             plt.plot(fpr, tpr, label=f'{label} (AUC = {roc_auc:0.4f})')
