@@ -14,6 +14,8 @@ Sample command line prompt (no acceleration)
 python run_mope.py --mod_size 70m --n_samples 1000 --n_models 15 --sigma 0.001
 Sample command line prompt (with acceleration)
 python run_mope.py --mod_size 70m --n_samples 1000 --n_models 15 --sigma 0.001 --accelerate
+Sample command line prompt (with validation dataset pt file)
+python run_mope.py --mod_size 1B --n_samples 1000 --n_models 15 --sigma 0.001 --val_pt val_data.pt 
 """
 
 def main():
@@ -23,8 +25,8 @@ def main():
     parser.add_argument('--n_samples', action="store", type=int, required=True, help='Number of samples')
     parser.add_argument('--sigma', action="store", type=float, required=True, help='Noise standard deviation')
     parser.add_argument('--accelerate', action="store_true", required=False, help='Use accelerate')
-    parser.add_argument('--train_dl', action="store", required=False, help='.pt file of train dataloader')
-    parser.add_argument('--val_dl', action="store", required=False, help='.pt file of val dataloader')
+    parser.add_argument('--train_pt', action="store", required=False, help='.pt file of train dataset')
+    parser.add_argument('--val_pt', action="store", required=False, help='.pt file of val dataset')
     args = parser.parse_args()
 
     ## Other parameters
@@ -49,27 +51,28 @@ def main():
 
     print("Loading Data")
 
-    if args.val_dl:
-        fixed_input = args.val_dl + ".pt" if not args.val_dl.endswith(".pt") else args.val_dl
-        print("You are using a self-specified validation dataloader. Verify that it has the batching/window lengths you intend.")
-        validation_dataloader = torch.load(fixed_input)
-        print("Val Done!")
+    if args.val_pt:
+        fixed_input = args.val_pt + ".pt" if not args.val_pt.endswith(".pt") else args.val_pt
+        print("You are using a self-specified validation dataset...")
+        validation_dataset = torch.load(fixed_input)[:args.n_samples]
+        validation_dataloader = DataLoader(validation_dataset, batch_size = 1, collate_fn=lambda batch: collate_fn(batch, tokenizer=tokenizer, length=max_length))
+        print("Val Dataset Setup Done!")
     else:
         validation_dataset = load_val_pile(number=args.n_samples, seed=seed, num_splits=1)[0]
         validation_dataloader = DataLoader(validation_dataset, batch_size = 1, collate_fn=lambda batch: collate_fn(batch, tokenizer=tokenizer, length=max_length))
 
-    if args.train_dl:
-        print("You are using a self-specified training dataloader. Verify that it has the batching/window lengths you intend.")
-        fixed_input = args.train_dl + ".pt" if not args.train_dl.endswith(".pt") else args.train_dl
-        training_dataloader = torch.load(fixed_input)
-        print("Train Done!")
+    if args.train_pt:
+        print("You are using a self-specified training dataset...")
+        fixed_input = args.train_pt + ".pt" if not args.train_pt.endswith(".pt") else args.train_pt
+        training_dataset = torch.load(fixed_input)[:args.n_samples]
+        training_dataloader = DataLoader(training_dataset, batch_size = 1, collate_fn=lambda batch: collate_fn(batch, tokenizer=tokenizer, length=max_length))
+        print("Train Dataset Setup Done!")
     else:
-        training_dataset = load_train_pile_random(number=args.n_samples,seed=seed,num_splits=1)[0] # TODO - replace w/ sequence at some point
+        training_dataset = load_train_pile_random_deduped(number=args.n_samples,seed=seed,num_splits=1)[0] # TODO - replace w/ sequence at some point
         training_dataloader = DataLoader(training_dataset, batch_size = 1, collate_fn=lambda batch: collate_fn(batch, tokenizer=tokenizer, length=max_length))
 
-    if args.accelerate and (args.val_dl is None and args.train_dl is None):
-        torch.save(training_dataset,"train_data.pt")
-        torch.save(validation_dataset,"val_data.pt")
+    train_pt = args.train_pt if args.accelerate and args.train_pt else "train_data.pt"
+    val_pt = args.val_pt if args.accelerate and args.val_pt else "val_data.pt"
 
     ## Run MoPe attack
 
@@ -82,8 +85,10 @@ def main():
         "nbatches": args.n_samples,
         "samplelength": None,
         "device": device,
-        "accelerate": args.accelerate,
-        "tokenizer": tokenizer
+        "accelerate": args.accelerate, # if this is false, then train_pt and val_pt are not used
+        "tokenizer": tokenizer, 
+        "train_pt": train_pt,
+        "val_pt": val_pt
     }
 
     ## Stopwatch for testing MoPe runtime

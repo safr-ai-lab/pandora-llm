@@ -16,6 +16,8 @@ Sample command line prompt (no acceleration)
 python run_loss.py --mod_size 70m --n_samples 1000
 Sample command line prompt (with acceleration)
 accelerate launch run_loss.py --mod_size 70m --n_samples 1000 --accelerate
+Sample command line prompt (with validation dataset pt file)
+python run_loss.py --mod_size 70m --n_samples 1000 --val_pt val_data.pt
 """
 
 def main():
@@ -24,8 +26,8 @@ def main():
     parser.add_argument('--n_samples', action="store", type=int, required=True, help='Number of samples')
     parser.add_argument('--sample_length', action="store", type=int, required=False, help='Number of tokens to calculate loss for')
     parser.add_argument('--accelerate', action="store_true", required=False, help='Use accelerate')
-    parser.add_argument('--train_dl', action="store", required=False, help='.pt file of train dataloader')
-    parser.add_argument('--val_dl', action="store", required=False, help='.pt file of val dataloader')
+    parser.add_argument('--train_pt', action="store", required=False, help='.pt file of train dataloader')
+    parser.add_argument('--val_pt', action="store", required=False, help='.pt file of val dataloader')
     args = parser.parse_args()
 
     accelerator = Accelerator() if args.accelerate else None
@@ -54,25 +56,31 @@ def main():
     if accelerator is None or accelerator.is_main_process:
         print("Loading Data")
     
-    if args.val_dl:
-        fixed_input = args.val_dl + ".pt" if not args.val_dl.endswith(".pt") else args.val_dl
-        print("You are using a self-specified validation dataloader. Verify that it has the batching/window lengths you intend.")
-        validation_dataloader = torch.load(fixed_input)
-        print("Val Data Loaded!")
+    print("Loading Data")
+
+    if args.val_pt:
+        fixed_input = args.val_pt + ".pt" if not args.val_pt.endswith(".pt") else args.val_pt
+        print("You are using a self-specified validation dataset...")
+        validation_dataset = torch.load(fixed_input)[:args.n_samples]
+        validation_dataloader = DataLoader(validation_dataset, batch_size = 1, collate_fn=lambda batch: collate_fn(batch, tokenizer=tokenizer, length=max_length))
+        print("Val Dataset Setup Done!")
     else:
         validation_dataset = load_val_pile(number=args.n_samples, seed=seed, num_splits=1)[0]
         validation_dataloader = DataLoader(validation_dataset, batch_size = 1, collate_fn=lambda batch: collate_fn(batch, tokenizer=tokenizer, length=max_length))
 
-    if args.train_dl:
-        fixed_input = args.train_dl + ".pt" if not args.train_dl.endswith(".pt") else args.train_dl
-        print("You are using a self-specified training dataloader. Verify that it has the batching/window lengths you intend.")
-        training_dataloader = torch.load(fixed_input)
-        print("Train data loaded!")
-    else:
-        training_dataset = load_train_pile_random_duped(number=args.n_samples,seed=seed,num_splits=1)[0] # TODO - replace w/ sequence at some point
+    if args.train_pt:
+        print("You are using a self-specified training dataset...")
+        fixed_input = args.train_pt + ".pt" if not args.train_pt.endswith(".pt") else args.train_pt
+        training_dataset = torch.load(fixed_input)[:args.n_samples]
         training_dataloader = DataLoader(training_dataset, batch_size = 1, collate_fn=lambda batch: collate_fn(batch, tokenizer=tokenizer, length=max_length))
-    
+        print("Train Dataset Setup Done!")
+    else:
+        training_dataset = load_train_pile_random_deduped(number=args.n_samples,seed=seed,num_splits=1)[0] # TODO - replace w/ sequence at some point
+        training_dataloader = DataLoader(training_dataset, batch_size = 1, collate_fn=lambda batch: collate_fn(batch, tokenizer=tokenizer, length=max_length))
+
     ## Run LOSS attack
+
+    print(args.sample_length)
 
     config_loss = {
         "training_dl": training_dataloader,
@@ -95,10 +103,10 @@ def main():
     LOSSer = LOSS(model_name, model_revision=model_revision, cache_dir=model_cache_dir)
 
     LOSSer.inference(config_loss)
+    LOSSer.save()
 
     LOSSer.attack_plot_ROC(log_scale = False, show_plot=False)
     LOSSer.attack_plot_ROC(log_scale = True, show_plot=False)
-    LOSSer.save()
 
     end = time.time()
 

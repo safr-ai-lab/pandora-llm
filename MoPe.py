@@ -75,6 +75,8 @@ class MoPe(MIA):
         self.device = config["device"]
         self.accelerate = config["accelerate"]
         self.tokenizer = config["tokenizer"]
+        self.train_pt = config["train_pt"]
+        self.val_pt = config["val_pt"]
 
         ## If model has not been created (i.e., first call)
         if self.model == None:
@@ -120,7 +122,7 @@ class MoPe(MIA):
                 "--model_path", self.model_path,
                 "--model_revision", self.model_revision,
                 "--cache_dir", self.cache_dir,
-                "--dataset_path", "train_data.pt",
+                "--dataset_path", self.train_pt,
                 "--n_samples", str(self.nbatches),
                 "--bs", str(self.bs),
                 "--save_path", "MoPe/train_0.pt",
@@ -131,7 +133,7 @@ class MoPe(MIA):
                 "--model_path", self.model_path,
                 "--model_revision", self.model_revision,
                 "--cache_dir", self.cache_dir,
-                "--dataset_path", "val_data.pt",
+                "--dataset_path", self.val_pt,
                 "--n_samples", str(self.nbatches),
                 "--bs", str(self.bs),
                 "--save_path", "MoPe/val_0.pt",
@@ -148,7 +150,7 @@ class MoPe(MIA):
                     "--model_path", f"MoPe/{self.model_name}-{ind_model}",
                     "--model_revision", self.model_revision,
                     "--cache_dir", self.cache_dir,
-                    "--dataset_path", "train_data.pt",
+                    "--dataset_path", self.train_pt,
                     "--n_samples", str(self.nbatches),
                     "--bs", str(self.bs),
                     "--save_path", f"MoPe/train_{ind_model}.pt",
@@ -159,7 +161,7 @@ class MoPe(MIA):
                     "--model_path", f"MoPe/{self.model_name}-{ind_model}",
                     "--model_revision", self.model_revision,
                     "--cache_dir", self.cache_dir,
-                    "--dataset_path", "val_data.pt",
+                    "--dataset_path", self.val_pt,
                     "--n_samples", str(self.nbatches),
                     "--bs", str(self.bs),
                     "--save_path", f"MoPe/val_{ind_model}.pt",

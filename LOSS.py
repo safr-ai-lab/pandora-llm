@@ -2,6 +2,7 @@ from Attack import MIA
 from attack_utils import *
 from transformers import GPTNeoXForCausalLM
 import torch
+import os
 
 class LOSS(MIA):
     """
@@ -24,6 +25,9 @@ class LOSS(MIA):
                 nbatches
                 accelerator
         """
+        if not os.path.exists("LOSS"):
+            os.mkdir("LOSS")
+
         self.config = config
         model = GPTNeoXForCausalLM.from_pretrained(self.model_path, revision=self.model_revision, cache_dir=self.cache_dir)
 
