@@ -4,10 +4,13 @@ from transformers import GPTNeoXForCausalLM
 import torch
 import pickle
 import subprocess
+import os
 
 class LoRa(MIA):
     def __init__(self,*args,**kwargs):
         super().__init__(*args, **kwargs)
+        if not os.path.exists("LoRa"):
+            os.mkdir("LoRa")
     
     def inference(self, config):
         """

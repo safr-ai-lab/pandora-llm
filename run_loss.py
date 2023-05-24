@@ -35,16 +35,13 @@ def main():
     ## Other parameters
     model_revision = "step98000"
     seed = 229
-
-    ## Load model and training and validation dataset
     device = "cuda" if torch.cuda.is_available() else "cpu"
-
-    ## Stopwatch for testing timing
-    start = time.time()
-
-    model_title = f"pythia-{args.mod_size}"
+    model_title = f"pythia-{args.mod_size}-deduped"
     model_name = "EleutherAI/" + model_title
     model_cache_dir = "./"+ model_title +"/"+model_revision
+
+    ## Load model and training and validation dataset
+    start = time.perf_counter()
 
     if accelerator is None or accelerator.is_main_process:
         print("Initializing Base Model")
@@ -56,18 +53,6 @@ def main():
     if accelerator is None or accelerator.is_main_process:
         print("Loading Data")
     
-    print("Loading Data")
-
-    if args.val_pt:
-        fixed_input = args.val_pt + ".pt" if not args.val_pt.endswith(".pt") else args.val_pt
-        print("You are using a self-specified validation dataset...")
-        validation_dataset = torch.load(fixed_input)[:args.n_samples]
-        validation_dataloader = DataLoader(validation_dataset, batch_size = 1, collate_fn=lambda batch: collate_fn(batch, tokenizer=tokenizer, length=max_length))
-        print("Val Dataset Setup Done!")
-    else:
-        validation_dataset = load_val_pile(number=args.n_samples, seed=seed, num_splits=1)[0]
-        validation_dataloader = DataLoader(validation_dataset, batch_size = 1, collate_fn=lambda batch: collate_fn(batch, tokenizer=tokenizer, length=max_length))
-
     if args.train_pt:
         print("You are using a self-specified training dataset...")
         fixed_input = args.train_pt + ".pt" if not args.train_pt.endswith(".pt") else args.train_pt
@@ -77,6 +62,16 @@ def main():
     else:
         training_dataset = load_train_pile_random_deduped(number=args.n_samples,seed=seed,num_splits=1)[0] # TODO - replace w/ sequence at some point
         training_dataloader = DataLoader(training_dataset, batch_size = 1, collate_fn=lambda batch: collate_fn(batch, tokenizer=tokenizer, length=max_length))
+
+    if args.val_pt:
+        fixed_input = args.val_pt + ".pt" if not args.val_pt.endswith(".pt") else args.val_pt
+        print("You are using a self-specified validation dataset...")
+        validation_dataset = torch.load(fixed_input)[:args.n_samples]
+        validation_dataloader = DataLoader(validation_dataset, batch_size = 1, collate_fn=lambda batch: collate_fn(batch, tokenizer=tokenizer, length=max_length))
+        print("Val Dataset Setup Done!")
+    else:
+        validation_dataset = load_val_pile_packed(number=args.n_samples, seed=seed, num_splits=1)[0]
+        validation_dataloader = DataLoader(validation_dataset, batch_size = 1, collate_fn=lambda batch: collate_fn(batch, tokenizer=tokenizer, length=max_length))
 
     ## Run LOSS attack
 
@@ -92,13 +87,12 @@ def main():
         "accelerator": accelerator
     }
 
-    ## Stopwatch for testing LOSS runtime
-    end = time.time()
+    end = time.perf_counter()
 
     if accelerator is None or accelerator.is_main_process:
         print(f"- Code initialization time was {end-start} seconds.")
 
-    start = time.time()
+    start = time.perf_counter()
 
     LOSSer = LOSS(model_name, model_revision=model_revision, cache_dir=model_cache_dir)
 
@@ -108,7 +102,7 @@ def main():
     LOSSer.attack_plot_ROC(log_scale = False, show_plot=False)
     LOSSer.attack_plot_ROC(log_scale = True, show_plot=False)
 
-    end = time.time()
+    end = time.perf_counter()
 
     if accelerator is None or accelerator.is_main_process:
         print(f"- LOSS at {args.mod_size} and {args.n_samples} samples took {end-start} seconds.")

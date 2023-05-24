@@ -5,6 +5,7 @@ import torch
 import copy
 import subprocess
 import time
+import os
 
 class MoPe(MIA):
     """
@@ -14,6 +15,8 @@ class MoPe(MIA):
         super().__init__(*args, **kwargs)
         self.model = None
         self.new_model_paths = []
+        if not os.path.exists("MoPe"):
+            os.mkdir("MoPe")
 
     def perturb_model(self,ind_model):
         dummy_model = copy.deepcopy(self.model)

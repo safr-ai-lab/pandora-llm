@@ -12,6 +12,8 @@ class LOSS(MIA):
         super().__init__(*args, **kwargs)
         self.train_cross_entropy = None
         self.val_cross_entropy = None
+        if not os.path.exists("LOSS"):
+            os.mkdir("LOSS")
 
     def inference(self, config):
         """
@@ -25,9 +27,6 @@ class LOSS(MIA):
                 nbatches
                 accelerator
         """
-        if not os.path.exists("LOSS"):
-            os.mkdir("LOSS")
-
         self.config = config
         model = GPTNeoXForCausalLM.from_pretrained(self.model_path, revision=self.model_revision, cache_dir=self.cache_dir)
 

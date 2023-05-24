@@ -6,6 +6,7 @@ from torch.utils.data import DataLoader
 import math
 from attack_utils import *
 from dataset_utils import *
+import os
 
 class LiRa(MIA):
     """
@@ -24,6 +25,8 @@ class LiRa(MIA):
         super().__init__(*args, **kwargs)
         self.mod_size = kwargs["mod_size"]
         self.N = kwargs["num_shadows"]
+        if not os.path.exists("LiRa"):
+            os.mkdir("LiRa")
     
     def get_N_chunks(self, dataset):
         data_chunks = [dataset[i * len(dataset)//self.N : (i+1) * len(dataset) // N] for i in range(N)]
