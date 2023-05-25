@@ -23,6 +23,7 @@ def main():
     parser.add_argument('--mod_size', action="store", type=str, required=True, help='Pythia Model Size')
     parser.add_argument('--n_models', action="store", type=int, required=True, help='Number of new models')
     parser.add_argument('--n_samples', action="store", type=int, required=True, help='Number of samples')
+    parser.add_argument('--sample_length', action="store", type=int, required=False, help='Number of tokens to calculate loss for')
     parser.add_argument('--sigma', action="store", type=float, required=True, help='Noise standard deviation')
     parser.add_argument('--accelerate', action="store_true", required=False, help='Use accelerate')
     parser.add_argument('--train_pt', action="store", required=False, help='.pt file of train dataset')
@@ -83,7 +84,7 @@ def main():
         "noise_stdev": args.sigma,
         "bs" : 1,
         "nbatches": args.n_samples,
-        "samplelength": None,
+        "samplelength": args.sample_length,
         "device": device,
         "accelerate": args.accelerate, # if this is false, then train_pt and val_pt are not used
         "tokenizer": tokenizer, 

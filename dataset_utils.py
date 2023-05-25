@@ -66,11 +66,10 @@ def load_train_pile_random_duped_unpacked(number=1000, percentage=None, seed=229
         chunks = []
         for sample in examples:
             result = []
-            for i, (k, group) in enumerate(groupby(sample, lambda y: y == tokenizer.eos_token_id)):
-                if not ignore_first or i:
-                    input_ids= list(group)
-                    if (not k) and len(input_ids)>20:
-                        result.append(tokenizer.decode(input_ids))
+            for k, group in groupby(sample, lambda y: y == tokenizer.eos_token_id):
+                input_ids= list(group)
+                if (not k) and len(input_ids)>400:
+                    result.append(tokenizer.decode(input_ids))
             chunks.extend(result)
         return chunks
     
