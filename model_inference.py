@@ -13,7 +13,7 @@ from accelerate import Accelerator
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--model_path', action="store", type=str, required=True, help='Model Path')
-    parser.add_argument('--model_revision', action="store", type=str, required=False, help='Model Revision')
+    parser.add_argument('--model_revision', action="store", type=str, required=False, default="main", help='Model Revision')
     parser.add_argument('--cache_dir', action="store", type=str, required=False, help='Model Cache Dir')
     parser.add_argument('--dataset_path', action="store", type=str, required=True, help='Dataset path')
     parser.add_argument('--device', action="store", type=str, required=False, help='Device')

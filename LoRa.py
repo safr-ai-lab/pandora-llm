@@ -5,6 +5,7 @@ import torch
 import pickle
 import subprocess
 import os
+import dill
 
 class LoRa(MIA):
     def __init__(self,*args,**kwargs):
@@ -17,6 +18,7 @@ class LoRa(MIA):
         Perform MIA. Here, the model we attack is the fine-tuned one. 
             config: dictionary of configuration parameters
                 trainer
+                model_name
                 training_dl
                 validation_dl
                 tokenizer
@@ -66,16 +68,24 @@ class LoRa(MIA):
             )
             self.train_result_base = torch.load("LoRa/base_train.pt").reshape(-1,1)
             self.val_result_base = torch.load("LoRa/base_val.pt").reshape(-1,1)
-                        
-            self.config["trainer"].train()
-
-            self.config["trainer"].save_model(f"LoRa/{self.model_name}-ft")
+            
+            with open('LoRa/trainer.pt', 'wb') as f:
+                dill.dump(self.config["trainer"], f)
+            subprocess.call(["python", "model_train.py",
+                "--trainer_path", "LoRa/trainer.pt",
+                "--save_path", f"LoRa/{self.model_name}-ft",
+                "--model_path", self.model_path,
+                "--model_revision", self.model_revision,
+                "--cache_dir", self.cache_dir,
+                "--accelerate"
+                ]
+            )
             self.config["tokenizer"].save_pretrained(f"LoRa/{self.model_name}-ft")
 
             subprocess.call(["accelerate", "launch", "model_inference.py",
                 "--model_path", f"LoRa/{self.model_name}-ft",
-                "--model_revision", self.model_revision,
-                "--cache_dir", self.cache_dir,
+                # "--model_revision", self.model_revision,
+                # "--cache_dir", self.cache_dir,
                 "--dataset_path", "train_data.pt",
                 "--n_samples", str(self.config["n_batches"]),
                 "--bs", str(self.config["bs"]),
@@ -85,8 +95,8 @@ class LoRa(MIA):
             )
             subprocess.call(["accelerate", "launch", "model_inference.py",
                 "--model_path", f"LoRa/{self.model_name}-ft",
-                "--model_revision", self.model_revision,
-                "--cache_dir", self.cache_dir,
+                # "--model_revision", self.model_revision,
+                # "--cache_dir", self.cache_dir,
                 "--dataset_path", "val_data.pt",
                 "--n_samples", str(self.config["n_batches"]),
                 "--bs", str(self.config["bs"]),
@@ -96,7 +106,7 @@ class LoRa(MIA):
             )
 
             self.train_result_ft = torch.load("LoRa/ft_train.pt").reshape(-1,1)
-            self.val_result_ft = torch.load("LoRa/ft_train.pt").reshape(-1,1)
+            self.val_result_ft = torch.load("LoRa/ft_val.pt").reshape(-1,1)
 
             self.train_ratios = (self.train_result_ft/self.train_result_base)[~torch.any((self.train_result_ft/self.train_result_base).isnan(),dim=1)]
             self.val_ratios = (self.val_result_ft/self.val_result_base)[~torch.any((self.val_result_ft/self.val_result_base).isnan(),dim=1)]

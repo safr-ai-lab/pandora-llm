@@ -58,7 +58,7 @@ def main():
 
     ## Run LoRa attack
 
-    training_args = TrainingArguments(output_dir="fine-tuning",
+    training_args = TrainingArguments(output_dir=f"LoRa/{model_title}-ft",
                                         do_train=True,
                                         do_eval=True,
                                         num_train_epochs=1,
