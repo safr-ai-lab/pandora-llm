@@ -205,7 +205,7 @@ class MoPe(MIA):
         self.get_statistics()
         if title == None:
             title = self.get_default_title()
-        torch.save(self.get_statistics, 
+        torch.save(self.get_statistics(), 
             title + ".pt")
         torch.save(torch.vstack((self.train_flat, self.valid_flat)), 
             title + "_full.pt")
