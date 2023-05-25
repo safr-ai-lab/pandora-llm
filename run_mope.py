@@ -69,7 +69,7 @@ def main():
         training_dataloader = DataLoader(training_dataset, batch_size = 1, collate_fn=lambda batch: collate_fn(batch, tokenizer=tokenizer, length=max_length))
         print("Train Dataset Setup Done!")
     else:
-        training_dataset = load_train_pile_random_deduped(number=args.n_samples,seed=seed,num_splits=1)[0] # TODO - replace w/ sequence at some point
+        training_dataset = load_train_pile_random_duped_unpacked(number=args.n_samples,seed=seed,num_splits=1,unpack=True)[0] # TODO - replace w/ sequence at some point #load_train_pile_random_deduped(number=args.n_samples,seed=seed,num_splits=1)[0] # TODO - replace w/ sequence at some point
         training_dataloader = DataLoader(training_dataset, batch_size = 1, collate_fn=lambda batch: collate_fn(batch, tokenizer=tokenizer, length=max_length))
 
     train_pt = args.train_pt if args.accelerate and args.train_pt else "train_data.pt"
