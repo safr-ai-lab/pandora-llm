@@ -105,15 +105,15 @@ class MoPe(MIA):
         if not self.accelerate:
             # Compute losses for base model
             print("Evaluating Base Model")
-            self.training_res[0,:,:] = compute_dataloader_cross_entropy(self.model, self.training_dl, device=self.device, nbatches=self.nbatches, samplelength=self.samplelength).reshape(-1,1) # model gets moved to device in this method
-            self.validation_res[0,:,:] = compute_dataloader_cross_entropy(self.model, self.validation_dl, device=self.device, nbatches=self.nbatches, samplelength=self.samplelength).reshape(-1,1)
+            self.training_res[0,:,:] = compute_dataloader_cross_entropy(self.model, self.training_dl, device=self.device, nbatches=self.nbatches, samplelength=self.samplelength).reshape(-1,1).cpu()
+            self.validation_res[0,:,:] = compute_dataloader_cross_entropy(self.model, self.validation_dl, device=self.device, nbatches=self.nbatches, samplelength=self.samplelength).reshape(-1,1).cpu()
 
             # Compute loss for each perturbed model
             for ind_model in range(1,self.n_new_models+1):
                 print(f"Evaluating Perturbed Model {ind_model}/{self.n_new_models}")
                 t_model = GPTNeoXForCausalLM.from_pretrained(self.new_model_paths[ind_model-1])
-                self.training_res[ind_model,:,:] = compute_dataloader_cross_entropy(t_model, self.training_dl, device=self.device, nbatches=self.nbatches, samplelength=self.samplelength).reshape(-1,1)
-                self.validation_res[ind_model,:,:] = compute_dataloader_cross_entropy(t_model, self.validation_dl, device=self.device, nbatches=self.nbatches, samplelength=self.samplelength).reshape(-1,1)
+                self.training_res[ind_model,:,:] = compute_dataloader_cross_entropy(t_model, self.training_dl, device=self.device, nbatches=self.nbatches, samplelength=self.samplelength).reshape(-1,1).cpu()
+                self.validation_res[ind_model,:,:] = compute_dataloader_cross_entropy(t_model, self.validation_dl, device=self.device, nbatches=self.nbatches, samplelength=self.samplelength).reshape(-1,1).cpu()
                 del t_model
                 torch.cuda.empty_cache()
                 torch.cuda.synchronize()
@@ -191,7 +191,7 @@ class MoPe(MIA):
     def get_default_title(self):
         return "MoPe/MoPe_{}_{}_N={}_var={}_bs={}_nbatches={}".format(
             self.model_path.replace("/","-"),
-            self.model_revision.replace("/","-"),
+            self.model_revision.replace("/","-") if self.model_revision else "LastChkpt",
             self.n_new_models,
             self.noise_stdev,
             self.config["bs"],

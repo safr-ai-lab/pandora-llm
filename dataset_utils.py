@@ -37,6 +37,12 @@ def load_train_pile_random_deduped(number=1000, percentage=None, seed=229, num_s
 
     return splits
 
+def load_train_pile_random_deduped_unpacked(number=1000, percentage=None, min_length=20, seed=229, num_splits=2):
+    '''
+    Loads the random sample from deduped training pile, unpacking the sequences (i.e., splitting by EOS token)
+    '''
+    raise NotImplementedError()
+
 def load_train_pile_random_duped(number=1000, percentage=None, seed=229, num_splits=2):
     '''
     Loads the random sample from training pile
@@ -58,7 +64,7 @@ def load_train_pile_random_duped(number=1000, percentage=None, seed=229, num_spl
 
     return splits
 
-def load_train_pile_random_duped_unpacked(number=1000, percentage=None, seed=229, unpack=False, num_splits=2):
+def load_train_pile_random_duped_unpacked(number=1000, percentage=None, min_length=20, seed=229, num_splits=2):
     '''
     Loads the random sample from duped training pile, unpacking the sequences (i.e., splitting by EOS token)
     '''
@@ -68,7 +74,7 @@ def load_train_pile_random_duped_unpacked(number=1000, percentage=None, seed=229
             result = []
             for k, group in groupby(sample, lambda y: y == tokenizer.eos_token_id):
                 input_ids= list(group)
-                if (not k) and len(input_ids)>400:
+                if (not k) and len(input_ids)>min_length:
                     result.append(tokenizer.decode(input_ids))
             chunks.extend(result)
         return chunks

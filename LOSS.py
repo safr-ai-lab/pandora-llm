@@ -42,7 +42,7 @@ class LOSS(MIA):
     def get_default_title(self):
         return "LOSS/LOSS_{}_{}_bs={}_nbatches={}".format(
             self.model_path.replace("/","-"),
-            self.model_revision.replace("/","-"),
+            self.model_revision.replace("/","-") if self.model_revision else "LastChkpt",
             self.config["bs"],
             self.config["nbatches"]
         )

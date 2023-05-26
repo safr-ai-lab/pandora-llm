@@ -2,7 +2,6 @@ from Attack import MIA
 from attack_utils import *
 from transformers import GPTNeoXForCausalLM
 import torch
-import pickle
 import subprocess
 import os
 import dill
@@ -32,13 +31,13 @@ class LoRa(MIA):
 
         if not self.config["accelerate"]:
 
-            self.train_result_base = compute_dataloader_cross_entropy(self.config["trainer"].model, self.config["training_dl"], device=self.config["device"], nbatches=self.config["n_batches"], samplelength=self.config["n_samples"]).reshape(-1,1)
-            self.val_result_base = compute_dataloader_cross_entropy(self.config["trainer"].model, self.config["validation_dl"], device=self.config["device"], nbatches=self.config["n_batches"], samplelength=self.config["n_samples"]).reshape(-1,1)
+            self.train_result_base = compute_dataloader_cross_entropy(self.config["trainer"].model, self.config["training_dl"], half=False, device=self.config["device"], nbatches=self.config["n_batches"], samplelength=self.config["n_samples"]).reshape(-1,1).cpu()
+            self.val_result_base = compute_dataloader_cross_entropy(self.config["trainer"].model, self.config["validation_dl"], half=False, device=self.config["device"], nbatches=self.config["n_batches"], samplelength=self.config["n_samples"]).reshape(-1,1).cpu()
             
-            config["trainer"].train()
+            self.config["trainer"].train()
 
-            self.train_result_ft = compute_dataloader_cross_entropy(self.config["trainer"].model, self.config["training_dl"], device=self.config["device"], nbatches=self.config["n_batches"], samplelength=self.config["n_samples"]).reshape(-1,1)
-            self.val_result_ft = compute_dataloader_cross_entropy(self.config["trainer"].model, self.config["validation_dl"], device=self.config["device"], nbatches=self.config["n_batches"], samplelength=self.config["n_samples"]).reshape(-1,1)
+            self.train_result_ft = compute_dataloader_cross_entropy(self.config["trainer"].model, self.config["training_dl"], half=False, device=self.config["device"], nbatches=self.config["n_batches"], samplelength=self.config["n_samples"]).reshape(-1,1).cpu()
+            self.val_result_ft = compute_dataloader_cross_entropy(self.config["trainer"].model, self.config["validation_dl"], half=False, device=self.config["device"], nbatches=self.config["n_batches"], samplelength=self.config["n_samples"]).reshape(-1,1).cpu()
 
             self.train_ratios = (self.train_result_ft/self.train_result_base)[~torch.any((self.train_result_ft/self.train_result_base).isnan(),dim=1)]
             self.val_ratios = (self.val_result_ft/self.val_result_base)[~torch.any((self.val_result_ft/self.val_result_base).isnan(),dim=1)]
@@ -84,8 +83,6 @@ class LoRa(MIA):
 
             subprocess.call(["accelerate", "launch", "model_inference.py",
                 "--model_path", f"LoRa/{self.model_name}-ft",
-                # "--model_revision", self.model_revision,
-                # "--cache_dir", self.cache_dir,
                 "--dataset_path", "train_data.pt",
                 "--n_samples", str(self.config["n_batches"]),
                 "--bs", str(self.config["bs"]),
@@ -95,8 +92,6 @@ class LoRa(MIA):
             )
             subprocess.call(["accelerate", "launch", "model_inference.py",
                 "--model_path", f"LoRa/{self.model_name}-ft",
-                # "--model_revision", self.model_revision,
-                # "--cache_dir", self.cache_dir,
                 "--dataset_path", "val_data.pt",
                 "--n_samples", str(self.config["n_batches"]),
                 "--bs", str(self.config["bs"]),
@@ -118,7 +113,7 @@ class LoRa(MIA):
     def get_default_title(self):
         return "LoRa/LoRa_{}_{}_bs={}_nbatches={}".format(
             self.model_path.replace("/","-"),
-            self.model_revision.replace("/","-"),
+            self.model_revision.replace("/","-") if self.model_revision else "LastChkpt",
             self.config["bs"],
             self.config["n_batches"]
         )
