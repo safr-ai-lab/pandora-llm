@@ -27,7 +27,7 @@ def main():
     parser.add_argument('--unpack', action="store_true", required=False, help='Unpack training set')
     parser.add_argument('--n_samples', action="store", type=int, required=True, help='Dataset size')
     parser.add_argument('--sample_length', action="store", type=int, required=False, help='Truncate number of tokens')
-    parser.add_argument('--min_length', action="store", type=int, required=False, help='Min number of tokens')
+    parser.add_argument('--min_length', action="store", type=int, required=False, default=20, help='Min number of tokens')
     parser.add_argument('--seed', action="store", type=int, required=False, default=229, help='Seed')
     parser.add_argument('--bs', action="store", type=int, required=False, default=1, help='Batch size')
     parser.add_argument('--accelerate', action="store_true", required=False, help='Use accelerate')

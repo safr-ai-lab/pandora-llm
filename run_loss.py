@@ -21,7 +21,7 @@ def main():
     parser.add_argument('--deduped', action="store_true", required=False, help='Use deduped models')
     parser.add_argument('--checkpoint', action="store", type=str, required=False, help='Model revision. If not specified, use last checkpoint.')
     parser.add_argument('--pack', action="store_true", required=False, help='Pack validation set')
-    parser.add_argument('--unpack', action="store_true", required=False, help='Unpack training set')
+    parser.add_argument('--unpack', action="store_true", required=False, default=20, help='Unpack training set')
     parser.add_argument('--n_samples', action="store", type=int, required=True, help='Dataset size')
     parser.add_argument('--sample_length', action="store", type=int, required=False, help='Truncate number of tokens')
     parser.add_argument('--min_length', action="store", type=int, required=False, help='Min number of tokens')
