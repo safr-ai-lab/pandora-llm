@@ -22,7 +22,7 @@ def main():
     parser.add_argument('--n_models', action="store", type=int, required=True, help='Number of new models')
     parser.add_argument('--sigma', action="store", type=float, required=True, help='Noise standard deviation')
     parser.add_argument('--deduped', action="store_true", required=False, help='Use deduped models')
-    parser.add_argument('--checkpoint', action="store", type=str, required=False, help='Model revision')
+    parser.add_argument('--checkpoint', action="store", type=str, required=False, help='Model revision. If not specified, use last checkpoint.')
     parser.add_argument('--pack', action="store_true", required=False, help='Pack validation set')
     parser.add_argument('--unpack', action="store_true", required=False, help='Unpack training set')
     parser.add_argument('--n_samples', action="store", type=int, required=True, help='Dataset size')

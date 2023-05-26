@@ -18,7 +18,7 @@ def collate_fn(batch,tokenizer,length):
 
 def load_train_pile_random_deduped(number=1000, percentage=None, seed=229, num_splits=2):
     '''
-    Loads the random sample from training pile
+    Loads specified number of random samples from training pile
     '''
     if num_splits % 2 !=0:
         print(f"Warning! Shadow models requires an even number of splits! You specified {num_splits} splits.")
@@ -45,7 +45,7 @@ def load_train_pile_random_deduped_unpacked(number=1000, percentage=None, min_le
 
 def load_train_pile_random_duped(number=1000, percentage=None, seed=229, num_splits=2):
     '''
-    Loads the random sample from training pile
+    Loads specified number of random samples from training pile
     '''
     if num_splits % 2 !=0:
         print(f"Warning! Shadow models requires an even number of splits! You specified {num_splits} splits.")
@@ -126,6 +126,10 @@ def load_val_pile(number=1000, percentage=None, seed=229, num_splits=2):
     return splits
 
 def load_val_pile_packed(number=1000, percentage=None, seed=229, num_splits=2, window=2048):
+    '''
+    Loads the validation pile (NOT deduped), does an exact match deduplication and shuffling, 
+    packs samples into 2048-sized chunks, and returns the specified number of splits. 
+    '''
     if num_splits % 2 !=0:
         print(f"Warning! If using shadow models, use an even number of splits! You specified {num_splits} splits.")
 

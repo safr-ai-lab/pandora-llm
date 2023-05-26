@@ -19,7 +19,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--mod_size', action="store", type=str, required=True, help='Pythia Model Size')
     parser.add_argument('--deduped', action="store_true", required=False, help='Use deduped models')
-    parser.add_argument('--checkpoint', action="store", type=str, required=False, help='Model revision')
+    parser.add_argument('--checkpoint', action="store", type=str, required=False, help='Model revision. If not specified, use last checkpoint.')
     parser.add_argument('--pack', action="store_true", required=False, help='Pack validation set')
     parser.add_argument('--unpack', action="store_true", required=False, help='Unpack training set')
     parser.add_argument('--n_samples', action="store", type=int, required=True, help='Dataset size')
@@ -28,8 +28,8 @@ def main():
     parser.add_argument('--seed', action="store", type=int, required=False, default=229, help='Seed')
     parser.add_argument('--bs', action="store", type=int, required=False, default=1, help='Batch size')
     parser.add_argument('--accelerate', action="store_true", required=False, help='Use accelerate')
-    parser.add_argument('--train_pt', action="store", required=False, help='.pt file of train dataloader')
-    parser.add_argument('--val_pt', action="store", required=False, help='.pt file of val dataloader')
+    parser.add_argument('--train_pt', action="store", required=False, help='.pt file of train dataset (not dataloader)')
+    parser.add_argument('--val_pt', action="store", required=False, help='.pt file of val dataset (not dataloader)')
     args = parser.parse_args()
 
     accelerator = Accelerator() if args.accelerate else None

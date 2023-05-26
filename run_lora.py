@@ -17,7 +17,7 @@ python run_lora.py --mod_size 70m --n_samples 1000 --accelerate
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--mod_size', action="store", type=str, required=True, help='Pythia Model Size')
-    parser.add_argument('--checkpoint', action="store", type=str, required=False, help='Model revision')
+    parser.add_argument('--checkpoint', action="store", type=str, required=False, help='Model revision. If not specified, use last checkpoint.')
     parser.add_argument('--deduped', action="store_true", required=False, help='Use deduped models')
     parser.add_argument('--pack', action="store_true", required=False, help='Pack validation set')
     parser.add_argument('--bs', action="store", type=int, required=False, default=1, help='Batch size')
