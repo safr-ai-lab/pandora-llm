@@ -34,9 +34,9 @@ def main():
 
     accelerator = Accelerator() if args.accelerate else None
 
-    if args.pack ^ args.unpack:
+    if not (args.pack ^ args.unpack):
         if accelerator is None or accelerator.is_main_process:
-            print("WARNING: for an apples-to-apples comparison, we recommend setting exactly one of pack and unpack")
+            print(f"WARNING: for an apples-to-apples comparison, we recommend setting exactly one of pack ({args.pack}) and unpack ({args.unpack})")
 
     ## Other parameters
     model_revision = args.checkpoint

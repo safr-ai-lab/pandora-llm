@@ -35,8 +35,8 @@ def main():
     parser.add_argument('--val_pt', action="store", required=False, help='.pt file of val dataloader')
     args = parser.parse_args()
 
-    if args.pack ^ args.unpack:
-        print("WARNING: for an apples-to-apples comparison, we recommend setting exactly one of pack and unpack")
+    if not (args.pack ^ args.unpack):
+        print(f"WARNING: for an apples-to-apples comparison, we recommend setting exactly one of pack ({args.pack}) and unpack ({args.unpack})")
 
     ## Other parameters
     model_revision = args.checkpoint

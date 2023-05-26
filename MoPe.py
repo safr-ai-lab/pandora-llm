@@ -86,7 +86,6 @@ class MoPe(MIA):
             print("Loading Base Model")
             self.model = GPTNeoXForCausalLM.from_pretrained(self.model_path, revision=self.model_revision, cache_dir=self.cache_dir)
 
-        self.model.half()
         self.model.eval()
 
         ## Generate new models if we are supplied with noise_stdev and n_new_models
@@ -100,8 +99,6 @@ class MoPe(MIA):
         self.training_res = torch.zeros((self.n_new_models + 1, self.nbatches, self.bs))  
         self.validation_res = torch.zeros((self.n_new_models + 1, self.nbatches, self.bs))  
         
-        args = [self.device, self.nbatches, self.bs, self.samplelength]
-
         if not self.accelerate:
             # Compute losses for base model
             print("Evaluating Base Model")
