@@ -70,7 +70,7 @@ def main():
                                         gradient_accumulation_steps=1,
                                         gradient_checkpointing=False,
                                         load_best_model_at_end=True,
-                                        fp16=True,
+                                        fp16=False,
                                         deepspeed='ds_config_zero3.json' if args.accelerate else None
                                         )
     trainer = Trainer(model=model,
