@@ -1,14 +1,16 @@
 import os
+import argparse
 
-sizes = ["1.4B", "2.8B"]
-perturb_amts = [0.001, 0.005, 0.01, 0.05]
-N = 15
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--mod_size', action="store", type=str, required=True, help='Pythia Model Size')
+    args = parser.parse_args()
+    
+    perturb_amts = [1e-2, 5e-3, 1e-3, 5e-4, 1e-4]
+    N = 20
 
-for size in sizes:
     for p in perturb_amts:
-        dirname = f"{size}_{p}_{N}"
-        os.mkdir(dirname)
-        os.chdir(dirname)
-        os.system("cp ../*py .")
-        os.system(f"python run_mope.py --mod_size {size} --n_models {N} --n_samples 1000 --sigma {p}")
-        os.chdir("..")
+        os.system(f"python run_mope.py --mod_size {args.mod_size} --n_models {N} --sigma {p} --pack --n_samples 2000")
+
+if __name__ == "__main__":
+    main()

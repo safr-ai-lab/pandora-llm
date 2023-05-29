@@ -198,3 +198,6 @@ def plot_ROC_files(files,title,labels=None,log_scale=False,show_plot=True,save_n
     if labels is None:
         labels = files
     plot_ROC_multiple(train_statistics,val_statistics,title,labels,log_scale=log_scale,show_plot=show_plot,save_name=save_name)
+
+def rademacher(shape):
+    return 2*(torch.rand(shape) > 0.5) - 1
