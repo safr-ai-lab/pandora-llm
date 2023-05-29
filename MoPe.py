@@ -261,7 +261,7 @@ class MoPe(MIA):
             # Plot the histograms
             if i == n-1:
                 ax_i.hist(self.train_diff, bins=25, alpha=0.5, color='r', label='train diff')
-                ax_i.hist(self.valid_diff, bins=25, alpha=0.5, color='g', label='train diff')
+                ax_i.hist(self.valid_diff, bins=25, alpha=0.5, color='g', label='val diff')
                 ax_i.set_title(f"Histogram of train/val diff for MoPe")
                 ax_i.legend(loc='upper right')
             else:
