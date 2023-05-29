@@ -111,8 +111,10 @@ def main():
     MoPer = MoPe(model_name, model_revision=model_revision, cache_dir=model_cache_dir)
     MoPer.inference(config_mope)
 
-    MoPer.attack_plot_ROC(log_scale = False, show_plot=False)
-    MoPer.attack_plot_ROC(log_scale = True, show_plot=False)
+    MoPer.attack_plot_ROC(log_scale = False, show_plot=True)
+    MoPer.attack_plot_ROC(log_scale = True, show_plot=True)
+    print("Plotting...")
+    MoPer.plot_stat_hists(args.n_models, show_plot=True)
     MoPer.save()
 
     end = time.perf_counter()

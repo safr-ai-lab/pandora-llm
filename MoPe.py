@@ -6,6 +6,7 @@ import copy
 import subprocess
 import time
 import os
+import matplotlib.pyplot as plt
 
 class MoPe(MIA):
     """
@@ -173,7 +174,7 @@ class MoPe(MIA):
 
         return self.get_statistics()
 
-    def get_statistics(self):
+    def get_statistics(self, verbose=False):
         """
         Compute the difference between the base model and the perturbed models
         """
@@ -183,10 +184,28 @@ class MoPe(MIA):
         self.train_diff = self.train_flat[0,:]-self.train_flat[1:,:].mean(dim=0)
         self.valid_diff = self.valid_flat[0,:]-self.valid_flat[1:,:].mean(dim=0)
 
+        if verbose:
+            print(f"Train_res shape is {self.training_res.shape}")
+            print(f"Train_flat shape is {self.train_flat.shape}")
+            print(f"Train_diff shape is {self.train_diff.shape}")
+            print(f"Val res shape is {self.validation_res.shape}")
+            print(f"Val_flat shape is {self.valid_flat.shape}")
+            print(f"Val_diff shape is {self.valid_diff.shape}")
+
         return self.train_diff, self.valid_diff
 
     def get_default_title(self):
         return "MoPe/MoPe_{}_{}_N={}_var={}_bs={}_nbatches={}".format(
+            self.model_path.replace("/","-"),
+            self.model_revision.replace("/","-") if self.model_revision else "LastChkpt",
+            self.n_new_models,
+            self.noise_stdev,
+            self.config["bs"],
+            self.config["nbatches"]
+        )
+
+    def get_histogram_title(self):
+        return "MoPe/Histograms_MoPe_{}_{}_N={}_var={}_bs={}_nbatches={}".format(
             self.model_path.replace("/","-"),
             self.model_revision.replace("/","-") if self.model_revision else "LastChkpt",
             self.n_new_models,
@@ -206,3 +225,65 @@ class MoPe(MIA):
             title + ".pt")
         torch.save(torch.vstack((self.train_flat, self.valid_flat)), 
             title + "_full.pt")
+    
+    def plot_stat_hists(self, n, show_plot=False, log_scale=False, save_name=None):
+        """
+        Plot histograms of loss train vs val per perturbed model. And MoPe. Must be run after infer(). 
+        """
+        try:
+            array1 = self.train_flat.T
+            array2 = self.valid_flat.T
+        except:
+            print(" - WARNING: Please run infer() before plotting. Exiting plot_stat_hists()...")
+            return
+
+        n = n+1 # add 1 for MoPe plot
+        # Calculate the number of rows and columns for subplots
+        rows = n // 4
+        if n % 4:
+            rows += 1
+
+        fig, ax = plt.subplots(rows, 4, figsize=(20, rows * 3))
+
+        for i in range(n):
+            print(n)
+            print(i)
+            # Calculate the row and column index
+            row_idx = i // 4
+            col_idx = i % 4
+
+            # If there is only one row, ax will be a 1-D array
+            if rows == 1:
+                ax_i = ax[col_idx]
+            else:
+                ax_i = ax[row_idx, col_idx]
+
+            # Plot the histograms
+            if i == n-1:
+                ax_i.hist(self.train_diff, bins=25, alpha=0.5, color='r', label='train diff')
+                ax_i.hist(self.valid_diff, bins=25, alpha=0.5, color='g', label='train diff')
+                ax_i.set_title(f"Histogram of train/val diff for MoPe")
+                ax_i.legend(loc='upper right')
+            else:
+                ax_i.hist(array1[i], bins=25, alpha=0.5, color='r', label='train loss')
+                ax_i.hist(array2[i], bins=25, alpha=0.5, color='g', label='val loss')
+                if i == 0:
+                    ax_i.set_title(f"Histogram of LOSS for base model")
+                else:
+                    ax_i.set_title(f"Histogram of LOSS for model {i+1}")
+                ax_i.legend(loc='upper right')
+
+        # If n is not a multiple of 4, some plots will be empty
+        # We can remove them
+        if n % 4:
+            for j in range(n % 4, 4):
+                fig.delaxes(ax[row_idx, j]) if rows > 1 else fig.delaxes(ax[j])
+
+        fig.tight_layout()
+        if show_plot:
+            fig.show()
+        
+        default_name = self.get_histogram_title() + (" log.png" if log_scale else ".png")
+        save_name = save_name if save_name else default_name
+        fig.savefig(save_name, bbox_inches='tight')
+    

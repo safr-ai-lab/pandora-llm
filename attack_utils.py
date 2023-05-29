@@ -151,6 +151,7 @@ def plot_ROC(train_statistic,val_statistic,title,log_scale=False,show_plot=True,
     plt.legend(loc="lower right")
     plt.xlabel('False Positive Rate')
     plt.ylabel('True Positive Rate')
+    print(f" - AUC for this experiment is: {roc_auc}")
     if save_name is not None:
         plt.savefig(save_name, bbox_inches="tight")
     if show_plot:

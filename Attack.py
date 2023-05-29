@@ -20,6 +20,9 @@ class MIA:
         raise NotImplementedError()
 
     def attack_plot_ROC(self, title=None, log_scale=False, show_plot=True, save_name=None):
+        """
+        Plot ROC curve for the attack
+        """
         train_statistics, val_statistics = self.get_statistics()
         if title is None:
             title = self.get_default_title()
