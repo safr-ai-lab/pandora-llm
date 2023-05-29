@@ -201,3 +201,66 @@ def plot_ROC_files(files,title,labels=None,log_scale=False,show_plot=True,save_n
 
 def rademacher(shape):
     return 2*(torch.rand(shape) > 0.5) - 1
+
+
+
+def flat_grad(y, x, retain_graph=False, create_graph=False):
+    if create_graph:
+        retain_graph = True
+
+    g = torch.autograd.grad(y, x, retain_graph=retain_graph, create_graph=create_graph)
+    g = torch.cat([t.view(-1) for t in g])
+    return g
+
+def compute_point_probe(model, input_ids, probe):
+    mask  = (input_ids > 0).detach()                                     
+    
+    model.zero_grad()
+    outputs =  model(input_ids=input_ids.to(torch.long), attention_mask = mask, labels=input_ids)
+    outputs.loss.backward()
+
+    grad = flat_grad(outputs.loss, model.parameters(), create_graph=True)  
+    grad_v = flat_grad(grad_v.dot(grad), model.parameters(), retain_graph=True)  
+    return grad_v.dot(probe)
+
+def compute_dataloader_probe(model, dataloader, probe, device=None, nbatches=None, samplelength=None, accelerator=None, half=False):    
+    '''
+    Computes z^THz where H is the Hessian for a probe z
+    Warning: using samplelength is discouraged
+    '''
+    if samplelength is not None:
+        print("Warning: using sample length is discouraged. Please avoid using this parameter.")
+    if accelerator is None:
+        if half:
+            model.half()
+        model.to(device)
+
+    trace_estimates = []
+    for batchno, data_x in tqdm(enumerate(dataloader),total=len(dataloader)):
+        if nbatches is not None and batchno >= nbatches:
+            break
+        with torch.no_grad():    
+            ## Get predictions on training data 
+            data_x = data_x["input_ids"]
+            if samplelength is None:
+                data_x = data_x.detach()                
+            else:
+                data_x = data_x[:,:samplelength].detach()
+   
+            ## Compute average log likelihood
+            if accelerator is None:
+                est = compute_point_probe(model, input_ids, probe).detach().cpu()
+            else:
+                est = compute_input_ids_cross_entropy(model, data_x, return_pt = False)
+
+            trace_estimates.append(est)
+
+            torch.cuda.empty_cache()
+            torch.cuda.synchronize()
+    
+    if accelerator is None:
+        return torch.tensor(trace_estimates)
+    else:
+        trace_estimates = accelerator.gather_for_metrics(trace_estimates)
+        trace_estimates = torch.cat([loss[0] for loss in trace_estimates])
+        return trace_estimates

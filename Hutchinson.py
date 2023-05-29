@@ -49,20 +49,19 @@ class HutchinsonTraceAttack(MIA):
         if self.model == None:
             print("Loading Base Model")
             self.model = GPTNeoXForCausalLM.from_pretrained(self.model_path, revision=self.model_revision, cache_dir=self.cache_dir)
-
-        self.model.eval()
+            self.probe_length = sum([p.numel() for p in model.parameters()])
 
         ## Initialize train/val result arrays (Number probes, Number Batches, Batch Size)   
         self.training_tr   = torch.zeros((self.n_probes, self.nbatches, self.bs))  
         self.validation_tr = torch.zeros((self.n_probes, self.nbatches, self.bs))  
         
         if not self.accelerate:
-            # Compute 
             for ind_probe in range(self.n_probes):
                 print(f"Probe #{ind_probe}")
+                self.probe = self.generate_probe_vec((self.probe_length)).to(self.device)
 
                 self.training_tr[ind_probe,:,:]  =  None 
-                self.validation_tr[ind_probe,:,:] = None 
+                self.validation_tr[ind_probe,:,:] = None
 
                 torch.cuda.empty_cache()
                 torch.cuda.synchronize()
