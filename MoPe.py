@@ -264,13 +264,23 @@ class MoPe(MIA):
                 ax_i.hist(self.valid_diff, bins=25, alpha=0.5, color='g', label='val diff')
                 ax_i.set_title(f"Histogram of train/val diff for MoPe")
                 ax_i.legend(loc='upper right')
+            elif i == n-2: # base train vs avg of train MoPes
+                ax_i.hist(self.train_flat[0,:], bins=25, alpha=0.5, color='r', label='base train loss')
+                ax_i.hist(self.train_flat[1:,:].mean(dim=0), bins=25, alpha=0.5, color='g', label='avg perturbed train loss')
+                ax_i.set_title(f"Histogram of train loss: base vs MoPe avg")
+                ax_i.legend(loc='upper right')
+            elif i == n-3: # base val vs avg of val MoPes
+                ax_i.hist(self.valid_flat[0,:], bins=25, alpha=0.5, color='r', label='base val loss')
+                ax_i.hist(self.valid_flat[1:,:].mean(dim=0), bins=25, alpha=0.5, color='g', label='avg perturbed val loss')
+                ax_i.set_title(f"Histogram of val loss: base vs MoPe avg")
+                ax_i.legend(loc='upper right')
             else:
                 ax_i.hist(array1[i], bins=25, alpha=0.5, color='r', label='train loss')
                 ax_i.hist(array2[i], bins=25, alpha=0.5, color='g', label='val loss')
                 if i == 0:
                     ax_i.set_title(f"Histogram of LOSS for base model")
                 else:
-                    ax_i.set_title(f"Histogram of LOSS for model {i+1}")
+                    ax_i.set_title(f"Histogram of LOSS for perturbed model {i}")
                 ax_i.legend(loc='upper right')
 
         # If n is not a multiple of 4, some plots will be empty
