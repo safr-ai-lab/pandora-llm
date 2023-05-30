@@ -74,8 +74,8 @@ class HutchinsonTraceAttack(MIA):
         self.train_flat = self.training_tr.flatten(start_dim=1)
         self.valid_flat = self.validation_tr.flatten(start_dim=1)
 
-        self.train_avg = self.train_flat[0,:].mean(dim=0)
-        self.valid_avg = self.valid_flat[0,:].mean(dim=0)
+        self.train_avg = self.train_flat.mean(dim=0)
+        self.valid_avg = self.valid_flat.mean(dim=0)
 
         if verbose:
             print(f"Train_tr shape is {self.training_tr.shape}")
