@@ -233,7 +233,7 @@ def compute_point_probe(model, data_x, probe):
         ce_loss.backward(retain_graph=True)
 
         grad = flat_grad(ce_loss, model.parameters(), create_graph=True)  
-        grad_v = flat_grad(grad.dot(grad), model.parameters(), retain_graph=True)  
+        grad_v = flat_grad(grad.dot(probe), model.parameters(), retain_graph=True)  
         probe_values[i] = grad_v.dot(probe)
     return probe_values
 
