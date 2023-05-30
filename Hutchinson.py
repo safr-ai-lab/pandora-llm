@@ -41,10 +41,7 @@ class HutchinsonTraceAttack(MIA):
         self.nbatches = config["nbatches"]
         self.device = config["device"]
         self.accelerate = config["accelerate"]
-        self.tokenizer = config["tokenizer"]
-        self.train_pt = config["train_pt"]
-        self.val_pt = config["val_pt"]
-
+        
         ## If model has not been created (i.e., first call)
         if self.model == None:
             print("Loading Base Model")

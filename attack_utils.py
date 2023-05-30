@@ -50,7 +50,7 @@ def compute_input_ids_cross_entropy(model, input_ids, return_pt=True):
 
   return torch.tensor(ans) if return_pt else ans 
 
-def compute_dataloader_cross_entropy(model, dataloader, device=None, nbatches=None, samplelength=None, accelerator=None, half=False):    
+def compute_dataloader_cross_entropy(model, dataloader, device=None, nbatches=None, samplelength=None, accelerator=None, half=True):    
     '''
     Computes dataloader cross entropy with additional support for specifying the full data loader and full sample length.
     Warning: using samplelength is discouraged
@@ -62,6 +62,7 @@ def compute_dataloader_cross_entropy(model, dataloader, device=None, nbatches=No
             model.half()
         model.eval()
         model.to(device)
+
     losses = []
     for batchno, data_x in tqdm(enumerate(dataloader),total=len(dataloader)):
         if nbatches is not None and batchno >= nbatches:
@@ -212,24 +213,21 @@ def flat_grad(y, x, retain_graph=False, create_graph=False):
     g = torch.cat([t.view(-1) for t in g])
     return g
 
-def compute_point_probe(model, data_x, probe):                         
+def compute_point_probe(model, data_x, probe, device):                         
     probe_values = torch.zeros((data_x.size(0)))
     loss_fn = CrossEntropyLoss()
 
     for i in range(data_x.size(0)):
         input_ids = data_x[i:(i+1),:].to(device)
         mask  = (input_ids > 0).detach()       
-
         outputs =  model(input_ids=input_ids.to(torch.long), attention_mask = mask.to(device))
         logits = outputs.logits 
-
-        mask  = (input_ids > 0).detach()  
 
         length = len(input_ids[0,1:])
         if len(torch.where(input_ids[0,1:] == 0)[0]) > 0:
             length = torch.where(input_ids[0,1:] == 0)[0].min()
 
-        ce_loss = loss_fn(logits[0,:length,:], input_ids[0, 1:])
+        ce_loss = loss_fn(logits[0,:length,:], input_ids[0, 1:length+1])
         ce_loss.backward(retain_graph=True)
 
         grad = flat_grad(ce_loss, model.parameters(), create_graph=True)  
@@ -262,9 +260,9 @@ def compute_dataloader_probe(model, dataloader, probe, device=None, nbatches=Non
 
         ## Compute v^THv 
         if accelerator is None:
-            est = compute_point_probe(model, data_x, probe).detach().cpu()
+            est = compute_point_probe(model, data_x, probe, device).detach().cpu()
         else:
-            est = compute_point_probe(model, data_x, probe).tolist()
+            est = compute_point_probe(model, data_x, probe, device).tolist()
 
         model.zero_grad()
         trace_estimates.append(est)
