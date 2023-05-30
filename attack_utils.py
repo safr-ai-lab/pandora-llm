@@ -212,16 +212,30 @@ def flat_grad(y, x, retain_graph=False, create_graph=False):
     g = torch.cat([t.view(-1) for t in g])
     return g
 
-def compute_point_probe(model, input_ids, probe):
-    mask  = (input_ids > 0).detach()                                     
-    
-    model.zero_grad()
-    outputs =  model(input_ids=input_ids.to(torch.long), attention_mask = mask, labels=input_ids)
-    outputs.loss.backward()
+def compute_point_probe(model, data_x, probe):                         
+    probe_values = torch.zeros((data_x.size(0)))
+    loss_fn = CrossEntropyLoss()
 
-    grad = flat_grad(outputs.loss, model.parameters(), create_graph=True)  
-    grad_v = flat_grad(grad_v.dot(grad), model.parameters(), retain_graph=True)  
-    return grad_v.dot(probe)
+    for i in range(data_x.size(0)):
+        input_ids = data_x[i:(i+1),:].to(device)
+        mask  = (input_ids > 0).detach()       
+
+        outputs =  model(input_ids=input_ids.to(torch.long), attention_mask = mask.to(device))
+        logits = outputs.logits 
+
+        mask  = (input_ids > 0).detach()  
+
+        length = len(input_ids[0,1:])
+        if len(torch.where(input_ids[0,1:] == 0)[0]) > 0:
+            length = torch.where(input_ids[0,1:] == 0)[0].min()
+
+        ce_loss = -loss_fn(logits[0,:length,:], input_ids[0, 1:])
+        ce_loss.backward(retain_graph=True)
+
+        grad = flat_grad(ce_loss, model.parameters(), create_graph=True)  
+        grad_v = flat_grad(grad.dot(grad), model.parameters(), retain_graph=True)  
+        probe_values[i] = grad_v.dot(probe)
+    return probe_values
 
 def compute_dataloader_probe(model, dataloader, probe, device=None, nbatches=None, samplelength=None, accelerator=None, half=False):    
     '''
@@ -239,24 +253,22 @@ def compute_dataloader_probe(model, dataloader, probe, device=None, nbatches=Non
     for batchno, data_x in tqdm(enumerate(dataloader),total=len(dataloader)):
         if nbatches is not None and batchno >= nbatches:
             break
-        with torch.no_grad():    
-            ## Get predictions on training data 
-            data_x = data_x["input_ids"]
-            if samplelength is None:
-                data_x = data_x.detach()                
-            else:
-                data_x = data_x[:,:samplelength].detach()
-   
-            ## Compute average log likelihood
-            if accelerator is None:
-                est = compute_point_probe(model, input_ids, probe).detach().cpu()
-            else:
-                est = compute_input_ids_cross_entropy(model, data_x, return_pt = False)
+        ## Get predictions on training data 
+        data_x = data_x["input_ids"]
+        if samplelength is None:
+            data_x = data_x.detach()                
+        else:
+            data_x = data_x[:,:samplelength].detach()
 
-            trace_estimates.append(est)
+        ## Compute v^THv 
+        if accelerator is None:
+            est = compute_point_probe(model, data_x, probe).detach().cpu()
+        else:
+            est = compute_point_probe(model, data_x, probe).tolist()
 
-            torch.cuda.empty_cache()
-            torch.cuda.synchronize()
+        model.zero_grad()
+        trace_estimates.append(est)
+            
     
     if accelerator is None:
         return torch.tensor(trace_estimates)
