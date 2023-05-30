@@ -229,7 +229,7 @@ def compute_point_probe(model, data_x, probe):
         if len(torch.where(input_ids[0,1:] == 0)[0]) > 0:
             length = torch.where(input_ids[0,1:] == 0)[0].min()
 
-        ce_loss = -loss_fn(logits[0,:length,:], input_ids[0, 1:])
+        ce_loss = loss_fn(logits[0,:length,:], input_ids[0, 1:])
         ce_loss.backward(retain_graph=True)
 
         grad = flat_grad(ce_loss, model.parameters(), create_graph=True)  
