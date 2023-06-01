@@ -25,6 +25,7 @@ def main():
     parser.add_argument('--n_samples', action="store", type=int, required=True, help='Dataset size')
     parser.add_argument('--sample_length', action="store", type=int, required=False, help='Truncate number of tokens')
     parser.add_argument('--accelerate', action="store_true", required=False, help='Use accelerate')
+    parser.add_argument('--model_half', action="store_false", required=False, help='Use half precision (fp16). 1 for use; 0 for not.')
     args = parser.parse_args()
 
     ## Other parameters
@@ -70,7 +71,7 @@ def main():
                                         gradient_accumulation_steps=1,
                                         gradient_checkpointing=False,
                                         load_best_model_at_end=True,
-                                        fp16=False,
+                                        fp16=False if args.model_half else True, # TODO - jason check this
                                         deepspeed='ds_config_zero3.json' if args.accelerate else None
                                         )
     trainer = Trainer(model=model,
@@ -90,7 +91,8 @@ def main():
         "n_batches": args.n_samples,
         "n_samples": args.sample_length,
         "bs": args.bs,
-        "accelerate": args.accelerate
+        "accelerate": args.accelerate,
+        "model_half": args.model_half
     }
 
     ## Stopwatch for testing MoPe runtime

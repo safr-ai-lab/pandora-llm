@@ -83,6 +83,7 @@ class MoPe(MIA):
         self.tokenizer = config["tokenizer"]
         self.train_pt = config["train_pt"]
         self.val_pt = config["val_pt"]
+        self.model_half = config["model_half"]
 
         ## If model has not been created (i.e., first call)
         if self.model == None:
@@ -105,20 +106,23 @@ class MoPe(MIA):
         if not self.accelerate:
             # Compute losses for base model
             print("Evaluating Base Model")
-            self.training_res[0,:,:] = compute_dataloader_cross_entropy(self.model, self.training_dl, device=self.device, nbatches=self.nbatches, samplelength=self.samplelength).reshape(-1,1).cpu()
-            self.validation_res[0,:,:] = compute_dataloader_cross_entropy(self.model, self.validation_dl, device=self.device, nbatches=self.nbatches, samplelength=self.samplelength).reshape(-1,1).cpu()
+            self.training_res[0,:,:] = compute_dataloader_cross_entropy(self.model, self.training_dl, device=self.device, nbatches=self.nbatches, samplelength=self.samplelength, half=self.model_half).reshape(-1,1).cpu()
+            self.validation_res[0,:,:] = compute_dataloader_cross_entropy(self.model, self.validation_dl, device=self.device, nbatches=self.nbatches, samplelength=self.samplelength, half=self.model_half).reshape(-1,1).cpu()
 
             # Compute loss for each perturbed model
             for ind_model in range(1,self.n_new_models+1):
                 print(f"Evaluating Perturbed Model {ind_model}/{self.n_new_models}")
                 t_model = GPTNeoXForCausalLM.from_pretrained(self.new_model_paths[ind_model-1])
-                self.training_res[ind_model,:,:] = compute_dataloader_cross_entropy(t_model, self.training_dl, device=self.device, nbatches=self.nbatches, samplelength=self.samplelength).reshape(-1,1).cpu()
-                self.validation_res[ind_model,:,:] = compute_dataloader_cross_entropy(t_model, self.validation_dl, device=self.device, nbatches=self.nbatches, samplelength=self.samplelength).reshape(-1,1).cpu()
+                self.training_res[ind_model,:,:] = compute_dataloader_cross_entropy(t_model, self.training_dl, device=self.device, nbatches=self.nbatches, samplelength=self.samplelength, half=self.model_half).reshape(-1,1).cpu()
+                self.validation_res[ind_model,:,:] = compute_dataloader_cross_entropy(t_model, self.validation_dl, device=self.device, nbatches=self.nbatches, samplelength=self.samplelength, half=self.model_half).reshape(-1,1).cpu()
                 del t_model
                 torch.cuda.empty_cache()
                 torch.cuda.synchronize()
 
         else:
+
+            model_half_arg = "1" if self.model_half else "0"
+
             # Compute losses for base model
             print("Evaluating Base Model")
             subprocess.call(["accelerate", "launch", "model_inference.py",
@@ -129,6 +133,7 @@ class MoPe(MIA):
                 "--n_samples", str(self.nbatches),
                 "--bs", str(self.bs),
                 "--save_path", "MoPe/train_0.pt",
+                "--model_half", model_half_arg,
                 "--accelerate",
                 ]
             )
@@ -140,6 +145,7 @@ class MoPe(MIA):
                 "--n_samples", str(self.nbatches),
                 "--bs", str(self.bs),
                 "--save_path", "MoPe/val_0.pt",
+                "--model_half", model_half_arg,
                 "--accelerate",
                 ]
             )
@@ -157,6 +163,7 @@ class MoPe(MIA):
                     "--n_samples", str(self.nbatches),
                     "--bs", str(self.bs),
                     "--save_path", f"MoPe/train_{ind_model}.pt",
+                    "--model_half", model_half_arg,
                     "--accelerate",
                     ]
                 )
@@ -168,6 +175,7 @@ class MoPe(MIA):
                     "--n_samples", str(self.nbatches),
                     "--bs", str(self.bs),
                     "--save_path", f"MoPe/val_{ind_model}.pt",
+                    "--model_half", model_half_arg,
                     "--accelerate",
                     ]
                 )

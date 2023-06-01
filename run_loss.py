@@ -30,6 +30,7 @@ def main():
     parser.add_argument('--accelerate', action="store_true", required=False, help='Use accelerate')
     parser.add_argument('--train_pt', action="store", required=False, help='.pt file of train dataset (not dataloader)')
     parser.add_argument('--val_pt', action="store", required=False, help='.pt file of val dataset (not dataloader)')
+    parser.add_argument('--model_half', action="store_false", required=False, help='Use half precision (fp16). 1 for use; 0 for not.')
     args = parser.parse_args()
 
     accelerator = Accelerator() if args.accelerate else None
@@ -92,7 +93,8 @@ def main():
         "nbatches": args.n_samples,
         "samplelength": args.sample_length,
         "device": device,
-        "accelerator": accelerator
+        "accelerator": accelerator,
+        "model_half": args.model_half
     }
 
     end = time.perf_counter()

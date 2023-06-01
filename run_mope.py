@@ -33,6 +33,7 @@ def main():
     parser.add_argument('--accelerate', action="store_true", required=False, help='Use accelerate')
     parser.add_argument('--train_pt', action="store", required=False, help='.pt file of train dataloader')
     parser.add_argument('--val_pt', action="store", required=False, help='.pt file of val dataloader')
+    parser.add_argument('--model_half', action="store_false", required=False, help='Use half precision (fp16). 1 for use; 0 for not.')
     args = parser.parse_args()
 
     if not (args.pack ^ args.unpack):
@@ -99,7 +100,8 @@ def main():
         "accelerate": args.accelerate, # if this is false, then train_pt and val_pt are not used
         "tokenizer": tokenizer, 
         "train_pt": train_pt,
-        "val_pt": val_pt
+        "val_pt": val_pt,
+        "model_half": args.model_half,
     }
 
     ## Stopwatch for testing MoPe runtime
