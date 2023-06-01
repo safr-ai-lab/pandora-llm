@@ -277,8 +277,8 @@ def compute_dataloader_probe(model, dataloader, probe, device=None, nbatches=Non
 
 def z_standardize_together(tensor1, tensor2):
     tensor_concat = torch.cat((tensor1,tensor2))
-    tensor1 = (tensor1-tensor_concat.mean())/tensor_concat.std()
-    tensor2 = (tensor2-tensor_concat.mean())/tensor_concat.std()
+    tensor1 = (tensor1-tensor_concat.nanmean())/np.nanstd(tensor_concat)
+    tensor2 = (tensor2-tensor_concat.nanmean())/np.nanstd(tensor_concat)
     return tensor1, tensor2
 
 def approx_log_scale(x):

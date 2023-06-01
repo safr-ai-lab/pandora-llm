@@ -3,6 +3,7 @@ from attack_utils import *
 from transformers import GPTNeoXForCausalLM
 from scipy import stats
 import torch
+import numpy
 import copy
 import subprocess
 import time
@@ -251,8 +252,7 @@ class MoPe(MIA):
         """
         Find best combination of MoPe and Loss metrics
         """
-        self.get_statistics()
-
+        
         try:
             train_mope_z, valid_mope_z = z_standardize_together(self.train_diff, self.valid_diff)
             train_loss_z, valid_loss_z = z_standardize_together(self.train_flat[0,:], self.valid_flat[0,:])
@@ -265,6 +265,9 @@ class MoPe(MIA):
         for lmbda in np.arange(0,1,stepsize):
             train_mix = train_mope_z * lmbda + (1-lmbda) * train_loss_z 
             valid_mix = valid_mope_z * lmbda + (1-lmbda) * valid_loss_z 
+
+            train_mix = train_mix[~train_mix.isnan()]
+            valid_max = valid_mix[~valid_mix.isnan()]
             fpr, tpr, _ = roc_curve(np.concatenate((np.ones_like(train_mix),np.zeros_like(valid_mix))),
                                     np.concatenate((train_mix, valid_mix)))
             if best_auc < auc(fpr, tpr):
@@ -272,12 +275,12 @@ class MoPe(MIA):
                 best_lambda = lmbda
         print(f"Best linear combination with lambda={best_lambda} achieves AUC={best_auc}")
 
-        train_stat = train_mope_z * best_lmbda + (1-best_lmbda) * train_loss_z
-        valid_stat = valid_mope_z * best_lmbda + (1-best_lmbda) * valid_loss_z 
+        train_stat = train_mope_z * best_lambda + (1-best_lambda) * train_loss_z
+        valid_stat = valid_mope_z * best_lambda + (1-best_lambda) * valid_loss_z 
 
         default_name = self.get_mope_loss_linear_title() + (" log.png" if log_scale else ".png")
         save_name = save_name if save_name else default_name
-        plot_ROC(train_stat,val_stat,f"ROC of MoPe * {best_lambda} + LOSS * ({1-best_lambda})",log_scale=log_scale,show_plot=show_plot,save_name=save_name)
+        plot_ROC(-train_stat,-valid_stat,f"ROC of MoPe * {best_lambda} + LOSS * ({1-best_lambda})",log_scale=log_scale,show_plot=show_plot,save_name=save_name)
 
     def plot_mope_loss_plot(self, show_plot=False, log_scale=False, save_name=None):
         """
@@ -289,13 +292,13 @@ class MoPe(MIA):
         except:
             print(" - WARNING: Please run inference() before plotting. Exiting plot_mope_loss_plot()...")
             return
-        
+
         if log_scale:
             train_mope = approx_log_scale(train_mope)
             valid_mope = approx_log_scale(valid_mope)
             train_loss = approx_log_scale(train_loss)
             valid_loss = approx_log_scale(valid_loss)
-        
+        plt.figure()
         plt.scatter(train_mope, train_loss, c='orange', label='Training')
         plt.scatter(valid_mope, valid_loss, c='blue', label='Validation')
 
@@ -304,12 +307,14 @@ class MoPe(MIA):
         plt.title('MoPe vs. LOSS predictions')
         plt.legend()
 
-        if show_plot:
-            plt.show()
-
         default_name = self.get_mope_loss_title() + (" log.png" if log_scale else ".png")
         save_name = save_name if save_name else default_name
         plt.savefig(save_name)
+
+        if show_plot:
+            plt.show()
+
+
 
     def plot_stat_hists(self, n, show_plot=False, log_scale=False, save_name=None):
         """
