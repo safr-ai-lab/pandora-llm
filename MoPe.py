@@ -321,8 +321,8 @@ class MoPe(MIA):
         Plot histograms of loss train vs val per perturbed model. And MoPe. Must be run after inference(). 
         """
         try:
-            array1 = self.train_flat.T
-            array2 = self.valid_flat.T
+            array1 = self.train_flat
+            array2 = self.valid_flat
         except:
             print(" - WARNING: Please run inference() before plotting. Exiting plot_stat_hists()...")
             return
