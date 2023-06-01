@@ -59,7 +59,10 @@ def compute_dataloader_cross_entropy(model, dataloader, device=None, nbatches=No
         print("Warning: using sample length is discouraged. Please avoid using this parameter.")
     if accelerator is None:
         if half:
+            print("Using model.half() ....")
             model.half()
+        else:
+            print("Not using model.half() ....")
         model.eval()
         model.to(device)
 
