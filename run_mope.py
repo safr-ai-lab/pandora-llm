@@ -89,6 +89,8 @@ def main():
     ## Run MoPe attack
 
     config_mope = {
+        "train_dataset": training_dataset,
+        "val_dataset": validation_dataset,
         "training_dl": training_dataloader,
         "validation_dl": validation_dataloader,
         "n_new_models": args.n_models,

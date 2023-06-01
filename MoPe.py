@@ -9,6 +9,17 @@ import subprocess
 import time
 import os
 import matplotlib.pyplot as plt
+import plotly.graph_objects as go # for dynamic MoPe vs LOSS plotting
+
+def add_line_breaks(strings, max_length=100):
+    modified_strings = []
+    for string in strings:
+        if len(string) > max_length:
+            modified_string = "<br>".join([string[i:i+max_length] for i in range(0, len(string), max_length)])
+        else:
+            modified_string = string
+        modified_strings.append(modified_string)
+    return modified_strings
 
 class MoPe(MIA):
     """
@@ -71,6 +82,8 @@ class MoPe(MIA):
                 accelerate
         """
         self.config = config
+        self.train_dataset = [string[:900] for string in config["train_dataset"]]
+        self.val_dataset = [string[:900] for string in config["train_dataset"]]
         self.training_dl = config["training_dl"]
         self.validation_dl = config["validation_dl"]
         self.n_new_models = config["n_new_models"]
@@ -258,7 +271,7 @@ class MoPe(MIA):
     
     def plot_mope_loss_linear_ROC(self, show_plot=False, log_scale=False, save_name=None, stepsize = 0.01):
         """
-        Find best combination of MoPe and Loss metrics
+        Find best linear combination of MoPe and Loss metrics
         """
         
         try:
@@ -290,9 +303,9 @@ class MoPe(MIA):
         save_name = save_name if save_name else default_name
         plot_ROC(-train_stat,-valid_stat,f"ROC of MoPe * {best_lambda} + LOSS * ({1-best_lambda})",log_scale=log_scale,show_plot=show_plot,save_name=save_name)
 
-    def plot_mope_loss_plot(self, show_plot=False, log_scale=False, save_name=None):
+    def plot_mope_loss_plot(self, show_plot=False, log_scale=False, save_name=None, dynamic=True):
         """
-        Plot MoPe vs LOSS
+        Plot MoPe vs LOSS (z-scored)
         """
         try:
             train_mope, valid_mope = z_standardize_together(self.train_diff, self.valid_diff)
@@ -306,6 +319,7 @@ class MoPe(MIA):
             valid_mope = approx_log_scale(valid_mope)
             train_loss = approx_log_scale(train_loss)
             valid_loss = approx_log_scale(valid_loss)
+        
         plt.figure()
         plt.scatter(train_mope, train_loss, c='orange', label='Training')
         plt.scatter(valid_mope, valid_loss, c='blue', label='Validation')
@@ -321,6 +335,55 @@ class MoPe(MIA):
 
         if show_plot:
             plt.show()
+        
+        train_data_labels = add_line_breaks(self.train_dataset)
+        val_data_labels = add_line_breaks(self.val_dataset)
+         
+        if dynamic: # use plotly
+            
+            # Create scatter plot
+            fig = go.Figure()
+
+            fig.add_trace(go.Scatter(
+                x=train_mope,
+                y=train_loss,
+                mode='markers',
+                name='Train',
+                marker=dict(
+                    size=8,
+                    color='blue',  # Set a single color for train points
+                ),
+                hovertemplate='%{text}',  # Set the hover label to display only the 'z' value
+                text=train_data_labels,  # Assign 'z' values to the 'text' attribute
+            ))
+
+            fig.add_trace(go.Scatter(
+                x=valid_mope,
+                y=valid_loss,
+                mode='markers',
+                name='Validation',
+                marker=dict(
+                    size=8,
+                    color='red',  # Set a single color for val points
+                ),
+                hovertemplate='%{text}',  # Set the hover label to display only the 'z' value
+                text=val_data_labels,  # Assign 'z' values to the 'text' attribute
+            ))
+
+            fig.update_layout(
+                title='MoPe vs. LOSS predictions',
+                xaxis=dict(title='MoPe predictions (z-score)'),
+                yaxis=dict(title='LOSS predictions (z-score)'),
+                showlegend=True,  # Show the legend
+                hovermode='closest',
+                coloraxis_showscale=False,  # Hide the color scale
+            )
+
+            # Save the plot as HTML file
+            if save_name is None or ".html" not in save_name:
+                save_name = self.get_mope_loss_title() + (" log.html" if log_scale else ".html")
+            fig.write_html(save_name)
+
 
 
 
