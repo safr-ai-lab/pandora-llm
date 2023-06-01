@@ -8,6 +8,7 @@ import copy
 import subprocess
 import time
 import os
+import re
 import matplotlib.pyplot as plt
 import plotly.graph_objects as go # for dynamic MoPe vs LOSS plotting
 
@@ -217,6 +218,59 @@ class MoPe(MIA):
 
         return self.train_diff, self.valid_diff
 
+    def save(self, title = None):
+        """
+        Save differences in cross entropy between base model and perturbed models
+        """
+        self.get_statistics()
+        if title == None:
+            title = self.get_default_title()
+        torch.save(self.get_statistics(), 
+            title + ".pt")
+        torch.save(torch.vstack((self.train_flat, self.valid_flat)), 
+            title + "_full.pt")
+
+    def load_data_for_plotting(self, filename, train_dataset = None, val_dataset = None):
+        pattern = r"MoPe_(.*?)_(.*?)_N=(\d+)_var=([\d.]+)_bs=(\d+)_nbatches=(\d+)_full\.pt"
+    
+        # Search for the pattern in the filename
+        match = re.search(pattern, filename)
+
+        if match is None:
+            print("Pattern not found in the filename.")
+            return 
+
+        # Extract the values using group() method
+        self.model_path = match.group(1).replace("-", "/", 1)
+        self.model_revision =  None if match.group(2)=="LastChkpt" else match.group(2)
+        self.n_new_models = int(match.group(3))
+        self.noise_stdev = float(match.group(4))
+        self.config = {}
+        self.config["bs"] = int(match.group(5))
+        self.config["nbatches"] = int(match.group(6))
+        self.cache_dir = "./"+ self.model_path.split("/")[-1] + ("/"+ self.model_revision if self.model_revision is not None else "")
+
+        # Print the extracted values
+        print("model_path:", self.model_path)
+        print("model_revision:", self.model_revision)
+        print("n_new_models:", self.n_new_models)
+        print("noise_stdev:", self.noise_stdev)
+        print("bs:", self.config["bs"])
+        print("nbatches:", self.config["nbatches"])
+        print("cache_dir:", self.cache_dir)
+        
+        total_dataset = torch.load(filename)
+        self.train_dataset = train_dataset
+        self.val_dataset   = val_dataset 
+
+        self.train_flat = total_dataset[:self.n_new_models+1,:]
+        self.valid_flat = total_dataset[self.n_new_models+1:,:]
+
+        self.train_diff = self.train_flat[0,:]-self.train_flat[1:,:].mean(dim=0)
+        self.valid_diff = self.valid_flat[0,:]-self.valid_flat[1:,:].mean(dim=0)
+
+
+
     def get_default_title(self):
         return "MoPe/MoPe_{}_{}_N={}_var={}_bs={}_nbatches={}".format(
             self.model_path.replace("/","-"),
@@ -257,17 +311,6 @@ class MoPe(MIA):
             self.config["nbatches"]
         )
         
-    def save(self, title = None):
-        """
-        Save differences in cross entropy between base model and perturbed models
-        """
-        self.get_statistics()
-        if title == None:
-            title = self.get_default_title()
-        torch.save(self.get_statistics(), 
-            title + ".pt")
-        torch.save(torch.vstack((self.train_flat, self.valid_flat)), 
-            title + "_full.pt")
     
     def plot_mope_loss_linear_ROC(self, show_plot=False, log_scale=False, save_name=None, stepsize = 0.01):
         """
@@ -383,8 +426,6 @@ class MoPe(MIA):
             if save_name is None or ".html" not in save_name:
                 save_name = self.get_mope_loss_title() + (" log.html" if log_scale else ".html")
             fig.write_html(save_name)
-
-
 
 
     def plot_stat_hists(self, n, show_plot=False, log_scale=False, save_name=None):
