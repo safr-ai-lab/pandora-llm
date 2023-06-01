@@ -274,3 +274,12 @@ def compute_dataloader_probe(model, dataloader, probe, device=None, nbatches=Non
         trace_estimates = accelerator.gather_for_metrics(trace_estimates)
         trace_estimates = torch.cat([loss[0] for loss in trace_estimates])
         return trace_estimates
+
+def z_standardize_together(tensor1, tensor2):
+    tensor_concat = torch.cat((tensor1,tensor2))
+    tensor1 = (tensor1-tensor_concat.mean())/tensor_concat.std()
+    tensor2 = (tensor2-tensor_concat.mean())/tensor_concat.std()
+    return tensor1, tensor2
+
+def approx_log_scale(x):
+    return torch.log(1+torch.abs(x))*torch.sign(x)

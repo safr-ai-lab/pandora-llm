@@ -115,6 +115,10 @@ def main():
     MoPer.attack_plot_ROC(log_scale = True, show_plot=True)
     print("Plotting...")
     MoPer.plot_stat_hists(args.n_models, show_plot=True)
+    MoPer.plot_mope_loss_linear_ROC(show_plot=True, log_scale=False)
+    MoPer.plot_mope_loss_linear_ROC(show_plot=True, log_scale=True)
+    MoPer.plot_mope_loss_plot(show_plot=True, log_scale=False)
+    MoPer.plot_mope_loss_plot(show_plot=True, log_scale=True)
     MoPer.save()
 
     end = time.perf_counter()

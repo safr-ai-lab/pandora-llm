@@ -85,7 +85,7 @@ class HutchinsonTraceAttack(MIA):
             print(f"Val_flat shape is {self.valid_flat.shape}")
             print(f"Val_avg shape is {self.valid_avg.shape}")
 
-        return self.train_avg, self.valid_avg
+        return -self.train_avg, -self.valid_avg
 
     def get_default_title(self):
         return "Hutch/Hutch_{}_{}_N={}_probe_gen={}_bs={}_nbatches={}".format(
