@@ -383,6 +383,8 @@ class MoPe(MIA):
         val_data_labels = add_line_breaks(self.val_dataset)
          
         if dynamic: # use plotly
+
+            markersize = max(-(self.nbatches/400)+12,1) # scale marker size with number of batches
             
             # Create scatter plot
             fig = go.Figure()
@@ -393,7 +395,7 @@ class MoPe(MIA):
                 mode='markers',
                 name='Train',
                 marker=dict(
-                    size=8,
+                    size=markersize,
                     color='blue',  # Set a single color for train points
                 ),
                 hovertemplate='%{text}',  # Set the hover label to display only the 'z' value
@@ -406,7 +408,7 @@ class MoPe(MIA):
                 mode='markers',
                 name='Validation',
                 marker=dict(
-                    size=8,
+                    size=markersize,
                     color='red',  # Set a single color for val points
                 ),
                 hovertemplate='%{text}',  # Set the hover label to display only the 'z' value
