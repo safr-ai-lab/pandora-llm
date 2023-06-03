@@ -438,7 +438,7 @@ class MoPe(MIA):
             print(" - WARNING: Please run inference() before plotting. Exiting plot_stat_hists()...")
             return
 
-        n = n+1 # add 1 for MoPe plot
+        n = n+4 # add 1 for MoPe plot
         # Calculate the number of rows and columns for subplots
         rows = n // 4
         if n % 4:
