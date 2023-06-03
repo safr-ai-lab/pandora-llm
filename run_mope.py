@@ -34,6 +34,7 @@ def main():
     parser.add_argument('--train_pt', action="store", required=False, help='.pt file of train dataloader')
     parser.add_argument('--val_pt', action="store", required=False, help='.pt file of val dataloader')
     parser.add_argument('--model_half', action="store_true", required=False, help='Use half precision (fp16)')
+    parser.add_argument('--noise', action="store", required=False, help='Noise to add to model. Options: 1 = Gaussian, 2 = Rademacher, 3+ = user-specified (see README). If not specified, use Gaussian noise.')
     args = parser.parse_args()
 
     if not (args.pack ^ args.unpack):
@@ -104,6 +105,7 @@ def main():
         "train_pt": train_pt,
         "val_pt": val_pt,
         "model_half": args.model_half,
+        "noise_type": args.noise
     }
 
     ## Stopwatch for testing MoPe runtime

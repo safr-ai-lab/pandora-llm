@@ -38,6 +38,10 @@ Run Experiment Scripts: `run_{attack}.py` (`.ipynb` notebooks also provided)
 
 Summarize Experiments: `aggregate_results.py` (you can specify a txt file with the results or load automatically from a folder)
 
+### MoPe
+
+You can specify what type of noise you want to add to models in MoPe, using `--noise` in `run_mope.py`. The default options are Gaussian (enabled by default, no need to pass in anything) and Rademacher (2). If you want to specify your own type of noise, edit `noise_vector` inside of `MoPe.py` and pass that number into `run_mope`. 
+
 ### Usage
 
 We use accelerate's zero3 inference to enable multi-GPU inference.

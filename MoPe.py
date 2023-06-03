@@ -22,6 +22,15 @@ def add_line_breaks(strings, max_length=100):
         modified_strings.append(modified_string)
     return modified_strings
 
+def noise_vector(size, noise_type):
+    if noise_type == 1: # gaussian
+        return torch.randn(size)
+    elif noise_type == 2: # rademacher
+        return torch.randint(0,2,size)*2-1
+    else: # user-specified
+        print(" - WARNING: noise_type not recognized. Using Gaussian noise. You can specify other options here.")
+        return torch.randn(size)
+
 class MoPe(MIA):
     """
     Model Perturbation attack thresholding attack (vs. pre-training)
@@ -45,7 +54,7 @@ class MoPe(MIA):
         dummy_model.save_pretrained(f"MoPe/{self.model_name}-{ind_model}", from_pt=True) 
         self.new_model_paths.append(f"MoPe/{self.model_name}-{ind_model}")
         
-    def generate_new_models(self,tokenizer):
+    def generate_new_models(self,tokenizer,noise_type=1):
         self.new_model_paths = []
 
         with torch.no_grad():
@@ -56,7 +65,7 @@ class MoPe(MIA):
 
                 ## Perturbed model
                 for name, param in dummy_model.named_parameters():
-                    noise = torch.randn(param.size()) * self.noise_stdev
+                    noise = noise_vector(param.size(), noise_type) * self.noise_stdev
                     param.add_(noise)
                 
                 # Move to disk 
@@ -98,6 +107,7 @@ class MoPe(MIA):
         self.train_pt = config["train_pt"]
         self.val_pt = config["val_pt"]
         self.model_half = config["model_half"]
+        self.noise_type = config["noise_type"]
 
         ## If model has not been created (i.e., first call)
         if self.model == None:
@@ -109,7 +119,7 @@ class MoPe(MIA):
         ## Generate new models if we are supplied with noise_stdev and n_new_models
         if self.noise_stdev != None and self.n_new_models != None:
             start = time.perf_counter()
-            self.generate_new_models(self.tokenizer)
+            self.generate_new_models(self.tokenizer, self.noise_type)
             end = time.perf_counter()
             print(f"Perturbing Models took {end-start} seconds!")
 
