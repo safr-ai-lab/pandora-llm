@@ -1,7 +1,7 @@
 from attack_utils import *
 
 class MIA:
-    def __init__(self, model_path=None, model_revision=None, cache_dir=None):
+    def __init__(self, model_path, model_revision=None, cache_dir=None):
         """
         Base class for all membership inference attacks. Contains a "base" model image. 
             model_path: path to the model to be attacked
@@ -9,7 +9,7 @@ class MIA:
             cache_dir: directory to cache the model
         """
         self.model_path      = model_path
-        self.model_name      = None if model_path is None else self.model_path.split("/")[-1]
+        self.model_name      = self.model_path.split("/")[-1]
         self.model_revision  = model_revision
         self.cache_dir       = cache_dir
     

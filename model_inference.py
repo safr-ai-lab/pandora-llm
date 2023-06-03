@@ -13,7 +13,6 @@ from accelerate import Accelerator
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--model_path', action="store", type=str, required=True, help='Model Path')
-    parser.add_argument('--model_half', action="store", required=True, help='Use half precision (fp16). 1 for use; 0 for not.')
     parser.add_argument('--model_revision', action="store", type=str, required=False, default="main", help='Model Revision')
     parser.add_argument('--cache_dir', action="store", type=str, required=False, help='Model Cache Dir')
     parser.add_argument('--dataset_path', action="store", type=str, required=True, help='Dataset path')
@@ -22,6 +21,7 @@ def main():
     parser.add_argument('--bs', action="store", type=int, required=True, help='Batch size')
     parser.add_argument('--save_path', action="store", type=str, required=True, help="Save path")
     parser.add_argument('--accelerate', action="store_true", required=False, help='Use accelerate')
+    parser.add_argument('--model_half', action="store_true", required=False, help='Use half precision (fp16)')
     args = parser.parse_args()
 
     accelerator = Accelerator() if args.accelerate else None
@@ -35,11 +35,8 @@ def main():
     if accelerator is not None:
         model, dataloader = accelerator.prepare(model, dataloader)
 
-    if args.model_half == 1:
-        loss = compute_dataloader_cross_entropy(model, dataloader, device=args.device, nbatches=args.n_samples, accelerator=accelerator, half=True).detach().cpu()
-    else:
-        loss = compute_dataloader_cross_entropy(model, dataloader, device=args.device, nbatches=args.n_samples, accelerator=accelerator, half=False).detach().cpu()
-
+    loss = compute_dataloader_cross_entropy(model, dataloader, device=args.device, nbatches=args.n_samples, accelerator=accelerator, half=args.model_half).detach().cpu()
+    
     if accelerator is None or accelerator.is_main_process:
         torch.save(loss,args.save_path)
 

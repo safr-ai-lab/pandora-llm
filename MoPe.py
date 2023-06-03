@@ -134,9 +134,6 @@ class MoPe(MIA):
                 torch.cuda.synchronize()
 
         else:
-
-            model_half_arg = "1" if self.model_half else "0"
-
             # Compute losses for base model
             print("Evaluating Base Model")
             subprocess.call(["accelerate", "launch", "model_inference.py",
@@ -147,8 +144,8 @@ class MoPe(MIA):
                 "--n_samples", str(self.nbatches),
                 "--bs", str(self.bs),
                 "--save_path", "MoPe/train_0.pt",
-                "--model_half", model_half_arg,
                 "--accelerate",
+                "--model_half" if self.model_half else ""
                 ]
             )
             subprocess.call(["accelerate", "launch", "model_inference.py",
@@ -159,8 +156,8 @@ class MoPe(MIA):
                 "--n_samples", str(self.nbatches),
                 "--bs", str(self.bs),
                 "--save_path", "MoPe/val_0.pt",
-                "--model_half", model_half_arg,
                 "--accelerate",
+                "--model_half" if self.model_half else ""
                 ]
             )
             self.training_res[0,:,:] = torch.load("MoPe/train_0.pt").reshape(-1,1)
@@ -177,8 +174,8 @@ class MoPe(MIA):
                     "--n_samples", str(self.nbatches),
                     "--bs", str(self.bs),
                     "--save_path", f"MoPe/train_{ind_model}.pt",
-                    "--model_half", model_half_arg,
                     "--accelerate",
+                    "--model_half" if self.model_half else ""
                     ]
                 )
                 subprocess.call(["accelerate", "launch", "model_inference.py",
@@ -189,8 +186,8 @@ class MoPe(MIA):
                     "--n_samples", str(self.nbatches),
                     "--bs", str(self.bs),
                     "--save_path", f"MoPe/val_{ind_model}.pt",
-                    "--model_half", model_half_arg,
                     "--accelerate",
+                    "--model_half" if self.model_half else ""
                     ]
                 )
                 self.training_res[ind_model,:,:] = torch.load(f"MoPe/train_{ind_model}.pt").reshape(-1,1)

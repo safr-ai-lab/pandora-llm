@@ -28,6 +28,9 @@ def main():
     parser.add_argument('--model_half', action="store_true", required=False, help='Use half precision (fp16). 1 for use; 0 for not.')
     args = parser.parse_args()
 
+    if args.model_half and args.accelerate:
+        print("WARNING: training in half precision is not supported yet!!!")
+
     ## Other parameters
     model_revision = args.checkpoint
     seed = args.seed
@@ -71,7 +74,7 @@ def main():
                                         gradient_accumulation_steps=1,
                                         gradient_checkpointing=False,
                                         load_best_model_at_end=True,
-                                        fp16=False if args.model_half else True, # TODO - jason check this
+                                        fp16=False,
                                         deepspeed='ds_config_zero3.json' if args.accelerate else None
                                         )
     trainer = Trainer(model=model,

@@ -29,8 +29,6 @@ class LoRa(MIA):
         """
         self.config = config
 
-        model_half_arg = "1" if self.config["model_half"] else "0"
-
         if not self.config["accelerate"]:
 
             self.train_result_base = compute_dataloader_cross_entropy(self.config["trainer"].model, self.config["training_dl"], half=False, device=self.config["device"], nbatches=self.config["n_batches"], samplelength=self.config["n_samples"], half=self.config["model_half"]).reshape(-1,1).cpu()
@@ -53,8 +51,8 @@ class LoRa(MIA):
                 "--n_samples", str(self.config["n_batches"]),
                 "--bs", str(self.config["bs"]),
                 "--save_path", "LoRa/base_train.pt",
-                "--model_half", model_half_arg, 
                 "--accelerate",
+                "--model_half" if self.config["model_half"] else ""
                 ]
             )
             subprocess.call(["accelerate", "launch", "model_inference.py",
@@ -65,8 +63,8 @@ class LoRa(MIA):
                 "--n_samples", str(self.config["n_batches"]),
                 "--bs", str(self.config["bs"]),
                 "--save_path", "LoRa/base_val.pt",
-                "--model_half", model_half_arg, 
                 "--accelerate",
+                "--model_half" if self.config["model_half"] else ""
                 ]
             )
             self.train_result_base = torch.load("LoRa/base_train.pt").reshape(-1,1)
@@ -91,8 +89,8 @@ class LoRa(MIA):
                 "--n_samples", str(self.config["n_batches"]),
                 "--bs", str(self.config["bs"]),
                 "--save_path", "LoRa/ft_train.pt",
-                "--model_half", model_half_arg, 
                 "--accelerate",
+                "--model_half" if self.config["model_half"] else ""
                 ]
             )
             subprocess.call(["accelerate", "launch", "model_inference.py",
@@ -101,8 +99,8 @@ class LoRa(MIA):
                 "--n_samples", str(self.config["n_batches"]),
                 "--bs", str(self.config["bs"]),
                 "--save_path", "LoRa/ft_val.pt",
-                "--model_half", model_half_arg, 
                 "--accelerate",
+                "--model_half" if self.config["model_half"] else ""
                 ]
             )
 
