@@ -36,6 +36,8 @@ Dataset Functions: `dataset_utils.py`
 
 Run Experiment Scripts: `run_{attack}.py` (`.ipynb` notebooks also provided)
 
+Summarize Experiments: `aggregate_results.py` (you can specify a txt file with the results or load automatically from a folder)
+
 ### Usage
 
 We use accelerate's zero3 inference to enable multi-GPU inference.
