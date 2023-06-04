@@ -23,9 +23,9 @@ def add_line_breaks(strings, max_length=100):
     return modified_strings
 
 def noise_vector(size, noise_type):
-    if noise_type == 1: # gaussian
+    if str(noise_type) == "1": # gaussian
         return torch.randn(size)
-    elif noise_type == 2: # rademacher
+    elif str(noise_type) == "2": # rademacher
         return torch.randint(0,2,size)*2-1
     else: # user-specified
         print(" - WARNING: noise_type not recognized. Using Gaussian noise. You can specify other options here.")
