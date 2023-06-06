@@ -308,22 +308,23 @@ class MoPe(MIA):
             save_name = title + (" log.png" if log_scale else ".png")
         plot_ROC(train_stats,valid_stats,title,log_scale=log_scale,show_plot=show_plot,save_name=save_name)
 
-        plt.figure()
-        plt.scatter(train_mope_z, train_loss_z, c='orange', label='Training', alpha=0.5)
-        plt.scatter(valid_mope_z, valid_loss_z, c='blue', label='Validation', alpha=0.5)
-        x = np.linspace(-4, 4, 2)
-        m = -clf.coef_.T[0]/clf.coef_.T[1]
-        b = -clf.intercept_[0]/clf.coef_.T[1]
-        plt.xlim(-4,3)
-        plt.ylim(-3,3)
-        plt.plot(x, m*x+b, linestyle='--')
-        plt.fill_between(x, m*x+b, 3, color='orange', alpha=0.25)
-        plt.fill_between(x, m*x+b, -3, color='blue', alpha=0.25)
-        plt.xlabel('MoPe predictions (z-score)')
-        plt.ylabel('LOSS predictions (z-score)')
-        plt.title('MoPe vs. LOSS predictions')
-        plt.legend()
-        plt.savefig(save_name+"_SCATTER.png", bbox_inches='tight')
+        # # TODO check this code for correctness
+        # plt.figure()
+        # plt.scatter(train_mope_z, train_loss_z, c='orange', label='Training', alpha=0.5)
+        # plt.scatter(valid_mope_z, valid_loss_z, c='blue', label='Validation', alpha=0.5)
+        # x = np.linspace(-4, 4, 2)
+        # m = -clf.coef_.T[0]/clf.coef_.T[1]
+        # b = -clf.intercept_[0]/clf.coef_.T[1]
+        # plt.xlim(-3,3)
+        # plt.ylim(-3,3)
+        # plt.plot(x, m*x+b, linestyle='--')
+        # plt.fill_between(x, m*x+b, 3, color='orange', alpha=0.25)
+        # plt.fill_between(x, m*x+b, -3, color='blue', alpha=0.25)
+        # plt.xlabel('MoPe predictions (z-score)')
+        # plt.ylabel('LOSS predictions (z-score)')
+        # plt.title('MoPe vs. LOSS logistic regression')
+        # plt.legend()
+        # plt.savefig(save_name+"_SCATTER.png", bbox_inches='tight')
 
 
     def plot_mope_loss_linear_ROC(self, show_plot=False, log_scale=False, save_name=None, num_lambdas=1000):
@@ -355,10 +356,26 @@ class MoPe(MIA):
         train_stat = train_mope_z * best_lambda + (1-best_lambda) * train_loss_z
         valid_stat = valid_mope_z * best_lambda + (1-best_lambda) * valid_loss_z 
 
-        default_name = self.get_default_title() + "_COMBO" + (" log.png" if log_scale else ".png")
-        save_name = save_name if save_name else default_name
+        title = self.get_default_title() + "_COMBO"
+        if save_name is None:
+            save_name = title + (" log.png" if log_scale else ".png")
         plot_ROC(train_stat,valid_stat,f"ROC of MoPe * {best_lambda} + LOSS * ({1-best_lambda})",log_scale=log_scale,show_plot=show_plot,save_name=save_name)
 
+        # # TODO check this code for correctness
+        # plt.figure()
+        # plt.scatter(train_mope_z, train_loss_z, c='orange', label='Training', alpha=0.5)
+        # plt.scatter(valid_mope_z, valid_loss_z, c='blue', label='Validation', alpha=0.5)
+        # x = np.linspace(-4, 4, 2)
+        # plt.xlim(-3,3)
+        # plt.ylim(-3,3)
+        # plt.plot(x, -((1-best_lambda)/(best_lambda+1e-5))*x, linestyle='--')
+        # plt.fill_between(x, -((1-best_lambda)/(best_lambda+1e-5))*x, 3, color='orange', alpha=0.25)
+        # plt.fill_between(x, -((1-best_lambda)/(best_lambda+1e-5))*x, -3, color='blue', alpha=0.25)
+        # plt.xlabel('MoPe predictions (z-score)')
+        # plt.ylabel('LOSS predictions (z-score)')
+        # plt.title(f"ROC of MoPe * {best_lambda} + LOSS * ({1-best_lambda})")
+        # plt.legend()
+        # plt.savefig(save_name+"_SCATTER.png", bbox_inches='tight')
 
     def plot_mope_loss(self, show_plot=False, log_scale=False, save_name=None, dynamic=True):
         """
