@@ -1,16 +1,15 @@
 from Attack import MIA
 from attack_utils import *
 from transformers import GPTNeoXForCausalLM
-from scipy import stats
 import torch
-import numpy
 import copy
 import subprocess
 import time
 import os
 import re
 import matplotlib.pyplot as plt
-import plotly.graph_objects as go # for dynamic MoPe vs LOSS plotting
+import plotly.graph_objects as go
+from sklearn.linear_model import LogisticRegression
 
 def add_line_breaks(strings, max_length=100):
     modified_strings = []
@@ -23,9 +22,9 @@ def add_line_breaks(strings, max_length=100):
     return modified_strings
 
 def noise_vector(size, noise_type):
-    if str(noise_type) == "1": # gaussian
+    if noise_type == 1: # gaussian
         return torch.randn(size)
-    elif str(noise_type) == "2": # rademacher
+    elif noise_type == 2: # rademacher
         return torch.randint(0,2,size)*2-1
     else: # user-specified
         print(" - WARNING: noise_type not recognized. Using Gaussian noise. You can specify other options here.")
@@ -41,18 +40,6 @@ class MoPe(MIA):
         self.new_model_paths = []
         if not os.path.exists("MoPe"):
             os.mkdir("MoPe")
-
-    def perturb_model(self,ind_model):
-        dummy_model = copy.deepcopy(self.model)
-        ## Perturb model
-        with torch.no_grad():
-            for name, param in dummy_model.named_parameters():
-                noise = torch.randn(param.size()) * self.noise_stdev
-                param.add_(noise)
-        
-        # Move to disk 
-        dummy_model.save_pretrained(f"MoPe/{self.model_name}-{ind_model}", from_pt=True) 
-        self.new_model_paths.append(f"MoPe/{self.model_name}-{ind_model}")
         
     def generate_new_models(self,tokenizer,noise_type=1):
         self.new_model_paths = []
@@ -276,8 +263,6 @@ class MoPe(MIA):
         self.train_diff = self.train_flat[0,:]-self.train_flat[1:,:].mean(dim=0)
         self.valid_diff = self.valid_flat[0,:]-self.valid_flat[1:,:].mean(dim=0)
 
-
-
     def get_default_title(self):
         return "MoPe/MoPe_{}_{}_N={}_var={}_bs={}_nbatches={}".format(
             self.model_path.replace("/","-"),
@@ -287,60 +272,81 @@ class MoPe(MIA):
             self.config["bs"],
             self.config["nbatches"]
         )
-
-    def get_mope_loss_linear_title(self):
-        return "MoPe/MoPe-LOSS-combination_{}_{}_N={}_var={}_bs={}_nbatches={}".format(
-            self.model_path.replace("/","-"),
-            self.model_revision.replace("/","-") if self.model_revision else "LastChkpt",
-            self.n_new_models,
-            self.noise_stdev,
-            self.config["bs"],
-            self.config["nbatches"]
-        )
-    
-    def get_mope_loss_title(self):
-        return "MoPe/MoPe-LOSS-scatter_{}_{}_N={}_var={}_bs={}_nbatches={}".format(
-            self.model_path.replace("/","-"),
-            self.model_revision.replace("/","-") if self.model_revision else "LastChkpt",
-            self.n_new_models,
-            self.noise_stdev,
-            self.config["bs"],
-            self.config["nbatches"]
-        )
-
-    def get_histogram_title(self):
-        return "MoPe/Histograms_MoPe_{}_{}_N={}_var={}_bs={}_nbatches={}".format(
-            self.model_path.replace("/","-"),
-            self.model_revision.replace("/","-") if self.model_revision else "LastChkpt",
-            self.n_new_models,
-            self.noise_stdev,
-            self.config["bs"],
-            self.config["nbatches"]
-        )
         
-    
-    def plot_mope_loss_linear_ROC(self, show_plot=False, log_scale=False, save_name=None, stepsize = 0.01):
-        """
-        Find best linear combination of MoPe and Loss metrics
-        """
-        
+    def plot_loss_ROC(self, title=None, log_scale=False, show_plot=True, save_name=None):
+        '''
+        Plot LOSS results for free (i.e., using just the base model rather than the perturbed)
+        '''
+        train_statistics, val_statistics = self.train_flat[0,:], self.valid_flat[0,:]
+        if title is None:
+            title = self.get_default_title() + "_LOSS"
+        if save_name is None:
+            save_name = title + (" log.png" if log_scale else ".png")
+        plot_ROC(train_statistics, val_statistics, title, log_scale=log_scale, show_plot=show_plot, save_name=save_name)
+
+    def plot_mope_loss_LR_ROC(self, show_plot=False, log_scale=False, save_name=None):
         try:
             train_mope_z, valid_mope_z = z_standardize_together(self.train_diff, self.valid_diff)
             train_loss_z, valid_loss_z = z_standardize_together(self.train_flat[0,:], self.valid_flat[0,:])
         except:
-            print(" - WARNING: Please run inference() before plotting. Exiting plot_mope_loss_linear_ROC()...")
+            print("WARNING: Please run inference() before plotting. Exiting plot_mope_loss_linear_ROC()...")
+            return
+
+        train_mope_z = train_mope_z.reshape(-1,1)
+        valid_mope_z = valid_mope_z.reshape(-1,1)
+        train_loss_z = train_loss_z.reshape(-1,1)
+        valid_loss_z = valid_loss_z.reshape(-1,1)
+
+        train_mix = np.concatenate((train_mope_z,train_loss_z),axis=1)
+        valid_mix = np.concatenate((valid_mope_z,valid_loss_z),axis=1)
+
+        clf = LogisticRegression(random_state=0).fit(np.concatenate((-train_mix, -valid_mix)), np.concatenate((np.ones_like(train_mix)[:,0],np.zeros_like(valid_mix)[:,0])))
+        train_stats, valid_stats = clf.decision_function(train_mix), clf.decision_function(valid_mix)
+
+        title = self.get_default_title() + "_LR"
+        if save_name is None:
+            save_name = title + (" log.png" if log_scale else ".png")
+        plot_ROC(train_stats,valid_stats,title,log_scale=log_scale,show_plot=show_plot,save_name=save_name)
+
+        plt.figure()
+        plt.scatter(train_mope_z, train_loss_z, c='orange', label='Training', alpha=0.5)
+        plt.scatter(valid_mope_z, valid_loss_z, c='blue', label='Validation', alpha=0.5)
+        x = np.linspace(-4, 4, 2)
+        m = -clf.coef_.T[0]/clf.coef_.T[1]
+        b = -clf.intercept_[0]/clf.coef_.T[1]
+        plt.xlim(-4,3)
+        plt.ylim(-3,3)
+        plt.plot(x, m*x+b, linestyle='--')
+        plt.fill_between(x, m*x+b, 3, color='orange', alpha=0.25)
+        plt.fill_between(x, m*x+b, -3, color='blue', alpha=0.25)
+        plt.xlabel('MoPe predictions (z-score)')
+        plt.ylabel('LOSS predictions (z-score)')
+        plt.title('MoPe vs. LOSS predictions')
+        plt.legend()
+        plt.savefig(save_name+"_SCATTER.png", bbox_inches='tight')
+
+
+    def plot_mope_loss_linear_ROC(self, show_plot=False, log_scale=False, save_name=None, num_lambdas=1000):
+        """
+        Find best linear combination of MoPe and Loss metrics
+        """
+        try:
+            train_mope_z, valid_mope_z = z_standardize_together(self.train_diff, self.valid_diff)
+            train_loss_z, valid_loss_z = z_standardize_together(self.train_flat[0,:], self.valid_flat[0,:])
+        except:
+            print("WARNING: Please run inference() before plotting. Exiting plot_mope_loss_linear_ROC()...")
             return
 
         best_lambda = -1
         best_auc   = 0
-        for lmbda in np.arange(0,1,stepsize):
+        for lmbda in np.linspace(0,1,num_lambdas):
             train_mix = train_mope_z * lmbda + (1-lmbda) * train_loss_z 
             valid_mix = valid_mope_z * lmbda + (1-lmbda) * valid_loss_z 
 
             train_mix = train_mix[~train_mix.isnan()]
-            valid_max = valid_mix[~valid_mix.isnan()]
-            fpr, tpr, _ = roc_curve(np.concatenate((np.ones_like(train_mix),np.zeros_like(valid_mix))),
-                                    np.concatenate((train_mix, valid_mix)))
+            valid_mix = valid_mix[~valid_mix.isnan()]
+            fpr, tpr, thresholds = roc_curve(np.concatenate((np.ones_like(train_mix),np.zeros_like(valid_mix))),
+                                    np.concatenate((-train_mix, -valid_mix)))
             if best_auc < auc(fpr, tpr):
                 best_auc = auc(fpr, tpr)
                 best_lambda = lmbda
@@ -349,11 +355,12 @@ class MoPe(MIA):
         train_stat = train_mope_z * best_lambda + (1-best_lambda) * train_loss_z
         valid_stat = valid_mope_z * best_lambda + (1-best_lambda) * valid_loss_z 
 
-        default_name = self.get_mope_loss_linear_title() + (" log.png" if log_scale else ".png")
+        default_name = self.get_default_title() + "_COMBO" + (" log.png" if log_scale else ".png")
         save_name = save_name if save_name else default_name
-        plot_ROC(-train_stat,-valid_stat,f"ROC of MoPe * {best_lambda} + LOSS * ({1-best_lambda})",log_scale=log_scale,show_plot=show_plot,save_name=save_name)
+        plot_ROC(train_stat,valid_stat,f"ROC of MoPe * {best_lambda} + LOSS * ({1-best_lambda})",log_scale=log_scale,show_plot=show_plot,save_name=save_name)
 
-    def plot_mope_loss_plot(self, show_plot=False, log_scale=False, save_name=None, dynamic=True):
+
+    def plot_mope_loss(self, show_plot=False, log_scale=False, save_name=None, dynamic=True):
         """
         Plot MoPe vs LOSS (z-scored)
         """
@@ -361,7 +368,7 @@ class MoPe(MIA):
             train_mope, valid_mope = z_standardize_together(self.train_diff, self.valid_diff)
             train_loss, valid_loss = z_standardize_together(self.train_flat[0,:], self.valid_flat[0,:])
         except:
-            print(" - WARNING: Please run inference() before plotting. Exiting plot_mope_loss_plot()...")
+            print("WARNING: Please run inference() before plotting. Exiting plot_mope_loss_plot()...")
             return
 
         if log_scale:
@@ -371,25 +378,25 @@ class MoPe(MIA):
             valid_loss = approx_log_scale(valid_loss)
         
         plt.figure()
-        plt.scatter(train_mope, train_loss, c='orange', label='Training')
-        plt.scatter(valid_mope, valid_loss, c='blue', label='Validation')
+        plt.scatter(train_mope, train_loss, c='orange', label='Training', alpha=0.5)
+        plt.scatter(valid_mope, valid_loss, c='blue', label='Validation', alpha=0.5)
 
         plt.xlabel('MoPe predictions (z-score)')
         plt.ylabel('LOSS predictions (z-score)')
         plt.title('MoPe vs. LOSS predictions')
         plt.legend()
 
-        default_name = self.get_mope_loss_title() + (" log.png" if log_scale else ".png")
+        default_name = self.get_default_title() + "_SCATTER" + (" log.png" if log_scale else ".png")
         save_name = save_name if save_name else default_name
-        plt.savefig(save_name)
+        plt.savefig(save_name, bbox_inches='tight')
 
         if show_plot:
             plt.show()
-        
-        train_data_labels = add_line_breaks(self.train_dataset)
-        val_data_labels = add_line_breaks(self.val_dataset)
          
         if dynamic: # use plotly
+
+            train_data_labels = add_line_breaks(self.train_dataset)
+            val_data_labels = add_line_breaks(self.val_dataset)
 
             markersize = max(-(self.nbatches/400)+12,1) # scale marker size with number of batches
             
@@ -433,7 +440,7 @@ class MoPe(MIA):
 
             # Save the plot as HTML file
             if save_name is None or ".html" not in save_name:
-                save_name = self.get_mope_loss_title() + (" log.html" if log_scale else ".html")
+                save_name = self.get_default_title() + "_SCATTER" + (" log.html" if log_scale else ".html")
             fig.write_html(save_name)
 
 
@@ -457,8 +464,6 @@ class MoPe(MIA):
         fig, ax = plt.subplots(rows, 4, figsize=(20, rows * 3))
 
         for i in range(n):
-            print(n)
-            print(i)
             # Calculate the row and column index
             row_idx = i // 4
             col_idx = i % 4
@@ -504,7 +509,7 @@ class MoPe(MIA):
         if show_plot:
             fig.show()
         
-        default_name = self.get_histogram_title() + (" log.png" if log_scale else ".png")
+        default_name = self.get_default_title() + "_HIST" + (" log.png" if log_scale else ".png")
         save_name = save_name if save_name else default_name
         fig.savefig(save_name, bbox_inches='tight')
     

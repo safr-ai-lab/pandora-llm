@@ -149,13 +149,19 @@ def plot_ROC(train_statistic,val_statistic,title,log_scale=False,show_plot=True,
     if not log_scale:
         plt.plot(fpr, tpr, color='darkorange', label='ROC curve (area = %0.4f)' % roc_auc)
     else:
-        plt.loglog(fpr, tpr, color='darkorange', label='ROC curve (area = %0.4f)' % roc_auc)
+        plt.plot(fpr, tpr, color='darkorange', label='ROC curve (area = %0.4f)' % roc_auc)
+        plt.xscale("log",base=10,subs=list(range(11)))
+        plt.yscale("log",base=10,subs=list(range(11)))
+        # plt.xscale("symlog",base=10,subs=list(range(11)),linthresh=1e-3,linscale=0.25)
+        # plt.yscale("symlog",base=10,subs=list(range(11)),linthresh=1e-3,linscale=0.25)
+        plt.xlim(9e-4,1.1)
+        plt.ylim(9e-4,1.1)
     plt.plot([0, 1], [0, 1], color='navy', linestyle='--')
     plt.title(title)
     plt.legend(loc="lower right")
     plt.xlabel('False Positive Rate')
     plt.ylabel('True Positive Rate')
-    print(f" - AUC for this experiment is: {roc_auc}")
+    print(f"AUC of Experiment {title}\n{roc_auc}")
     if save_name is not None:
         plt.savefig(save_name, bbox_inches="tight")
     if show_plot:
