@@ -23,7 +23,6 @@ def main():
     parser.add_argument('--accelerate', action="store_true", required=False, help='Use accelerate')
     args = parser.parse_args()
 
-
     with open(args.trainer_path, 'rb') as f:
         trainer = dill.load(f)
     trainer.train()

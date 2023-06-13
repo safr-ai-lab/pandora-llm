@@ -36,7 +36,6 @@ class MoPe(MIA):
     """
     def __init__(self,*args,**kwargs):
         super().__init__(*args, **kwargs)
-        self.model = None
         self.new_model_paths = []
         if not os.path.exists("MoPe"):
             os.mkdir("MoPe")
@@ -48,7 +47,8 @@ class MoPe(MIA):
             for ind_model in range(1, self.n_new_models+1):  
                 print(f"Loading Perturbed Model {ind_model}/{self.n_new_models}")      
                 
-                dummy_model = copy.deepcopy(self.model)
+                dummy_model = GPTNeoXForCausalLM.from_pretrained(self.model_path, revision=self.model_revision, cache_dir=self.cache_dir)
+                # dummy_model = copy.deepcopy(self.model)
 
                 ## Perturbed model
                 for name, param in dummy_model.named_parameters():
@@ -56,13 +56,12 @@ class MoPe(MIA):
                     param.add_(noise)
                 
                 # Move to disk 
-                dummy_model.save_pretrained(f"MoPe/{self.model_name}-{ind_model}", from_pt=True) 
+                dummy_model.save_pretrained(f"MoPe/{self.model_name}-{ind_model}", from_pt=True)
                 tokenizer.save_pretrained(f"MoPe/{self.model_name}-{ind_model}")
                 self.new_model_paths.append(f"MoPe/{self.model_name}-{ind_model}")
-
-        del dummy_model
-        torch.cuda.empty_cache()
-        torch.cuda.synchronize()
+                del dummy_model, name, param
+                torch.cuda.empty_cache()
+                torch.cuda.synchronize()
 
     def inference(self, config):
         """
@@ -95,16 +94,10 @@ class MoPe(MIA):
         self.val_pt = config["val_pt"]
         self.model_half = config["model_half"]
         self.noise_type = config["noise_type"]
-
-        ## If model has not been created (i.e., first call)
-        if self.model == None:
-            print("Loading Base Model")
-            self.model = GPTNeoXForCausalLM.from_pretrained(self.model_path, revision=self.model_revision, cache_dir=self.cache_dir)
-
-        self.model.eval()
+        self.use_old = config["use_old"]
 
         ## Generate new models if we are supplied with noise_stdev and n_new_models
-        if self.noise_stdev != None and self.n_new_models != None:
+        if (not self.use_old) and self.noise_stdev != None and self.n_new_models != None:
             start = time.perf_counter()
             self.generate_new_models(self.tokenizer, self.noise_type)
             end = time.perf_counter()
@@ -117,8 +110,10 @@ class MoPe(MIA):
         if not self.accelerate:
             # Compute losses for base model
             print("Evaluating Base Model")
-            self.training_res[0,:,:] = compute_dataloader_cross_entropy(self.model, self.training_dl, device=self.device, nbatches=self.nbatches, samplelength=self.samplelength, half=self.model_half).reshape(-1,1).cpu()
-            self.validation_res[0,:,:] = compute_dataloader_cross_entropy(self.model, self.validation_dl, device=self.device, nbatches=self.nbatches, samplelength=self.samplelength, half=self.model_half).reshape(-1,1).cpu()
+            model = GPTNeoXForCausalLM.from_pretrained(self.model_path, revision=self.model_revision, cache_dir=self.cache_dir)
+            self.training_res[0,:,:] = compute_dataloader_cross_entropy(model, self.training_dl, device=self.device, nbatches=self.nbatches, samplelength=self.samplelength, half=self.model_half).reshape(-1,1).cpu()
+            self.validation_res[0,:,:] = compute_dataloader_cross_entropy(model, self.validation_dl, device=self.device, nbatches=self.nbatches, samplelength=self.samplelength, half=self.model_half).reshape(-1,1).cpu()
+            del model
 
             # Compute loss for each perturbed model
             for ind_model in range(1,self.n_new_models+1):

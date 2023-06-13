@@ -35,6 +35,7 @@ def main():
     parser.add_argument('--val_pt', action="store", required=False, help='.pt file of val dataloader')
     parser.add_argument('--model_half', action="store_true", required=False, help='Use half precision (fp16)')
     parser.add_argument('--noise', action="store", type=int, default=1, required=False, help='Noise to add to model. Options: 1 = Gaussian, 2 = Rademacher, 3+ = user-specified (see README). If not specified, use Gaussian noise.')
+    parser.add_argument('--use_old', action="store_true", required=False, help='Use previously generated models')
     args = parser.parse_args()
 
     if not (args.pack ^ args.unpack):
@@ -84,8 +85,13 @@ def main():
             validation_dataset = load_val_pile(number=args.n_samples, seed=seed, num_splits=1)[0]
         validation_dataloader = DataLoader(validation_dataset, batch_size = args.bs, collate_fn=lambda batch: collate_fn(batch, tokenizer=tokenizer, length=max_length))
     
-    train_pt = args.train_pt if args.accelerate and args.train_pt else "train_data.pt"
-    val_pt = args.val_pt if args.accelerate and args.val_pt else "val_data.pt"
+    if args.accelerate and not args.train_pt:
+        torch.save(training_dataset,"train_data.pt")
+    if args.accelerate and not args.val_pt:
+        torch.save(validation_dataset,"val_data.pt")
+
+    train_pt = args.train_pt if args.train_pt else "train_data.pt"
+    val_pt = args.val_pt if args.val_pt else "val_data.pt"
 
     ## Run MoPe attack
 
@@ -105,7 +111,8 @@ def main():
         "train_pt": train_pt,
         "val_pt": val_pt,
         "model_half": args.model_half,
-        "noise_type": args.noise
+        "noise_type": args.noise,
+        "use_old": args.use_old
     }
 
     ## Stopwatch for testing MoPe runtime
