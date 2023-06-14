@@ -1,6 +1,6 @@
 from Attack import MIA
 from attack_utils import *
-from transformers import GPTNeoXForCausalLM
+from transformers import GPTNeoXForCausalLM, AutoModelForCausalLM
 import torch
 import os
 
@@ -35,6 +35,43 @@ class LOSS(MIA):
 
         self.train_cross_entropy = compute_dataloader_cross_entropy(model, self.config["training_dl"], self.config["device"], self.config["nbatches"], self.config["samplelength"], self.config["accelerator"], half=self.config["model_half"]).cpu() 
         self.val_cross_entropy = compute_dataloader_cross_entropy(model, self.config["validation_dl"], self.config["device"], self.config["nbatches"], self.config["samplelength"], self.config["accelerator"], half=self.config["model_half"]).cpu()
+
+    def generate(self,prefixes,suffix_length,bs,device):
+        generations = []
+        losses = []
+        
+        model = AutoModelForCausalLM.from_pretrained(self.model_path, revision=self.model_revision, cache_dir=self.cache_dir).half().eval().to(device)
+        for off in tqdm(range(0, len(prefixes), bs)):
+            prompt_batch = prefixes[off:off+bs]
+            prompt_batch = np.stack(prompt_batch, axis=0)
+            input_ids = torch.tensor(prompt_batch, dtype=torch.int64)
+            with torch.no_grad():
+                # 1. Generate outputs from the model
+                generated_tokens = model.generate(
+                    input_ids.to(device),
+                    max_length=prefixes.shape[1]+suffix_length,
+                    do_sample=True, 
+                    top_k=10,
+                    top_p=1,
+                    pad_token_id=50256
+                ).cpu().detach()
+
+                # 2. Compute each sequence's probability, excluding EOS and SOS.
+                outputs = model(
+                    generated_tokens.to(device),
+                    labels=generated_tokens.to(device),
+                )
+                logits = outputs.logits.cpu().detach()
+                logits = logits[:, :-1].reshape((-1, logits.shape[-1])).float()
+                loss_per_token = torch.nn.functional.cross_entropy(
+                    logits, generated_tokens[:, 1:].flatten(), reduction='none')
+                loss_per_token = loss_per_token.reshape((-1, prefixes.shape[1]+suffix_length - 1))[:,-suffix_length-1:-1]
+                likelihood = loss_per_token.mean(1)
+                
+                generations.extend(generated_tokens.numpy())
+                losses.extend(likelihood.numpy())
+        
+        return np.atleast_2d(generations), np.atleast_2d(losses).reshape((len(generations), -1))
 
     def get_statistics(self):
         return self.train_cross_entropy, self.val_cross_entropy

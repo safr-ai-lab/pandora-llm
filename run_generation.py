@@ -4,6 +4,7 @@ from transformers import AutoModelForCausalLM, GPTNeoXForCausalLM, AutoTokenizer
 from attack_utils import *
 from dataset_utils import *
 from LOSS import LOSS
+from MoPe import MoPe
 import time
 import argparse
 from accelerate import Accelerator
@@ -14,12 +15,12 @@ import csv
 Sample command line prompt (no acceleration)
 python run_generation.py --mod_size 70m --deduped --checkpoint step98000 --n_samples 1000
 Sample command line prompt (with acceleration)
-accelerate launch run_loss.py --accelerate --mod_size 70m --deduped --checkpoint step98000 --n_samples 1000
+accelerate launch run_generation.py --accelerate --mod_size 70m --deduped --checkpoint step98000 --n_samples 1000
 """
 
 def write_results(tokenizer,prefixes,suffixes,guesses,save_name):
     with open(save_name,"w") as f:
-        for row in range(1000):
+        for row in range(len(prefixes)):
             prefix = tokenizer.decode(prefixes[row])
             guess = tokenizer.decode(guesses[row])
             suffix = tokenizer.decode(suffixes[row])
@@ -28,7 +29,7 @@ def write_results(tokenizer,prefixes,suffixes,guesses,save_name):
             f.write("Suffix: "+suffix.replace("\n","")+"\n")
             f.write("Guess: "+guess.replace("\n","")+"\n\n")
 
-def generate(model,prefixes,suffix_length,bs,device):
+def generate(attack,prefixes,suffix_length,bs,device,method="loss"):
     generations = []
     losses = []
     for off in tqdm(range(0, len(prefixes), bs)):
@@ -103,28 +104,37 @@ def main():
     model = AutoModelForCausalLM.from_pretrained("EleutherAI/gpt-neo-1.3B").half().eval().to(device)
     tokenizer = AutoTokenizer.from_pretrained("EleutherAI/gpt-neo-1.3B")
 
+    model_name = "EleutherAI/gpt-neo-1.3B"
+    model_revision = None
+    model_cache_dir = None
+    attack = MoPe(model_name, model_revision=model_revision, cache_dir=model_cache_dir)
+
     all_generations, all_losses = [], []
     for trial in range(args.n_iterations):
-        generations, losses = generate(model,prefixes,args.suffix_length,args.bs,device)
+        # generations, losses = attack.generate(prefixes,args.suffix_length,args.bs,device)
+        generations, losses = attack.generate(prefixes,args.suffix_length,args.bs,device,tokenizer,2,0.005)
         all_generations.append(generations)
         all_losses.append(losses)
     generations = np.stack(all_generations, axis=1)
     losses = np.stack(all_losses, axis=1)
 
-    print("Generations,Losses",generations.shape,losses.shape)
+    # print("Generations,Losses",generations.shape,losses.shape)
 
     for generations_per_prompt in [1, 10, 100]:
         limited_generations = generations[:, :generations_per_prompt, :]
         limited_losses = losses[:, :generations_per_prompt, :]
 
-        print("Limited G,L",limited_generations.shape,limited_losses.shape)
+        # print("Limited G,L",limited_generations.shape,limited_losses.shape)
         
         axis0 = np.arange(generations.shape[0])
         axis1 = limited_losses.argmin(1).reshape(-1)
+
+        # print("Axes 0,1",axis0,axis1)
+
         guesses = limited_generations[axis0, axis1, -args.suffix_length:]
         batch_losses = limited_losses[axis0, axis1]
         
-        print("Guesses","Batch L",guesses.shape)
+        # print("Guesses","Batch L",guesses.shape)
         
         with open("guess%d.csv"%generations_per_prompt, "w") as file_handle:
             print("Writing out guess with", generations_per_prompt)

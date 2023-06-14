@@ -1,6 +1,6 @@
 from Attack import MIA
 from attack_utils import *
-from transformers import GPTNeoXForCausalLM
+from transformers import GPTNeoXForCausalLM, AutoModelForCausalLM
 import torch
 import copy
 import subprocess
@@ -47,7 +47,7 @@ class MoPe(MIA):
             for ind_model in range(1, self.n_new_models+1):  
                 print(f"Loading Perturbed Model {ind_model}/{self.n_new_models}")      
                 
-                dummy_model = GPTNeoXForCausalLM.from_pretrained(self.model_path, revision=self.model_revision, cache_dir=self.cache_dir)
+                dummy_model = AutoModelForCausalLM.from_pretrained(self.model_path, revision=self.model_revision, cache_dir=self.cache_dir)
                 # dummy_model = copy.deepcopy(self.model)
 
                 ## Perturbed model
@@ -186,6 +186,80 @@ class MoPe(MIA):
                 self.validation_res[ind_model,:,:] = torch.load(f"MoPe/val_{ind_model}.pt").reshape(-1,1)
 
         return self.get_statistics()
+
+    def generate(self,prefixes,suffix_length,bs,device,tokenizer,n_models,noise_stdev):
+        self.n_new_models = n_models
+        self.noise_stdev = noise_stdev
+        generations_batched = []
+        model_losses = []
+        
+        start = time.perf_counter()
+        self.generate_new_models(tokenizer)
+        end = time.perf_counter()
+        print(f"Perturbing Models took {end-start} seconds!")
+
+        for ind_model in range(self.n_new_models+1):
+            print(f"Evaluating Model {ind_model+1}/{self.n_new_models+1}")
+            model_losses.append([])
+            if ind_model==0: #Base Model
+                model = AutoModelForCausalLM.from_pretrained(self.model_path, revision=self.model_revision, cache_dir=self.cache_dir).half().eval().to(device)
+            else:
+                model = AutoModelForCausalLM.from_pretrained(self.new_model_paths[ind_model-1]).half().eval().to(device)
+            for i,off in tqdm(enumerate(range(0, len(prefixes), bs)),total=len(prefixes)//bs):
+                if ind_model==0:
+                    # 1. Generate outputs from the model
+                    prompt_batch = prefixes[off:off+bs]
+                    prompt_batch = np.stack(prompt_batch, axis=0)
+                    input_ids = torch.tensor(prompt_batch, dtype=torch.int64)
+                    with torch.no_grad():
+                        generated_tokens = model.generate(
+                            input_ids.to(device),
+                            max_length=prefixes.shape[1]+suffix_length,
+                            do_sample=True, 
+                            top_k=10,
+                            top_p=1,
+                            pad_token_id=50256
+                        ).cpu().detach()
+                        del input_ids
+                        del prompt_batch
+                        torch.cuda.empty_cache()
+                        torch.cuda.synchronize()
+                    generations_batched.append(generated_tokens.numpy())
+                
+                # 2. Compute each sequence's probability, excluding EOS and SOS.
+                outputs = model(
+                    torch.tensor(generations_batched[-1]).to(device),
+                    labels=torch.tensor(generations_batched[-1]).to(device),
+                )
+                logits = outputs.logits.cpu().detach()
+                del outputs
+                logits = logits[:, :-1].reshape((-1, logits.shape[-1])).float()
+                loss_per_token = torch.nn.functional.cross_entropy(
+                    logits, torch.tensor(generations_batched[-1])[:, 1:].flatten(), reduction='none')
+                del logits
+                loss_per_token = loss_per_token.reshape((-1, prefixes.shape[1]+suffix_length - 1))[:,-suffix_length-1:-1]
+                model_losses[ind_model].extend(loss_per_token.mean(1).numpy())
+                del loss_per_token
+                torch.cuda.empty_cache()
+                torch.cuda.synchronize()
+                print(i,len(model_losses[ind_model]),model_losses[ind_model])
+            del model
+            torch.cuda.empty_cache()
+            torch.cuda.synchronize()
+        generations = []
+        for i in range(len(generations_batched)):
+            generations.extend(generations_batched[i])
+        losses = []
+        print("Model Shapes",[len(t) for t in model_losses])
+        model_losses = torch.tensor(model_losses)
+        losses = model_losses[0,:]-model_losses[1:,:].mean(dim=0)
+        print("Generations",len(generations))
+        print([t.shape for t in generations])
+        print("Losses",losses.shape)
+        print("Generations",np.atleast_2d(generations))
+        print("Losses",np.atleast_2d(losses))
+        print("Losses2",np.atleast_2d(losses).reshape((len(generations), -1)))
+        return np.atleast_2d(generations), np.atleast_2d(losses).reshape((len(generations), -1))
 
     def get_statistics(self, verbose=False):
         """
