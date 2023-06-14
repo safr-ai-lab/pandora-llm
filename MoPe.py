@@ -228,21 +228,20 @@ class MoPe(MIA):
                 
                 # 2. Compute each sequence's probability, excluding EOS and SOS.
                 outputs = model(
-                    torch.tensor(generations_batched[-1]).to(device),
-                    labels=torch.tensor(generations_batched[-1]).to(device),
+                    torch.tensor(generations_batched[i]).to(device),
+                    labels=torch.tensor(generations_batched[i]).to(device),
                 )
                 logits = outputs.logits.cpu().detach()
                 del outputs
                 logits = logits[:, :-1].reshape((-1, logits.shape[-1])).float()
                 loss_per_token = torch.nn.functional.cross_entropy(
-                    logits, torch.tensor(generations_batched[-1])[:, 1:].flatten(), reduction='none')
+                    logits, torch.tensor(generations_batched[i])[:, 1:].flatten(), reduction='none')
                 del logits
                 loss_per_token = loss_per_token.reshape((-1, prefixes.shape[1]+suffix_length - 1))[:,-suffix_length-1:-1]
                 model_losses[ind_model].extend(loss_per_token.mean(1).numpy())
                 del loss_per_token
                 torch.cuda.empty_cache()
                 torch.cuda.synchronize()
-                print(i,len(model_losses[ind_model]),model_losses[ind_model])
             del model
             torch.cuda.empty_cache()
             torch.cuda.synchronize()
@@ -250,15 +249,8 @@ class MoPe(MIA):
         for i in range(len(generations_batched)):
             generations.extend(generations_batched[i])
         losses = []
-        print("Model Shapes",[len(t) for t in model_losses])
         model_losses = torch.tensor(model_losses)
         losses = model_losses[0,:]-model_losses[1:,:].mean(dim=0)
-        print("Generations",len(generations))
-        print([t.shape for t in generations])
-        print("Losses",losses.shape)
-        print("Generations",np.atleast_2d(generations))
-        print("Losses",np.atleast_2d(losses))
-        print("Losses2",np.atleast_2d(losses).reshape((len(generations), -1)))
         return np.atleast_2d(generations), np.atleast_2d(losses).reshape((len(generations), -1))
 
     def get_statistics(self, verbose=False):
