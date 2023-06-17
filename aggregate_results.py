@@ -57,8 +57,9 @@ def main():
                     else:
                         files.append(line[:sep_idx+3].strip())
                         labels.append(line[sep_idx+4:].strip())
-        if title is not None:
+        if title is None:
             title = args.title if args.title is not None else args.file
+        
         labels = [(label if label is not None else file) for file,label in zip(files,labels)]
         plot_ROC_files(files, title, labels=labels, save_name=title+("_log" if args.log else "")+".png", log_scale=args.log)
 

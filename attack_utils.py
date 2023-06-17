@@ -167,16 +167,18 @@ def plot_ROC(train_statistic,val_statistic,title,log_scale=False,show_plot=True,
     if show_plot:
         plt.show()
 
-def plot_ROC_multiple(train_statistics,val_statistics,title,labels,log_scale=False,show_plot=True,save_name=None):
+def plot_ROC_multiple(train_statistics,val_statistics,title,labels,log_scale=False,show_plot=True,save_name=None,keep_first=1000):
     '''
     Plots multiple ROC curves in a single plot
     '''
     plt.figure()
     plt.plot([0, 1], [0, 1], linestyle='--')
     for train_statistic, val_statistic, label in zip(train_statistics, val_statistics,labels):
-        train_statistic = torch.tensor(train_statistic).flatten()
+        train_statistic = torch.tensor(train_statistic).flatten()[:keep_first]
+        assert(len(train_statistic)==keep_first)
         train_statistic = train_statistic[~train_statistic.isnan()]
-        val_statistic = torch.tensor(val_statistic).flatten()
+        val_statistic = torch.tensor(val_statistic).flatten()[:keep_first]
+        assert(len(val_statistic)==keep_first)
         val_statistic = val_statistic[~val_statistic.isnan()]
 
         fpr, tpr, thresholds = roc_curve(torch.cat((torch.ones_like(train_statistic),torch.zeros_like(val_statistic))).flatten(),
@@ -186,6 +188,7 @@ def plot_ROC_multiple(train_statistics,val_statistics,title,labels,log_scale=Fal
             plt.plot(fpr, tpr, label=f'{label} (AUC = {roc_auc:0.4f})')
         else:
             plt.loglog(fpr, tpr, label=f'{label} (AUC = {roc_auc:0.4f})')
+    print(title)
     plt.title(title)
     plt.legend(loc="lower right")
     plt.xlabel('False Positive Rate')
