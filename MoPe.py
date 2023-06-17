@@ -187,14 +187,20 @@ class MoPe(MIA):
 
         return self.get_statistics()
 
-    def generate(self,prefixes,suffix_length,bs,device,tokenizer,n_models,noise_stdev):
-        self.n_new_models = n_models
-        self.noise_stdev = noise_stdev
+    def generate(self,prefixes,config):
+        self.n_new_models = config["n_models"]
+        self.noise_stdev = config["sigma"]
+        self.noise_type = config["noise_type"]
+        tokenizer = config["tokenizer"]
+        bs = config["bs"]
+        device = config["device"]
+        suffix_length = config["suffix_length"]
+
         generations_batched = []
         model_losses = []
         
         start = time.perf_counter()
-        self.generate_new_models(tokenizer)
+        self.generate_new_models(tokenizer,self.noise_type)
         end = time.perf_counter()
         print(f"Perturbing Models took {end-start} seconds!")
 

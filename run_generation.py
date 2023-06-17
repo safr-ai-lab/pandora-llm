@@ -13,7 +13,7 @@ import csv
 
 """
 Sample command line prompt (no acceleration)
-python run_generation.py --mod_size 70m --deduped --checkpoint step98000 --n_samples 1000
+python run_generation.py --prefixes train_prefix.npy --suffixes train_suffix.npy --mod_size 70m --deduped --checkpoint step98000 --n_samples 1000 --n_iterations 10 --bs 4 --attack MoPe --n_models 5 --sigma 0.005
 Sample command line prompt (with acceleration)
 accelerate launch run_generation.py --accelerate --mod_size 70m --deduped --checkpoint step98000 --n_samples 1000
 """
@@ -29,41 +29,6 @@ def write_results(tokenizer,prefixes,suffixes,guesses,save_name):
             f.write("Suffix: "+suffix.replace("\n","")+"\n")
             f.write("Guess: "+guess.replace("\n","")+"\n\n")
 
-def generate(attack,prefixes,suffix_length,bs,device,method="loss"):
-    generations = []
-    losses = []
-    for off in tqdm(range(0, len(prefixes), bs)):
-        prompt_batch = prefixes[off:off+bs]
-        prompt_batch = np.stack(prompt_batch, axis=0)
-        input_ids = torch.tensor(prompt_batch, dtype=torch.int64)
-        with torch.no_grad():
-            # 1. Generate outputs from the model
-            generated_tokens = model.generate(
-                input_ids.to(device),
-                max_length=prefixes.shape[1]+suffix_length,
-                do_sample=True, 
-                top_k=10,
-                top_p=1,
-                pad_token_id=50256
-            ).cpu().detach()
-
-            # 2. Compute each sequence's probability, excluding EOS and SOS.
-            outputs = model(
-                generated_tokens.cuda(),
-                labels=generated_tokens.cuda(),
-            )
-            logits = outputs.logits.cpu().detach()
-            logits = logits[:, :-1].reshape((-1, logits.shape[-1])).float()
-            loss_per_token = torch.nn.functional.cross_entropy(
-                logits, generated_tokens[:, 1:].flatten(), reduction='none')
-            loss_per_token = loss_per_token.reshape((-1, prefixes.shape[1]+suffix_length - 1))[:,-suffix_length-1:-1]
-            likelihood = loss_per_token.mean(1)
-            
-            generations.extend(generated_tokens.numpy())
-            losses.extend(likelihood.numpy())
-        
-    return np.atleast_2d(generations), np.atleast_2d(losses).reshape((len(generations), -1))
-
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--prefixes', action="store", required=True, help='.npy file of prefixes')
@@ -78,6 +43,10 @@ def main():
     parser.add_argument('--bs', action="store", type=int, required=False, default=1, help='Batch size')
     parser.add_argument('--accelerate', action="store_true", required=False, help='Use accelerate')
     parser.add_argument('--model_half', action="store_true", required=False, help='Use half precision (fp16). 1 for use; 0 for not.')
+    parser.add_argument('--attack', action="store", type=str, required=True, help='Attack type (LOSS or MoPe)')
+    parser.add_argument('--n_models', action="store", type=int, required=False, help='Number of new models')
+    parser.add_argument('--sigma', action="store", type=float, required=False, help='Noise standard deviation')
+    parser.add_argument('--noise_type', action="store", type=int, default=1, required=False, help='Noise to add to model. Options: 1 = Gaussian, 2 = Rademacher, 3+ = user-specified (see README). If not specified, use Gaussian noise.')
     args = parser.parse_args()
 
     accelerator = Accelerator() if args.accelerate else None
@@ -101,18 +70,38 @@ def main():
     # model = GPTNeoXForCausalLM.from_pretrained(model_name, revision=model_revision, cache_dir=model_cache_dir).half().eval().to(device)
     # tokenizer = AutoTokenizer.from_pretrained(model_name)
 
-    model = AutoModelForCausalLM.from_pretrained("EleutherAI/gpt-neo-1.3B").half().eval().to(device)
+    # model = AutoModelForCausalLM.from_pretrained("EleutherAI/gpt-neo-1.3B").half().eval().to(device)
     tokenizer = AutoTokenizer.from_pretrained("EleutherAI/gpt-neo-1.3B")
 
     model_name = "EleutherAI/gpt-neo-1.3B"
     model_revision = None
     model_cache_dir = None
-    attack = MoPe(model_name, model_revision=model_revision, cache_dir=model_cache_dir)
+
+    if args.attack=="LOSS":
+        attack = LOSS(model_name, model_revision=model_revision, cache_dir=model_cache_dir)
+        attack_config = {
+            "suffix_length": args.suffix_length,
+            "bs": args.bs,
+            "device": device,
+            "tokenizer": tokenizer
+        }
+    elif args.attack=="MoPe":
+        attack = MoPe(model_name, model_revision=model_revision, cache_dir=model_cache_dir)
+        attack_config = {
+            "suffix_length": args.suffix_length,
+            "bs": args.bs,
+            "device": device,
+            "tokenizer": tokenizer,
+            "n_models": args.n_models,
+            "sigma": args.sigma,
+            "noise_type": args.noise_type
+        }
+    else:
+        raise NotImplementedError()
 
     all_generations, all_losses = [], []
     for trial in range(args.n_iterations):
-        # generations, losses = attack.generate(prefixes,args.suffix_length,args.bs,device)
-        generations, losses = attack.generate(prefixes,args.suffix_length,args.bs,device,tokenizer,2,0.005)
+        generations, losses = attack.generate(prefixes,attack_config)
         all_generations.append(generations)
         all_losses.append(losses)
     generations = np.stack(all_generations, axis=1)

@@ -36,7 +36,12 @@ class LOSS(MIA):
         self.train_cross_entropy = compute_dataloader_cross_entropy(model, self.config["training_dl"], self.config["device"], self.config["nbatches"], self.config["samplelength"], self.config["accelerator"], half=self.config["model_half"]).cpu() 
         self.val_cross_entropy = compute_dataloader_cross_entropy(model, self.config["validation_dl"], self.config["device"], self.config["nbatches"], self.config["samplelength"], self.config["accelerator"], half=self.config["model_half"]).cpu()
 
-    def generate(self,prefixes,suffix_length,bs,device):
+    def generate(self,prefixes,config):
+        suffix_length = config["suffix_length"]
+        bs = config["bs"]
+        device = config["device"]
+
+
         generations = []
         losses = []
         
