@@ -56,8 +56,11 @@ class LOSS(MIA):
                     input_ids.to(device),
                     max_length=prefixes.shape[1]+suffix_length,
                     do_sample=True, 
-                    top_k=10,
-                    top_p=1,
+                    top_k=config["top_k"],
+                    top_p=config["top_p"],
+                    typical_p=config["typical_p"],
+                    temperature=config["temperature"],
+                    repetition_penalty=config["repetition_penalty"],
                     pad_token_id=50256
                 ).cpu().detach()
 
