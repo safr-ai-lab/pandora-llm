@@ -163,6 +163,8 @@ def plot_ROC(train_statistic,val_statistic,title,log_scale=False,show_plot=True,
     plt.ylabel('True Positive Rate')
     print(f"AUC of Experiment {title}\n{roc_auc}")
     if save_name is not None:
+        if "png" not in save_name:
+            save_name = save_name + ".png"
         plt.savefig(save_name, bbox_inches="tight")
     if show_plot:
         plt.show()
@@ -194,6 +196,8 @@ def plot_ROC_multiple(train_statistics,val_statistics,title,labels,log_scale=Fal
     plt.xlabel('False Positive Rate')
     plt.ylabel('True Positive Rate')
     if save_name is not None:
+        if "png" not in save_name:
+            save_name = save_name + ".png"
         plt.savefig(save_name, bbox_inches="tight")
     if show_plot:
         plt.show()
