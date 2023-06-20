@@ -16,7 +16,7 @@ from sklearn.metrics import roc_curve, auc
 
 """
 Sample command line prompt (no acceleration)
-python run_generation.py --prefixes train_prefix.npy --suffixes train_suffix.npy --mod_size 70m --deduped --checkpoint step98000 --n_samples 1000 --n_iterations 10 --bs 4 --attack MoPe --n_models 5 --sigma 0.005
+python run_generation.py --prefixes train_prefix.npy --suffixes train_suffix.npy --mod_size 70m --deduped --checkpoint step98000 --n_samples 1000 --n_iterations 100 --bs 4 --top_k 24 --top_p 0.8 --typical_p 0.9 --temperature 0.58 --repetition_penalty 1.04 --attack LOSS --n_models 5 --sigma 0.005
 Sample command line prompt (with acceleration)
 accelerate launch run_generation.py --accelerate --mod_size 70m --deduped --checkpoint step98000 --n_samples 1000
 """    
@@ -26,9 +26,11 @@ def results(generations,losses,prefixes,suffixes,n_samples,n_iterations,suffix_l
     axis0 = np.arange(generations.shape[0])
     axis1 = losses.argmin(1).reshape(-1)
     best_suffixes = generations[axis0, axis1, -suffix_length:]
-    print(f"Exact Match Accuracy (Precision): {(np.sum(np.all(best_suffixes==suffixes, axis=-1)) / n_samples):.4g}")
-    print(f"Hamming Distance Accuracy: {(np.sum(np.sum(best_suffixes==suffixes, axis=-1) / suffix_length) / n_samples):.4g}")
-    with open("guesses.txt","w") as f:
+    precision = np.sum(np.all(best_suffixes==suffixes, axis=-1)) / n_samples
+    hamming = np.sum(np.sum(best_suffixes==suffixes, axis=-1) / suffix_length) / n_samples
+    print(f"Exact Match Accuracy (Precision): {precision:.4g}")
+    print(f"Hamming Distance Accuracy: {hamming:.4g}")
+    with open("Generation/guesses.txt","w") as f:
         for row in range(len(prefixes)):
             prefix = tokenizer.decode(prefixes[row])
             guess = tokenizer.decode(best_suffixes[row])
@@ -48,11 +50,11 @@ def results(generations,losses,prefixes,suffixes,n_samples,n_iterations,suffix_l
 
     # Metrics obtained by ranking all the suffixes as a whole
     generations, losses = generations.reshape(-1,generations.shape[-1]), losses.flatten()
-    prefix_nums = np.concatenate(tuple(np.array(range(n_samples)) for _ in range(n_iterations))).flatten()
+    prefix_nums = np.concatenate(tuple(np.array(range(n_samples))[:,np.newaxis] for _ in range(n_iterations)),1).flatten()
     order = losses.argsort()
 
     # Write result for google extraction challenge
-    with open("generation_result.csv","w") as f:
+    with open("Generation/generation_result.csv","w") as f:
         writer = csv.writer(f)
         writer.writerow(["Example ID", "Suffix Guess"])
         for exid, generation in zip(prefix_nums[order], generations[order]):
@@ -64,7 +66,7 @@ def results(generations,losses,prefixes,suffixes,n_samples,n_iterations,suffix_l
     recall = []
     errors = []
     bad_guesses = 0
-    answer = None
+    answer = 0
 
     for exid, generation in zip(prefix_nums[order],generations[order]):
         total+=1
@@ -83,7 +85,7 @@ def results(generations,losses,prefixes,suffixes,n_samples,n_iterations,suffix_l
     plt.xlabel("Number of bad guesses")
     plt.ylabel("Recall")
     plt.title("Error-Recall Curve")
-    plt.savefig("error_curve.png")
+    plt.savefig("Generation/error_curve.png")
 
     # Plot overall ROC curve
     fpr, tpr, thresholds = roc_curve([np.all(suffixes[exid] == generation[-suffix_length:]) for exid, generation in zip(prefix_nums[order],generations[order])], -losses[order])
@@ -92,7 +94,7 @@ def results(generations,losses,prefixes,suffixes,n_samples,n_iterations,suffix_l
     plt.plot(fpr, tpr, color='darkorange', label='ROC curve (area = %0.4f)' % roc_auc)
     plt.plot([0, 1], [0, 1], color='navy', linestyle='--')
     title = "Generation Attack ROC"
-    save_name = "generation_roc.png"
+    save_name = "Generation/generation_roc.png"
     plt.title(title)
     plt.legend(loc="lower right")
     plt.xlabel('False Positive Rate')
@@ -100,7 +102,7 @@ def results(generations,losses,prefixes,suffixes,n_samples,n_iterations,suffix_l
     print(f"AUC of Experiment {title}\n{roc_auc}")
     plt.savefig(save_name, bbox_inches="tight")
     plt.show()
-    save_name = "generation_roc_log.png"
+    save_name = "Generation/generation_roc_log.png"
     plt.figure()
     plt.plot(fpr, tpr, color='darkorange', label='ROC curve (area = %0.4f)' % roc_auc)
     plt.plot([0, 1], [0, 1], color='navy', linestyle='--')
@@ -116,6 +118,10 @@ def results(generations,losses,prefixes,suffixes,n_samples,n_iterations,suffix_l
     plt.ylabel('True Positive Rate')
     plt.savefig(save_name, bbox_inches="tight")
     plt.show()
+
+    with open("Generation/metrics.txt","w") as f:
+        f.write(f"Precision: {precision:4g}\nHamming: {hamming:4g}\nMultiprecision: {precision_multi:4g}\nRecall@100: {answer:4g}\nAUC: {roc_auc}")
+
     return recall, errors
 
 
@@ -124,8 +130,6 @@ def main():
     parser.add_argument('--prefixes', action="store", required=True, help='.npy file of prefixes')
     parser.add_argument('--suffixes', action="store", required=True, help='.npy file of suffixes')
     parser.add_argument('--mod_size', action="store", type=str, required=True, help='Pythia Model Size')
-    parser.add_argument('--deduped', action="store_true", required=False, help='Use deduped models')
-    parser.add_argument('--checkpoint', action="store", type=str, required=False, help='Model revision. If not specified, use last checkpoint.')
     parser.add_argument('--n_samples', action="store", type=int, required=True, help='Dataset size')
     parser.add_argument('--n_iterations', action="store", type=int, required=False, help='How many generations per prompt')
     parser.add_argument('--suffix_length', action="store", type=int, required=False, default=50, help='Length of suffix')
@@ -147,31 +151,19 @@ def main():
     accelerator = Accelerator() if args.accelerate else None
 
     ## Other parameters
-    model_revision = args.checkpoint
     seed = args.seed
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    model_title = f"pythia-{args.mod_size}" + ("-deduped" if args.deduped else "")
+    model_title = f"gpt-neo-{args.mod_size}"
     model_name = "EleutherAI/" + model_title
-    model_cache_dir = "./"+ model_title + ("/"+model_revision if args.checkpoint else "")
 
     ## Load model and training and validation dataset
     prefixes = np.load(args.prefixes).astype(np.int64)[-args.n_samples:]
     suffixes = np.load(args.suffixes).astype(np.int64)[-args.n_samples:]
 
-    print("Prefixes,Suffixes",prefixes.shape,suffixes.shape)
-
-    # model = GPTNeoXForCausalLM.from_pretrained(model_name, revision=model_revision, cache_dir=model_cache_dir).half().eval().to(device)
-    # tokenizer = AutoTokenizer.from_pretrained(model_name)
-
-    # model = AutoModelForCausalLM.from_pretrained("EleutherAI/gpt-neo-1.3B").half().eval().to(device)
-    tokenizer = AutoTokenizer.from_pretrained("EleutherAI/gpt-neo-1.3B")
-
-    model_name = "EleutherAI/gpt-neo-1.3B"
-    model_revision = None
-    model_cache_dir = None
+    tokenizer = AutoTokenizer.from_pretrained("EleutherAI/gpt-neo-2.7b")
 
     if args.attack=="LOSS":
-        attack = LOSS(model_name, model_revision=model_revision, cache_dir=model_cache_dir)
+        attack = LOSS(model_name)
         attack_config = {
             "suffix_length": args.suffix_length,
             "bs": args.bs,
@@ -184,7 +176,7 @@ def main():
             "repetition_penalty": args.repetition_penalty,
         }
     elif args.attack=="MoPe":
-        attack = MoPe(model_name, model_revision=model_revision, cache_dir=model_cache_dir)
+        attack = MoPe(model_name)
         attack_config = {
             "suffix_length": args.suffix_length,
             "bs": args.bs,
@@ -204,6 +196,7 @@ def main():
 
     all_generations, all_losses = [], []
     for trial in range(args.n_iterations):
+        print(f"Generation {trial+1}/{args.n_iterations}")
         generations, losses = attack.generate(prefixes,attack_config)
         all_generations.append(generations)
         all_losses.append(losses)
