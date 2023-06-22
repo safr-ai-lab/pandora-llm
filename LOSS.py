@@ -79,7 +79,7 @@ class LOSS(MIA):
                 generations.extend(generated_tokens.numpy())
                 losses.extend(likelihood.numpy())
         
-        return np.atleast_2d(generations), np.atleast_2d(losses).reshape((len(generations), -1))
+        return np.atleast_2d(generations), np.atleast_2d(losses).reshape((len(generations), -1)), np.atleast_2d(losses).reshape((len(generations), -1))
 
     def get_statistics(self):
         return self.train_cross_entropy, self.val_cross_entropy

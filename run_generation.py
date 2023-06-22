@@ -12,16 +12,14 @@ import os
 import csv
 import numpy as np
 import matplotlib.pyplot as plt
-from sklearn.metrics import roc_curve, auc
+from sklearn.metrics import roc_curve, auc, precision_recall_curve
 
 """
-Sample command line prompt (no acceleration)
-python run_generation.py --prefixes train_prefix.npy --suffixes train_suffix.npy --mod_size 70m --deduped --checkpoint step98000 --n_samples 1000 --n_iterations 100 --bs 4 --top_k 24 --top_p 0.8 --typical_p 0.9 --temperature 0.58 --repetition_penalty 1.04 --attack LOSS --n_models 5 --sigma 0.005
-Sample command line prompt (with acceleration)
-accelerate launch run_generation.py --accelerate --mod_size 70m --deduped --checkpoint step98000 --n_samples 1000
+Sample command line prompt
+python run_generation.py --prefixes train_prefix.npy --suffixes train_suffix.npy --mod_size 125m --n_samples 128 --n_iterations 4 --bs 16 --top_k 24 --top_p 0.8 --typical_p 0.9 --temperature 0.58 --repetition_penalty 1.04 --attack MoPe --n_models 5 --sigma 0.005
 """    
 
-def results(generations,losses,prefixes,suffixes,n_samples,n_iterations,suffix_length,tokenizer):
+def results(generations,losses,base_losses,prefixes,suffixes,n_samples,n_iterations,suffix_length,tokenizer):
     # Metrics obtained by choosing the best suffix per prefix
     axis0 = np.arange(generations.shape[0])
     axis1 = losses.argmin(1).reshape(-1)
@@ -29,7 +27,7 @@ def results(generations,losses,prefixes,suffixes,n_samples,n_iterations,suffix_l
     precision = np.sum(np.all(best_suffixes==suffixes, axis=-1)) / n_samples
     hamming = np.sum(np.sum(best_suffixes==suffixes, axis=-1) / suffix_length) / n_samples
     print(f"Exact Match Accuracy (Precision): {precision:.4g}")
-    print(f"Hamming Distance Accuracy: {hamming:.4g}")
+    print(f"Token Level Accuracy (Hamming): {hamming:.4g}")
     with open("Generation/guesses.txt","w") as f:
         for row in range(len(prefixes)):
             prefix = tokenizer.decode(prefixes[row])
@@ -49,16 +47,16 @@ def results(generations,losses,prefixes,suffixes,n_samples,n_iterations,suffix_l
     print(f"Any Suffix Exact Match Accuracy: {precision_multi:.4g}")
 
     # Metrics obtained by ranking all the suffixes as a whole
-    generations, losses = generations.reshape(-1,generations.shape[-1]), losses.flatten()
+    generations, losses, base_losses = generations.reshape(-1,generations.shape[-1]), losses.flatten(), base_losses.flatten()
     prefix_nums = np.concatenate(tuple(np.array(range(n_samples))[:,np.newaxis] for _ in range(n_iterations)),1).flatten()
     order = losses.argsort()
 
     # Write result for google extraction challenge
     with open("Generation/generation_result.csv","w") as f:
         writer = csv.writer(f)
-        writer.writerow(["Example ID", "Suffix Guess"])
-        for exid, generation in zip(prefix_nums[order], generations[order]):
-            writer.writerow([exid,str(list(generation[-suffix_length:])).replace(" ", "")])
+        writer.writerow(["Example ID", "Suffix Guess", "MoPe", "LOSS", "Correct"])
+        for exid, generation, loss, base in zip(prefix_nums[order], generations[order], losses[order], base_losses[order]):
+            writer.writerow([exid,str(list(generation[-suffix_length:])).replace(" ", ""),loss,base,np.all(suffixes[exid] == generation[-suffix_length:])])
 
     # Measure recall at 100 errors
     total = 0
@@ -81,11 +79,24 @@ def results(generations,losses,prefixes,suffixes,n_samples,n_iterations,suffix_l
 
     print("Recall at 100 Errors", answer)
     plt.plot(errors, recall)
-    plt.semilogx()
     plt.xlabel("Number of bad guesses")
     plt.ylabel("Recall")
     plt.title("Error-Recall Curve")
+    plt.grid(which="both",alpha=0.2)
     plt.savefig("Generation/error_curve.png")
+    plt.semilogx()
+    plt.savefig("Generation/error_curve_log.png")
+
+    precision_scores, recall_scores, thresholds = precision_recall_curve([np.all(suffixes[exid] == generation[-suffix_length:]) for exid, generation in zip(prefix_nums[order],generations[order])], -losses[order])
+    plt.figure()
+    plt.plot(recall_scores,precision_scores)
+    plt.xlabel("Recall")
+    plt.ylabel("Precision")
+    plt.title("Precision-Recall Curve")
+    plt.grid(which="both",alpha=0.2)
+    plt.savefig("Generation/pr_curve.png")
+    plt.semilogy()
+    plt.savefig("Generation/pr_curve_log.png")
 
     # Plot overall ROC curve
     fpr, tpr, thresholds = roc_curve([np.all(suffixes[exid] == generation[-suffix_length:]) for exid, generation in zip(prefix_nums[order],generations[order])], -losses[order])
@@ -93,6 +104,7 @@ def results(generations,losses,prefixes,suffixes,n_samples,n_iterations,suffix_l
     plt.figure()
     plt.plot(fpr, tpr, color='darkorange', label='ROC curve (area = %0.4f)' % roc_auc)
     plt.plot([0, 1], [0, 1], color='navy', linestyle='--')
+    plt.grid(which="both",alpha=0.2)
     title = "Generation Attack ROC"
     save_name = "Generation/generation_roc.png"
     plt.title(title)
@@ -106,10 +118,9 @@ def results(generations,losses,prefixes,suffixes,n_samples,n_iterations,suffix_l
     plt.figure()
     plt.plot(fpr, tpr, color='darkorange', label='ROC curve (area = %0.4f)' % roc_auc)
     plt.plot([0, 1], [0, 1], color='navy', linestyle='--')
+    plt.grid(which="both",alpha=0.2)
     plt.xscale("log",base=10,subs=list(range(11)))
     plt.yscale("log",base=10,subs=list(range(11)))
-    # plt.xscale("symlog",base=10,subs=list(range(11)),linthresh=1e-3,linscale=0.25)
-    # plt.yscale("symlog",base=10,subs=list(range(11)),linthresh=1e-3,linscale=0.25)
     plt.xlim(9e-4,1.1)
     plt.ylim(9e-4,1.1)
     plt.title(title)
@@ -194,16 +205,25 @@ def main():
     else:
         raise NotImplementedError()
 
-    all_generations, all_losses = [], []
+    all_generations, all_losses, all_base_losses = [], [], []
     for trial in range(args.n_iterations):
         print(f"Generation {trial+1}/{args.n_iterations}")
-        generations, losses = attack.generate(prefixes,attack_config)
+        generations, losses, base_losses = attack.generate(prefixes,attack_config)
         all_generations.append(generations)
         all_losses.append(losses)
+        all_base_losses.append(base_losses)
     generations = np.stack(all_generations, axis=1)
     losses = np.stack(all_losses, axis=1)
+    base_losses = np.stack(all_base_losses, axis=1)
 
-    results(generations,losses,prefixes,suffixes,args.n_samples,args.n_iterations,args.suffix_length,tokenizer)
+    with open('Generation/generations.npy', 'wb') as f:
+        np.save(f,generations)
+    with open('Generation/losses.npy', 'wb') as f:
+        np.save(f,losses)
+    with open('Generation/base_losses.npy', 'wb') as f:
+        np.save(f,base_losses)
+
+    results(generations,losses,base_losses,prefixes,suffixes,args.n_samples,args.n_iterations,args.suffix_length,tokenizer)
 
 if __name__ == "__main__":
     start_time = time.perf_counter()

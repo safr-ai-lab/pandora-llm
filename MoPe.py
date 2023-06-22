@@ -199,10 +199,11 @@ class MoPe(MIA):
         generations_batched = []
         model_losses = []
         
-        start = time.perf_counter()
-        self.generate_new_models(tokenizer,self.noise_type)
-        end = time.perf_counter()
-        print(f"Perturbing Models took {end-start} seconds!")
+        if len(self.new_model_paths)==0:
+            start = time.perf_counter()
+            self.generate_new_models(tokenizer,self.noise_type)
+            end = time.perf_counter()
+            print(f"Perturbing Models took {end-start} seconds!")
 
         for ind_model in range(self.n_new_models+1):
             print(f"Evaluating Model {ind_model+1}/{self.n_new_models+1}")
@@ -260,7 +261,7 @@ class MoPe(MIA):
         losses = []
         model_losses = torch.tensor(model_losses)
         losses = model_losses[0,:]-model_losses[1:,:].mean(dim=0)
-        return np.atleast_2d(generations), np.atleast_2d(losses).reshape((len(generations), -1))
+        return np.atleast_2d(generations), np.atleast_2d(losses).reshape((len(generations), -1)), np.atleast_2d(model_losses[0,:]).reshape((len(generations), -1))
 
     def get_statistics(self, verbose=False):
         """
