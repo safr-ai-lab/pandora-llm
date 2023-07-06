@@ -31,6 +31,7 @@ def main():
     parser.add_argument('--train_pt', action="store", required=False, help='.pt file of train dataset (not dataloader)')
     parser.add_argument('--val_pt', action="store", required=False, help='.pt file of val dataset (not dataloader)')
     parser.add_argument('--model_half', action="store_true", required=False, help='Use half precision (fp16). 1 for use; 0 for not.')
+    parser.add_argument('--batch', action="store_true", required=False, help='compute batch losses for detectgpt')
     args = parser.parse_args()
 
     accelerator = Accelerator() if args.accelerate else None
@@ -94,7 +95,8 @@ def main():
         "samplelength": args.sample_length,
         "device": device,
         "accelerator": accelerator,
-        "model_half": args.model_half
+        "model_half": args.model_half,
+        "batch": args.batch
     }
 
     end = time.perf_counter()
