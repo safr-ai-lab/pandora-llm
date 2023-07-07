@@ -5,6 +5,7 @@ from sklearn.metrics import roc_curve, auc
 from torch.nn import CrossEntropyLoss
 from tqdm import tqdm
 import pdb
+from detect_gpt_utils import *
 
 def mem_stats():
     '''
@@ -92,7 +93,7 @@ def compute_input_ids_cross_entropy_batch(model, input_ids, return_pt=True):
 
   return torch.mean(torch.tensor(ans)) if return_pt else ans 
 
-def compute_dataloader_cross_entropy_batch(model, dataloader, device=None, nbatches=None, samplelength=None, accelerator=None, half=True, num_perts=3):    
+def compute_dataloader_cross_entropy_batch(model, dataloader, device=None, nbatches=None, samplelength=None, accelerator=None, half=True, detect_args=None):    
     '''
     Computes dataloader cross entropy with additional support for specifying the full data loader and full sample length.
     Warning: using samplelength is discouraged
@@ -109,6 +110,11 @@ def compute_dataloader_cross_entropy_batch(model, dataloader, device=None, nbatc
         model.to(device)
 
     losses = []
+    model_name = 't5-small'
+    mask_model = T5ForConditionalGeneration.from_pretrained(model_name)
+    mask_tokenizer = T5Tokenizer.from_pretrained(model_name)
+    base_tokenizer = AutoTokenizer.from_pretrained("EleutherAI/pythia-70m-deduped")
+
     for batchno, data_x in tqdm(enumerate(dataloader),total=len(dataloader)):
         if nbatches is not None and batchno >= nbatches:
             break
@@ -120,21 +126,24 @@ def compute_dataloader_cross_entropy_batch(model, dataloader, device=None, nbatc
             else:
                 data_x = data_x[:,:samplelength].detach()
             
-            # pack num_perts copies of data_x 
-            data_x_batch = torch.cat([data_x.unsqueeze(-1) for _ in range(num_perts)])
+
+            data_x_batch = perturb_input_ids(data_x.squeeze(0), args, base_tokenizer, mask_tokenizer, mask_model, ceil_pct=False).unsqueeze(-1)
+
+           
    
             ## Compute average log likelihood
             if accelerator is None:
                 loss = compute_input_ids_cross_entropy_batch(model, data_x_batch.to(device)).detach().cpu()
             else:
-                loss = compute_input_ids_cross_entropy_batch(model, data_x_batch, return_pt = False)
+                loss = compute_input_ids_cross_entropy_batch(model, data_x_batch.to(device), return_pt = False).detach().cpu()
 
             losses.append(loss)
 
-            del data_x
+            del data_x_batch, data_x
             torch.cuda.empty_cache()
             torch.cuda.synchronize()
-    
+
+    del mask_model, mask_tokenizer, base_tokenizer
     if accelerator is None:
         return torch.tensor(losses)
     else:

@@ -96,8 +96,14 @@ def main():
         "device": device,
         "accelerator": accelerator,
         "model_half": args.model_half,
-        "batch": args.batch
-    }
+        "batch": args.batch,
+        'buffer_size':1, 
+        'mask_top_p': 10, 
+        'pct_words_masked':.2, 
+        'span_length':2,
+        'num_perts': 5, 
+        'truncation_length':args.sample_length
+        }
 
     end = time.perf_counter()
 

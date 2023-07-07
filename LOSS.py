@@ -38,8 +38,8 @@ class LOSS(MIA):
             self.train_cross_entropy = compute_dataloader_cross_entropy(model, self.config["training_dl"], self.config["device"], self.config["nbatches"], self.config["samplelength"], self.config["accelerator"], half=self.config["model_half"]).cpu() 
             self.val_cross_entropy = compute_dataloader_cross_entropy(model, self.config["validation_dl"], self.config["device"], self.config["nbatches"], self.config["samplelength"], self.config["accelerator"], half=self.config["model_half"]).cpu()
         else: 
-            self.train_cross_entropy = compute_dataloader_cross_entropy_batch(model, self.config["training_dl"], self.config["device"], self.config["nbatches"], self.config["samplelength"], self.config["accelerator"], half=self.config["model_half"]).cpu() 
-            self.val_cross_entropy = compute_dataloader_cross_entropy_batch(model, self.config["validation_dl"], self.config["device"], self.config["nbatches"], self.config["samplelength"], self.config["accelerator"], half=self.config["model_half"]).cpu()
+            self.train_cross_entropy = compute_dataloader_cross_entropy_batch(model, self.config["training_dl"], self.config["device"], self.config["nbatches"], self.config["samplelength"], self.config["accelerator"], half=self.config["model_half"], detect_args=self.config['detect_gpt']).cpu() 
+            self.val_cross_entropy = compute_dataloader_cross_entropy_batch(model, self.config["validation_dl"], self.config["device"], self.config["nbatches"], self.config["samplelength"], self.config["accelerator"], half=self.config["model_half"], detect_args=self.config['detect_gpt']).cpu()
 
     def generate(self,prefixes,config):
         suffix_length = config["suffix_length"]

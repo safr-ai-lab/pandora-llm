@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
-from transformers import T5Tokenizer, T5ForConditionalGeneration
+from transformers import T5Tokenizer, T5ForConditionalGeneration, AutoTokenizer
 import re
 import random
 import argparse
@@ -8,6 +8,7 @@ import datetime
 import os
 import json
 import functools
+from dataset_utils import *
 
 import time
 
@@ -122,10 +123,24 @@ def perturb_texts_(texts, args, base_tokenizer, masked_model, ceil_pct=False):
 
     return convert(perturbed_texts)
 
+def perturb_input_ids(input_id, args, base_tokenizer, mask_tokenizer, masked_model, ceil_pct=False): 
+    input_ids = [input_id for _ in range(args["num_perts"])]
+    texts = [base_tokenizer.decode(input_id) for input_id in input_ids]
+    masked_texts = [tokenize_and_mask(x, args, ceil_pct) for x in texts]
+    raw_fills = replace_masks(masked_texts,mask_tokenizer, masked_model, args)
+    extracted_fills = extract_fills(raw_fills)
+    perturbed_texts = apply_extracted_fills(masked_texts, extracted_fills)
+    # convert backt to input_ids 
+    tokens = [base_tokenizer.encode(x, return_tensors="pt", truncation=True, max_length=args["truncation_length"]) for x in perturbed_texts]
+    max_length = max([t.size(1) for t in tokens])
+    tokens_padded = [torch.cat([t, t.new_zeros(t.size(0), max_length - t.size(1))], dim=1) for t in tokens]
+    tokens_padded = torch.cat(tokens_padded, dim=0)
+    return tokens_padded
+
+
 if __name__ == "__main__":
-    
-    
-    args = {'buffer_size':1, 'device':'cuda', 'mask_top_p': 10, 'pct_words_masked':.2, 'span_length':2}
+         
+    args = {'buffer_size':1, 'device':'cuda', 'mask_top_p': 10, 'pct_words_masked':.2, 'span_length':2, 'num_perts': 5}
     model_name = 't5-small'
     model = T5ForConditionalGeneration.from_pretrained(model_name)
     tokenizer = T5Tokenizer.from_pretrained(model_name)
@@ -134,3 +149,17 @@ if __name__ == "__main__":
     texts = ['Four young Athenians are in a romantic tangle. Lysander and Demetrius love Hermia; she loves Lysander and her friend Helena loves Demetrius.', ' Hermia’s father, Egeus, commands Hermia to marry Demetrius, and Theseus supports the father’s right. All four young Athenians end up in the woods, where Robin Goodfellow, who serves the fairy king Oberon, puts flower juice on the eyes of Lysander, and then Demetrius, unintentionally causing both to love Helena. Oberon, who is quarreling with his wife, Titania, uses the flower juice on her eyes. She falls in love with Bottom, who now, thanks to Robin Goodfellow, wears an ass’s head.']
     perturbed_text = perturb_texts_(texts, args, base_tokenizer=tokenizer, masked_model=model)
     print(perturbed_text)
+
+
+    # test perturb ids 
+    mod_size = '70m'
+    model_title = f"pythia-{mod_size}" + "-deduped" 
+    model_name = "EleutherAI/" + model_title
+    model_revision = 'step98000'
+    model_cache_dir = "./"+ model_title + "/"+model_revision 
+    base_tokenizer = AutoTokenizer.from_pretrained(model_name)
+    input_ids = collate_fn(texts, base_tokenizer, 1024)
+    x = input_ids["input_ids"][1]
+    perturbed_x_inputs = perturb_input_ids(x, args, base_tokenizer, tokenizer, model, 1024, ceil_pct=False)
+
+
