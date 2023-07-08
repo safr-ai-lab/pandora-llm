@@ -8,6 +8,8 @@ import time
 import argparse
 from accelerate import Accelerator
 import os
+import logging
+logging.disable(logging.CRITICAL)
 
 """
 Sample command line prompt (no acceleration)

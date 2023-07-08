@@ -2,7 +2,6 @@ from Attack import MIA
 from attack_utils import *
 from transformers import GPTNeoXForCausalLM, AutoModelForCausalLM
 import torch
-from torch.optim import Adam
 import os
 import subprocess
 
@@ -33,7 +32,7 @@ class GRAD(MIA):
         model = GPTNeoXForCausalLM.from_pretrained(self.model_path, revision=self.model_revision, cache_dir=self.cache_dir)
 
         if self.config["accelerator"] is not None:
-            model, self.config["training_dl"], self.config["validation_dl"], optimizer  = self.config["accelerator"].prepare(model, self.config["training_dl"], self.config["validation_dl"], Adam(params=model.parameters(), lr=0))
+            model, self.config["training_dl"], self.config["validation_dl"]  = self.config["accelerator"].prepare(model, self.config["training_dl"], self.config["validation_dl"])
             subprocess.call(["python", "model_embedding.py",
                 "--model_path", self.model_path,
                 "--model_revision", self.model_revision,
@@ -42,7 +41,7 @@ class GRAD(MIA):
                 "--model_half" if config["model_half"] else ""
                 ]
             )
-            embedding_layer = torch.load("GRAD/embedding.pt").to(self.config["accelerator"].device)
+            embedding_layer = torch.load("GRAD/embedding.pt")
             model.train()
         else:
             embedding_layer = model.get_input_embeddings().weight

@@ -100,20 +100,22 @@ def compute_dataloader_cross_entropy(model, dataloader, device=None, nbatches=No
         losses = torch.cat([loss[0] for loss in losses])
         return losses
 
-def compute_input_ids_gradient(model, embedding_layer, input_ids, accelerator):
+def compute_input_ids_gradient(model, embedding_layer, input_ids, device=None, accelerator=None):
     mask  = (input_ids > 0).detach()
-    input_embeds=Variable(embedding_layer[input_ids],requires_grad=True)
-    outputs = model(inputs_embeds=input_embeds.to(torch.float16), attention_mask = mask, labels=input_ids)
+    input_embeds=Variable(embedding_layer[input_ids.cpu()],requires_grad=True)
+    if accelerator is not None:
+        outputs = model(inputs_embeds=input_embeds.to(accelerator.device), attention_mask = mask.to(accelerator.device), labels=input_ids.to(accelerator.device))
+    else:
+        outputs = model(inputs_embeds=input_embeds.to(device),attention_mask=mask.to(device),labels=input_ids.to(device))
     if accelerator is None:
         outputs.loss.backward()
     else:
-        # outputs.loss.backward()
         accelerator.backward(outputs.loss)
     grad = input_embeds.grad
-    del outputs, input_embeds
+    del outputs, input_embeds, input_ids, mask
     torch.cuda.empty_cache()
     torch.cuda.synchronize()
-    return torch.norm(grad,p=float("inf"),dim=(1,2))
+    return torch.norm(grad,p=float("inf"),dim=(1,2)).to(accelerator.device)
 
 def compute_dataloader_gradients(model, embedding_layer, dataloader, device=None, nbatches=None, samplelength=None, accelerator=None, half=True):    
     '''
@@ -144,9 +146,9 @@ def compute_dataloader_gradients(model, embedding_layer, dataloader, device=None
 
         ## Compute average log likelihood
         if accelerator is None:
-            loss = compute_input_ids_gradient(model, embedding_layer.to(device), data_x.to(device)).detach().cpu()
+            loss = compute_input_ids_gradient(model, embedding_layer, data_x, device=device).detach().cpu()
         else:
-            loss = compute_input_ids_gradient(model, embedding_layer, data_x, accelerator)
+            loss = compute_input_ids_gradient(model, embedding_layer, data_x, accelerator=accelerator)
 
         losses.append(loss)
 
@@ -154,12 +156,10 @@ def compute_dataloader_gradients(model, embedding_layer, dataloader, device=None
         torch.cuda.empty_cache()
         torch.cuda.synchronize()
     
-    if accelerator is None:
-        return torch.tensor(losses)
-    else:
+    if accelerator is not None:
         losses = accelerator.gather_for_metrics(losses)
-        losses = torch.cat([loss[0] for loss in losses])
-        return losses
+
+    return torch.tensor(losses)
 
 def plot_hist(train_perplexity, val_perplexity, show_plot = True, save_plot=False, plot_title = "Histogram", plot_name="hist.png"):
     
