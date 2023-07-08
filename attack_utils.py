@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.metrics import roc_curve, auc
 from torch.nn import CrossEntropyLoss
+from torch.nn.functional import cross_entropy
 from tqdm import tqdm
 from transformers import AutoTokenizer
 from torch.autograd import Variable
@@ -99,20 +100,22 @@ def compute_dataloader_cross_entropy(model, dataloader, device=None, nbatches=No
         losses = torch.cat([loss[0] for loss in losses])
         return losses
 
-def compute_input_ids_gradient(model, input_ids):
+def compute_input_ids_gradient(model, embedding_layer, input_ids, accelerator):
     mask  = (input_ids > 0).detach()
-    model.eval()
-    input_embeds=Variable(model.get_input_embeddings().weight[input_ids],requires_grad=True)
-    outputs = model(inputs_embeds=input_embeds, attention_mask = mask, labels=input_ids)
-    mem_stats()
-    outputs.loss.backward()
+    input_embeds=Variable(embedding_layer[input_ids],requires_grad=True)
+    outputs = model(inputs_embeds=input_embeds.to(torch.float16), attention_mask = mask, labels=input_ids)
+    if accelerator is None:
+        outputs.loss.backward()
+    else:
+        # outputs.loss.backward()
+        accelerator.backward(outputs.loss)
     grad = input_embeds.grad
     del outputs, input_embeds
     torch.cuda.empty_cache()
     torch.cuda.synchronize()
     return torch.norm(grad,p=float("inf"),dim=(1,2))
 
-def compute_dataloader_gradients(model, dataloader, device=None, nbatches=None, samplelength=None, accelerator=None, half=True):    
+def compute_dataloader_gradients(model, embedding_layer, dataloader, device=None, nbatches=None, samplelength=None, accelerator=None, half=True):    
     '''
     Computes dataloader gradients with additional support for specifying the full data loader and full sample length.
     Warning: using samplelength is discouraged
@@ -141,9 +144,9 @@ def compute_dataloader_gradients(model, dataloader, device=None, nbatches=None, 
 
         ## Compute average log likelihood
         if accelerator is None:
-            loss = compute_input_ids_gradient(model, data_x.to(device)).detach().cpu()
+            loss = compute_input_ids_gradient(model, embedding_layer.to(device), data_x.to(device)).detach().cpu()
         else:
-            loss = compute_input_ids_gradient(model, data_x)
+            loss = compute_input_ids_gradient(model, embedding_layer, data_x, accelerator)
 
         losses.append(loss)
 

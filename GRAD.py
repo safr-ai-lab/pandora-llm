@@ -2,7 +2,9 @@ from Attack import MIA
 from attack_utils import *
 from transformers import GPTNeoXForCausalLM, AutoModelForCausalLM
 import torch
+from torch.optim import Adam
 import os
+import subprocess
 
 class GRAD(MIA):
     """
@@ -31,10 +33,22 @@ class GRAD(MIA):
         model = GPTNeoXForCausalLM.from_pretrained(self.model_path, revision=self.model_revision, cache_dir=self.cache_dir)
 
         if self.config["accelerator"] is not None:
-            model, self.config["training_dl"], self.config["validation_dl"]  = self.config["accelerator"].prepare(model, self.config["training_dl"], self.config["validation_dl"])
+            model, self.config["training_dl"], self.config["validation_dl"], optimizer  = self.config["accelerator"].prepare(model, self.config["training_dl"], self.config["validation_dl"], Adam(params=model.parameters(), lr=0))
+            subprocess.call(["python", "model_embedding.py",
+                "--model_path", self.model_path,
+                "--model_revision", self.model_revision,
+                "--cache_dir", self.cache_dir,
+                "--save_path", "GRAD/embedding.pt",
+                "--model_half" if config["model_half"] else ""
+                ]
+            )
+            embedding_layer = torch.load("GRAD/embedding.pt").to(self.config["accelerator"].device)
+            model.train()
+        else:
+            embedding_layer = model.get_input_embeddings().weight
 
-        self.train_gradients = compute_dataloader_gradients(model, self.config["training_dl"], self.config["device"], self.config["nbatches"], self.config["samplelength"], self.config["accelerator"], half=self.config["model_half"]).cpu() 
-        self.val_gradients = compute_dataloader_gradients(model, self.config["validation_dl"], self.config["device"], self.config["nbatches"], self.config["samplelength"], self.config["accelerator"], half=self.config["model_half"]).cpu()
+        self.train_gradients = compute_dataloader_gradients(model, embedding_layer, self.config["training_dl"], self.config["device"], self.config["nbatches"], self.config["samplelength"], self.config["accelerator"], half=self.config["model_half"]).cpu() 
+        self.val_gradients = compute_dataloader_gradients(model, embedding_layer, self.config["validation_dl"], self.config["device"], self.config["nbatches"], self.config["samplelength"], self.config["accelerator"], half=self.config["model_half"]).cpu()
 
     def get_statistics(self):
         return self.train_gradients, self.val_gradients

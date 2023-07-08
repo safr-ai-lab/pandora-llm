@@ -7,6 +7,7 @@ from GRAD import GRAD
 import time
 import argparse
 from accelerate import Accelerator
+import os
 
 """
 Sample command line prompt (no acceleration)
