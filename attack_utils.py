@@ -4,6 +4,8 @@ import numpy as np
 from sklearn.metrics import roc_curve, auc
 from torch.nn import CrossEntropyLoss
 from tqdm import tqdm
+from transformers import AutoTokenizer
+from torch.autograd import Variable
 
 def mem_stats():
     '''
@@ -97,6 +99,64 @@ def compute_dataloader_cross_entropy(model, dataloader, device=None, nbatches=No
         losses = torch.cat([loss[0] for loss in losses])
         return losses
 
+def compute_input_ids_gradient(model, input_ids):
+    mask  = (input_ids > 0).detach()
+    model.eval()
+    input_embeds=Variable(model.get_input_embeddings().weight[input_ids],requires_grad=True)
+    outputs = model(inputs_embeds=input_embeds, attention_mask = mask, labels=input_ids)
+    mem_stats()
+    outputs.loss.backward()
+    grad = input_embeds.grad
+    del outputs, input_embeds
+    torch.cuda.empty_cache()
+    torch.cuda.synchronize()
+    return torch.norm(grad,p=float("inf"),dim=(1,2))
+
+def compute_dataloader_gradients(model, dataloader, device=None, nbatches=None, samplelength=None, accelerator=None, half=True):    
+    '''
+    Computes dataloader gradients with additional support for specifying the full data loader and full sample length.
+    Warning: using samplelength is discouraged
+    '''
+    if samplelength is not None:
+        print("Warning: using sample length is discouraged. Please avoid using this parameter.")
+    if accelerator is None:
+        if half:
+            print("Using model.half() ....")
+            model.half()
+        else:
+            print("Not using model.half() ....")
+        model.eval()
+        model.to(device)
+
+    losses = []
+    for batchno, data_x in tqdm(enumerate(dataloader),total=len(dataloader)):
+        if nbatches is not None and batchno >= nbatches:
+            break
+        ## Get predictions on training data 
+        data_x = data_x["input_ids"]
+        if samplelength is None:
+            data_x = data_x.detach()                
+        else:
+            data_x = data_x[:,:samplelength].detach()
+
+        ## Compute average log likelihood
+        if accelerator is None:
+            loss = compute_input_ids_gradient(model, data_x.to(device)).detach().cpu()
+        else:
+            loss = compute_input_ids_gradient(model, data_x)
+
+        losses.append(loss)
+
+        del data_x
+        torch.cuda.empty_cache()
+        torch.cuda.synchronize()
+    
+    if accelerator is None:
+        return torch.tensor(losses)
+    else:
+        losses = accelerator.gather_for_metrics(losses)
+        losses = torch.cat([loss[0] for loss in losses])
+        return losses
 
 def plot_hist(train_perplexity, val_perplexity, show_plot = True, save_plot=False, plot_title = "Histogram", plot_name="hist.png"):
     
