@@ -100,7 +100,7 @@ def compute_dataloader_cross_entropy(model, dataloader, device=None, nbatches=No
         losses = torch.cat([loss[0] for loss in losses])
         return losses
 
-def compute_input_ids_gradient(model, embedding_layer, input_ids, device=None, accelerator=None):
+def compute_input_ids_gradient(model, embedding_layer, input_ids, p, device=None, accelerator=None):
     mask  = (input_ids > 0).detach()
     input_embeds=Variable(embedding_layer[input_ids.cpu()],requires_grad=True)
     if accelerator is not None:
@@ -117,7 +117,7 @@ def compute_input_ids_gradient(model, embedding_layer, input_ids, device=None, a
     torch.cuda.synchronize()
     return torch.norm(grad,p=float("inf"),dim=(1,2)).to(accelerator.device)
 
-def compute_dataloader_gradients(model, embedding_layer, dataloader, device=None, nbatches=None, samplelength=None, accelerator=None, half=True):    
+def compute_dataloader_gradients(model, embedding_layer, dataloader, p, device=None, nbatches=None, samplelength=None, accelerator=None, half=True):    
     '''
     Computes dataloader gradients with additional support for specifying the full data loader and full sample length.
     Warning: using samplelength is discouraged
@@ -146,9 +146,9 @@ def compute_dataloader_gradients(model, embedding_layer, dataloader, device=None
 
         ## Compute average log likelihood
         if accelerator is None:
-            loss = compute_input_ids_gradient(model, embedding_layer, data_x, device=device).detach().cpu()
+            loss = compute_input_ids_gradient(model, embedding_layer, data_x, p, device=device).detach().cpu()
         else:
-            loss = compute_input_ids_gradient(model, embedding_layer, data_x, accelerator=accelerator)
+            loss = compute_input_ids_gradient(model, embedding_layer, data_x, p, accelerator=accelerator)
 
         losses.append(loss)
 

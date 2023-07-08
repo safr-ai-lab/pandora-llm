@@ -30,6 +30,7 @@ def main():
     parser.add_argument('--min_length', action="store", type=int, required=False, default=20, help='Min number of tokens')
     parser.add_argument('--seed', action="store", type=int, required=False, default=229, help='Seed')
     parser.add_argument('--bs', action="store", type=int, required=False, default=1, help='Batch size')
+    parser.add_argument('--p', action="store", type=str, required=False, default="inf", help='p in Lp norm')
     parser.add_argument('--accelerate', action="store_true", required=False, help='Use accelerate')
     parser.add_argument('--train_pt', action="store", required=False, help='.pt file of train dataset (not dataloader)')
     parser.add_argument('--val_pt', action="store", required=False, help='.pt file of val dataset (not dataloader)')
@@ -41,6 +42,9 @@ def main():
     if not (args.pack ^ args.unpack):
         if accelerator is None or accelerator.is_main_process:
             print(f"WARNING: for an apples-to-apples comparison, we recommend setting exactly one of pack ({args.pack}) and unpack ({args.unpack})")
+
+    if not (args.p=="inf" or (args.p.isdigit() and int(args.p)>0)):
+        raise ValueError("p must be either 'inf' or a positive integer")
 
     ## Other parameters
     model_revision = args.checkpoint
@@ -97,7 +101,8 @@ def main():
         "samplelength": args.sample_length,
         "device": device,
         "accelerator": accelerator,
-        "model_half": args.model_half
+        "model_half": args.model_half,
+        "p": float("inf") if args.p=="inf" else args.p
     }
 
     end = time.perf_counter()

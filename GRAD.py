@@ -46,8 +46,8 @@ class GRAD(MIA):
         else:
             embedding_layer = model.get_input_embeddings().weight
 
-        self.train_gradients = compute_dataloader_gradients(model, embedding_layer, self.config["training_dl"], self.config["device"], self.config["nbatches"], self.config["samplelength"], self.config["accelerator"], half=self.config["model_half"]).cpu() 
-        self.val_gradients = compute_dataloader_gradients(model, embedding_layer, self.config["validation_dl"], self.config["device"], self.config["nbatches"], self.config["samplelength"], self.config["accelerator"], half=self.config["model_half"]).cpu()
+        self.train_gradients = compute_dataloader_gradients(model, embedding_layer, self.config["training_dl"], self.config["p"], self.config["device"], self.config["nbatches"], self.config["samplelength"], self.config["accelerator"], half=self.config["model_half"]).cpu() 
+        self.val_gradients = compute_dataloader_gradients(model, embedding_layer, self.config["validation_dl"], self.config["p"], self.config["device"], self.config["nbatches"], self.config["samplelength"], self.config["accelerator"], half=self.config["model_half"]).cpu()
 
     def get_statistics(self):
         return self.train_gradients, self.val_gradients
