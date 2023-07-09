@@ -8,6 +8,7 @@ import time
 import argparse
 from accelerate import Accelerator
 import os
+from contextlib import nullcontext
 import logging
 logging.disable(logging.CRITICAL)
 
@@ -63,35 +64,36 @@ def main():
     if accelerator is None or accelerator.is_main_process:
         print("Loading Data")
     
-    if args.train_pt:
-        print("You are using a self-specified training dataset...")
-        fixed_input = args.train_pt + ".pt" if not args.train_pt.endswith(".pt") else args.train_pt
-        training_dataset = torch.load(fixed_input)[:args.n_samples]
-        training_dataloader = DataLoader(training_dataset, batch_size = args.bs, collate_fn=lambda batch: collate_fn(batch, tokenizer=tokenizer, length=max_length))
-    else:
-        if args.deduped and args.unpack:
-            training_dataset = load_train_pile_random_deduped_unpacked(number=args.n_samples,seed=seed,num_splits=1,min_length=args.min_length)[0]
-        elif args.deduped and not args.unpack:
-            training_dataset = load_train_pile_random_deduped(number=args.n_samples,seed=seed,num_splits=1)[0]
-        elif not args.deduped and args.unpack:
-            training_dataset = load_train_pile_random_duped_unpacked(number=args.n_samples,seed=seed,num_splits=1,min_length=args.min_length)[0]
+    with accelerator.main_process_first() if accelerator is not None else nullcontext():
+        if args.train_pt:
+            print("You are using a self-specified training dataset...")
+            fixed_input = args.train_pt + ".pt" if not args.train_pt.endswith(".pt") else args.train_pt
+            training_dataset = torch.load(fixed_input)[:args.n_samples]
+            training_dataloader = DataLoader(training_dataset, batch_size = args.bs, collate_fn=lambda batch: collate_fn(batch, tokenizer=tokenizer, length=max_length))
         else:
-            training_dataset = load_train_pile_random_duped(number=args.n_samples,seed=seed,num_splits=1)[0]
-        training_dataloader = DataLoader(training_dataset, batch_size = args.bs, collate_fn=lambda batch: collate_fn(batch, tokenizer=tokenizer, length=max_length))
+            if args.deduped and args.unpack:
+                training_dataset = load_train_pile_random_deduped_unpacked(number=args.n_samples,seed=seed,num_splits=1,min_length=args.min_length)[0]
+            elif args.deduped and not args.unpack:
+                training_dataset = load_train_pile_random_deduped(number=args.n_samples,seed=seed,num_splits=1)[0]
+            elif not args.deduped and args.unpack:
+                training_dataset = load_train_pile_random_duped_unpacked(number=args.n_samples,seed=seed,num_splits=1,min_length=args.min_length)[0]
+            else:
+                training_dataset = load_train_pile_random_duped(number=args.n_samples,seed=seed,num_splits=1)[0]
+            training_dataloader = DataLoader(training_dataset, batch_size = args.bs, collate_fn=lambda batch: collate_fn(batch, tokenizer=tokenizer, length=max_length))
 
-    if args.val_pt:
-        fixed_input = args.val_pt + ".pt" if not args.val_pt.endswith(".pt") else args.val_pt
-        print("You are using a self-specified validation dataset...")
-        validation_dataset = torch.load(fixed_input)[:args.n_samples]
-        validation_dataloader = DataLoader(validation_dataset, batch_size = args.bs, collate_fn=lambda batch: collate_fn(batch, tokenizer=tokenizer, length=max_length))
-    else:
-        if args.pack:
-            validation_dataset = load_val_pile_packed(number=args.n_samples, seed=seed, num_splits=1)[0]
+        if args.val_pt:
+            fixed_input = args.val_pt + ".pt" if not args.val_pt.endswith(".pt") else args.val_pt
+            print("You are using a self-specified validation dataset...")
+            validation_dataset = torch.load(fixed_input)[:args.n_samples]
+            validation_dataloader = DataLoader(validation_dataset, batch_size = args.bs, collate_fn=lambda batch: collate_fn(batch, tokenizer=tokenizer, length=max_length))
         else:
-            validation_dataset = load_val_pile(number=args.n_samples, seed=seed, num_splits=1)[0]
-        validation_dataloader = DataLoader(validation_dataset, batch_size = args.bs, collate_fn=lambda batch: collate_fn(batch, tokenizer=tokenizer, length=max_length))
+            if args.pack:
+                validation_dataset = load_val_pile_packed(number=args.n_samples, seed=seed, num_splits=1)[0]
+            else:
+                validation_dataset = load_val_pile(number=args.n_samples, seed=seed, num_splits=1)[0]
+            validation_dataloader = DataLoader(validation_dataset, batch_size = args.bs, collate_fn=lambda batch: collate_fn(batch, tokenizer=tokenizer, length=max_length))
 
-    ## Run LOSS attack
+    ## Run GRAD attack
 
     config_loss = {
         "training_dl": training_dataloader,
@@ -115,14 +117,12 @@ def main():
     GRADer = GRAD(model_name, model_revision=model_revision, cache_dir=model_cache_dir)
 
     GRADer.inference(config_loss)
-    GRADer.save()
-
-    GRADer.attack_plot_ROC(log_scale = False, show_plot=False)
-    GRADer.attack_plot_ROC(log_scale = True, show_plot=False)
-
-    end = time.perf_counter()
 
     if accelerator is None or accelerator.is_main_process:
+        GRADer.save()
+        GRADer.attack_plot_ROC(log_scale = False, show_plot=False)
+        GRADer.attack_plot_ROC(log_scale = True, show_plot=False)
+        end = time.perf_counter()
         print(f"- LOSS at {args.mod_size} and {args.n_samples} samples took {end-start} seconds.")
 
 if __name__ == "__main__":

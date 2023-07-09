@@ -115,7 +115,7 @@ def compute_input_ids_gradient(model, embedding_layer, input_ids, p, device=None
     del outputs, input_embeds, input_ids, mask
     torch.cuda.empty_cache()
     torch.cuda.synchronize()
-    return torch.norm(grad,p=float("inf"),dim=(1,2)).to(accelerator.device)
+    return torch.norm(grad,p=float("inf"),dim=(1,2))
 
 def compute_dataloader_gradients(model, embedding_layer, dataloader, p, device=None, nbatches=None, samplelength=None, accelerator=None, half=True):    
     '''
@@ -148,7 +148,7 @@ def compute_dataloader_gradients(model, embedding_layer, dataloader, p, device=N
         if accelerator is None:
             loss = compute_input_ids_gradient(model, embedding_layer, data_x, p, device=device).detach().cpu()
         else:
-            loss = compute_input_ids_gradient(model, embedding_layer, data_x, p, accelerator=accelerator)
+            loss = compute_input_ids_gradient(model, embedding_layer, data_x, p, accelerator=accelerator).to(accelerator.device)
 
         losses.append(loss)
 
@@ -158,6 +158,7 @@ def compute_dataloader_gradients(model, embedding_layer, dataloader, p, device=N
     
     if accelerator is not None:
         losses = accelerator.gather_for_metrics(losses)
+        losses = torch.cat(losses)
 
     return torch.tensor(losses)
 
@@ -200,9 +201,15 @@ def plot_ROC(train_statistic,val_statistic,title,log_scale=False,show_plot=True,
     '''
     Plots ROC with train and validation test statistics. Note that we assume train statistic < test statistic. Negate before using if otherwise.
     '''
-    train_statistic = torch.tensor(train_statistic).flatten()
+    if torch.is_tensor(train_statistic):
+        train_statistic = train_statistic.flatten()
+    else:
+        train_statistic = torch.tensor(train_statistic).flatten()
     train_statistic = train_statistic[~train_statistic.isnan()]
-    val_statistic = torch.tensor(val_statistic).flatten()
+    if torch.is_tensor(val_statistic):
+        val_statistic = val_statistic.flatten()
+    else:
+        val_statistic = torch.tensor(val_statistic).flatten()
     val_statistic = val_statistic[~val_statistic.isnan()]
 
     fpr, tpr, thresholds = roc_curve(torch.cat((torch.ones_like(train_statistic),torch.zeros_like(val_statistic))).flatten(),

@@ -32,15 +32,18 @@ class GRAD(MIA):
         model = GPTNeoXForCausalLM.from_pretrained(self.model_path, revision=self.model_revision, cache_dir=self.cache_dir)
 
         if self.config["accelerator"] is not None:
+            model.gradient_checkpointing_enable()
             model, self.config["training_dl"], self.config["validation_dl"]  = self.config["accelerator"].prepare(model, self.config["training_dl"], self.config["validation_dl"])
-            subprocess.call(["python", "model_embedding.py",
-                "--model_path", self.model_path,
-                "--model_revision", self.model_revision,
-                "--cache_dir", self.cache_dir,
-                "--save_path", "GRAD/embedding.pt",
-                "--model_half" if config["model_half"] else ""
-                ]
-            )
+            if self.config["accelerator"].is_main_process:
+                subprocess.call(["python", "model_embedding.py",
+                    "--model_path", self.model_path,
+                    "--model_revision", self.model_revision,
+                    "--cache_dir", self.cache_dir,
+                    "--save_path", "GRAD/embedding.pt",
+                    "--model_half" if config["model_half"] else ""
+                    ]
+                )
+            self.config["accelerator"].wait_for_everyone()
             embedding_layer = torch.load("GRAD/embedding.pt")
             model.train()
         else:
