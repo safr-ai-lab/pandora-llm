@@ -7,6 +7,7 @@ from tqdm import tqdm
 import pdb
 from detect_gpt_utils import *
 
+
 def mem_stats():
     '''
     Memory statistics for memory management
@@ -112,6 +113,7 @@ def compute_dataloader_cross_entropy_batch(model, dataloader, device=None, nbatc
     losses = []
     model_name = 't5-small'
     mask_model = T5ForConditionalGeneration.from_pretrained(model_name)
+    mask_model.to(device)
     mask_tokenizer = T5Tokenizer.from_pretrained(model_name)
     base_tokenizer = AutoTokenizer.from_pretrained("EleutherAI/pythia-70m-deduped")
 
@@ -126,8 +128,8 @@ def compute_dataloader_cross_entropy_batch(model, dataloader, device=None, nbatc
             else:
                 data_x = data_x[:,:samplelength].detach()
             
-
-            data_x_batch = perturb_input_ids(data_x.squeeze(0), args, base_tokenizer, mask_tokenizer, mask_model, ceil_pct=False).unsqueeze(-1)
+  
+            data_x_batch = perturb_input_ids(data_x.squeeze(0).to(device), detect_args, base_tokenizer, mask_tokenizer, mask_model, ceil_pct=False).unsqueeze(-1)
 
            
    
@@ -143,7 +145,9 @@ def compute_dataloader_cross_entropy_batch(model, dataloader, device=None, nbatc
             torch.cuda.empty_cache()
             torch.cuda.synchronize()
 
+    # cleanup
     del mask_model, mask_tokenizer, base_tokenizer
+
     if accelerator is None:
         return torch.tensor(losses)
     else:
