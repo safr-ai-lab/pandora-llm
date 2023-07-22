@@ -10,13 +10,14 @@ from accelerate import Accelerator
 import os
 from contextlib import nullcontext
 import logging
+from accelerate.utils import set_seed
 logging.disable(logging.CRITICAL)
 
 """
 Sample command line prompt (no acceleration)
-python run_loss.py --mod_size 70m --deduped --checkpoint step98000 --n_samples 1000
+python run_grad.py --mod_size 70m --deduped --checkpoint step98000 --n_samples 1000
 Sample command line prompt (with acceleration)
-accelerate launch run_loss.py --accelerate --mod_size 70m --deduped --checkpoint step98000 --n_samples 1000
+accelerate launch run_grad.py --accelerate --mod_size 70m --deduped --checkpoint step98000 --n_samples 1000
 """
 
 def main():
@@ -32,11 +33,14 @@ def main():
     parser.add_argument('--seed', action="store", type=int, required=False, default=229, help='Seed')
     parser.add_argument('--bs', action="store", type=int, required=False, default=1, help='Batch size')
     parser.add_argument('--p', action="store", type=str, required=False, default="inf", help='p in Lp norm')
+    parser.add_argument('--wrt', action="store", type=str, required=False, default="x", help='Take gradient with respect to')
     parser.add_argument('--accelerate', action="store_true", required=False, help='Use accelerate')
     parser.add_argument('--train_pt', action="store", required=False, help='.pt file of train dataset (not dataloader)')
     parser.add_argument('--val_pt', action="store", required=False, help='.pt file of val dataset (not dataloader)')
     parser.add_argument('--model_half', action="store_true", required=False, help='Use half precision (fp16). 1 for use; 0 for not.')
     args = parser.parse_args()
+
+    set_seed(args.seed)
 
     accelerator = Accelerator() if args.accelerate else None
 
@@ -46,6 +50,9 @@ def main():
 
     if not (args.p=="inf" or (args.p.isdigit() and int(args.p)>0)):
         raise ValueError("p must be either 'inf' or a positive integer")
+    
+    if not (args.wrt in {"x","theta"}):
+        raise ValueError("wrt must be either 'x' or 'theta'")
 
     ## Other parameters
     model_revision = args.checkpoint
@@ -104,7 +111,8 @@ def main():
         "device": device,
         "accelerator": accelerator,
         "model_half": args.model_half,
-        "p": float("inf") if args.p=="inf" else args.p
+        "p": float("inf") if args.p=="inf" else int(args.p),
+        "wrt": args.wrt,
     }
 
     end = time.perf_counter()

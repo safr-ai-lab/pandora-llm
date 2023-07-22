@@ -1,5 +1,6 @@
 import torch
 import matplotlib.pyplot as plt
+import random
 import numpy as np
 from sklearn.metrics import roc_curve, auc
 from torch.nn import CrossEntropyLoss
@@ -7,6 +8,7 @@ from torch.nn.functional import cross_entropy
 from tqdm import tqdm
 from transformers import AutoTokenizer
 from torch.autograd import Variable
+from deepspeed.utils import safe_get_full_grad
 
 def mem_stats():
     '''
@@ -100,7 +102,7 @@ def compute_dataloader_cross_entropy(model, dataloader, device=None, nbatches=No
         losses = torch.cat([loss[0] for loss in losses])
         return losses
 
-def compute_input_ids_gradient(model, embedding_layer, input_ids, p, device=None, accelerator=None):
+def compute_input_ids_gradient_x(model, embedding_layer, input_ids, p, device=None, accelerator=None):
     mask  = (input_ids > 0).detach()
     input_embeds=Variable(embedding_layer[input_ids.cpu()],requires_grad=True)
     if accelerator is not None:
@@ -111,13 +113,13 @@ def compute_input_ids_gradient(model, embedding_layer, input_ids, p, device=None
         outputs.loss.backward()
     else:
         accelerator.backward(outputs.loss)
-    grad = input_embeds.grad
+    grad = input_embeds.grad.detach()
     del outputs, input_embeds, input_ids, mask
     torch.cuda.empty_cache()
     torch.cuda.synchronize()
-    return torch.norm(grad,p=float("inf"),dim=(1,2))
+    return torch.norm(grad,p=p,dim=(1,2))
 
-def compute_dataloader_gradients(model, embedding_layer, dataloader, p, device=None, nbatches=None, samplelength=None, accelerator=None, half=True):    
+def compute_dataloader_gradients_x(model, embedding_layer, dataloader, p, device=None, nbatches=None, samplelength=None, accelerator=None, half=True):    
     '''
     Computes dataloader gradients with additional support for specifying the full data loader and full sample length.
     Warning: using samplelength is discouraged
@@ -146,9 +148,82 @@ def compute_dataloader_gradients(model, embedding_layer, dataloader, p, device=N
 
         ## Compute average log likelihood
         if accelerator is None:
-            loss = compute_input_ids_gradient(model, embedding_layer, data_x, p, device=device).detach().cpu()
+            loss = compute_input_ids_gradient_x(model, embedding_layer, data_x, p, device=device).detach().cpu()
         else:
-            loss = compute_input_ids_gradient(model, embedding_layer, data_x, p, accelerator=accelerator).to(accelerator.device)
+            loss = compute_input_ids_gradient_x(model, embedding_layer, data_x, p, accelerator=accelerator).to(accelerator.device)
+
+        losses.append(loss)
+
+        del data_x
+        torch.cuda.empty_cache()
+        torch.cuda.synchronize()
+    
+    if accelerator is not None:
+        losses = accelerator.gather_for_metrics(losses)
+        losses = torch.cat(losses)
+
+    return torch.tensor(losses)
+
+def compute_input_ids_gradient_theta(model, input_ids, p, device=None, accelerator=None):
+    mask  = (input_ids > 0).detach()
+    if accelerator is not None:
+        outputs = model(input_ids=input_ids.to(accelerator.device), attention_mask = mask.to(accelerator.device), labels=input_ids.to(accelerator.device))
+    else:
+        model.zero_grad()
+        outputs = model(input_ids=input_ids.to(device),attention_mask=mask.to(device),labels=input_ids.to(device))
+    if accelerator is not None:
+        accelerator.backward(outputs.loss)
+    else:
+        outputs.loss.backward()
+    grads = []
+    for param in model.parameters():
+        if accelerator is None:
+            grads.append(torch.norm(param.grad,p=p))
+        else:
+            grads.append(torch.norm(safe_get_full_grad(param),p=p))
+    norm = torch.norm(torch.tensor(grads),p=p)
+    # if accelerator is None:
+    #     print(norm)
+    # else:
+    #     accelerator.print(norm)
+
+    del outputs, input_ids, mask, grads
+    torch.cuda.empty_cache()
+    torch.cuda.synchronize()
+    return norm
+
+def compute_dataloader_gradients_theta(model, dataloader, p, device=None, nbatches=None, samplelength=None, accelerator=None, half=True):    
+    '''
+    Computes dataloader gradients with additional support for specifying the full data loader and full sample length.
+    Warning: using samplelength is discouraged
+    '''
+    if samplelength is not None:
+        print("Warning: using sample length is discouraged. Please avoid using this parameter.")
+    if accelerator is None:
+        if half:
+            print("Using model.half() ....")
+            model.half()
+        else:
+            print("Not using model.half() ....")
+        model.eval()
+        model.to(device)
+
+    losses = []
+    for batchno, data_x in tqdm(enumerate(dataloader),total=len(dataloader)):
+        if nbatches is not None and batchno >= nbatches:
+            break
+        ## Get predictions on training data 
+        data_x = data_x["input_ids"]
+        if samplelength is None:
+            data_x = data_x.detach()                
+        else:
+            data_x = data_x[:,:samplelength].detach()
+
+        ## Compute average log likelihood
+        if accelerator is None:
+            loss = compute_input_ids_gradient_theta(model, data_x, p, device=device).detach().cpu()
+        else:
+            loss = compute_input_ids_gradient_theta(model, data_x, p, accelerator=accelerator).to(accelerator.device)
 
         losses.append(loss)
 

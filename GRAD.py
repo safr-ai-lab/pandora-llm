@@ -34,23 +34,29 @@ class GRAD(MIA):
         if self.config["accelerator"] is not None:
             model.gradient_checkpointing_enable()
             model, self.config["training_dl"], self.config["validation_dl"]  = self.config["accelerator"].prepare(model, self.config["training_dl"], self.config["validation_dl"])
-            if self.config["accelerator"].is_main_process:
-                subprocess.call(["python", "model_embedding.py",
-                    "--model_path", self.model_path,
-                    "--model_revision", self.model_revision,
-                    "--cache_dir", self.cache_dir,
-                    "--save_path", "GRAD/embedding.pt",
-                    "--model_half" if config["model_half"] else ""
-                    ]
-                )
-            self.config["accelerator"].wait_for_everyone()
-            embedding_layer = torch.load("GRAD/embedding.pt")
+            if self.config["wrt"]=="x":
+                if self.config["accelerator"].is_main_process:
+                    subprocess.call(["python", "model_embedding.py",
+                        "--model_path", self.model_path,
+                        "--model_revision", self.model_revision,
+                        "--cache_dir", self.cache_dir,
+                        "--save_path", "GRAD/embedding.pt",
+                        "--model_half" if config["model_half"] else ""
+                        ]
+                    )
+                self.config["accelerator"].wait_for_everyone()
+                embedding_layer = torch.load("GRAD/embedding.pt")
             model.train()
         else:
-            embedding_layer = model.get_input_embeddings().weight
+            if self.config["wrt"]=="x":
+                embedding_layer = model.get_input_embeddings().weight
 
-        self.train_gradients = compute_dataloader_gradients(model, embedding_layer, self.config["training_dl"], self.config["p"], self.config["device"], self.config["nbatches"], self.config["samplelength"], self.config["accelerator"], half=self.config["model_half"]).cpu() 
-        self.val_gradients = compute_dataloader_gradients(model, embedding_layer, self.config["validation_dl"], self.config["p"], self.config["device"], self.config["nbatches"], self.config["samplelength"], self.config["accelerator"], half=self.config["model_half"]).cpu()
+        if self.config["wrt"]=="x":
+            self.train_gradients = compute_dataloader_gradients_x(model, embedding_layer, self.config["training_dl"], self.config["p"], self.config["device"], self.config["nbatches"], self.config["samplelength"], self.config["accelerator"], half=self.config["model_half"]).cpu() 
+            self.val_gradients = compute_dataloader_gradients_x(model, embedding_layer, self.config["validation_dl"], self.config["p"], self.config["device"], self.config["nbatches"], self.config["samplelength"], self.config["accelerator"], half=self.config["model_half"]).cpu()
+        elif self.config["wrt"]=="theta":
+            self.train_gradients = compute_dataloader_gradients_theta(model, self.config["training_dl"], self.config["p"], self.config["device"], self.config["nbatches"], self.config["samplelength"], self.config["accelerator"], half=self.config["model_half"]).cpu() 
+            self.val_gradients = compute_dataloader_gradients_theta(model, self.config["validation_dl"], self.config["p"], self.config["device"], self.config["nbatches"], self.config["samplelength"], self.config["accelerator"], half=self.config["model_half"]).cpu()
 
     def get_statistics(self):
         return self.train_gradients, self.val_gradients
