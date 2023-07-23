@@ -3,7 +3,7 @@ from torch.utils.data import DataLoader
 from transformers import GPTNeoXForCausalLM, AutoTokenizer, AutoConfig
 from attack_utils import *
 from dataset_utils import *
-from LOSS import LOSS
+from DetectGPT import DetectGPT
 import time
 import argparse
 from accelerate import Accelerator
@@ -94,10 +94,16 @@ def main():
         "samplelength": args.sample_length,
         "device": device,
         "accelerator": accelerator,
-        "model_half": args.model_half
-        }
-    
-
+        "model_half": args.model_half,
+        "batch": args.batch,
+        "detect_args": {'buffer_size':1, 
+        'mask_top_p': 10, 
+        'pct_words_masked':.2, 
+        'span_length':2,
+        'num_perts': 2, 
+        'device': device, 
+        "model_max_length": max_length}
+    }
 
     end = time.perf_counter()
     if accelerator is None or accelerator.is_main_process:
@@ -105,7 +111,7 @@ def main():
 
     start = time.perf_counter()
 
-    LOSSer = LOSS(model_name, model_revision=model_revision, cache_dir=model_cache_dir)
+    LOSSer = DetectGPT(model_name, model_revision=model_revision, cache_dir=model_cache_dir)
 
     LOSSer.inference(config_loss)
     LOSSer.save()
@@ -116,7 +122,7 @@ def main():
     end = time.perf_counter()
 
     if accelerator is None or accelerator.is_main_process:
-        print(f"- LOSS at {args.mod_size} and {args.n_samples} samples took {end-start} seconds.")
+        print(f"- DetectGPT at {args.mod_size} and {args.n_samples} samples took {end-start} seconds.")
 
 if __name__ == "__main__":
     main()

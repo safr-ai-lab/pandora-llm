@@ -11,10 +11,21 @@ import pdb
 from transformers import T5Tokenizer, T5ForConditionalGeneration, AutoTokenizer, AutoConfig
 import time
 
-# define regex to match all <extra_id_*> tokens, where * is an integer
-pattern = re.compile(r"<extra_id_\d+>")
+PATTERN = re.compile(r"<extra_id_\d+>")
+SPLIT_LEN = 64
+
+def split_text(text, maxlen=64):
+    text = text.split(' ')
+    if len(text) <= maxlen:
+      return ' '.join(text)
+    else:
+
+      num_chunks = int(np.ceil(len(text) / maxlen))
+      chunks = [text[i*maxlen:(i+1)*maxlen] for i in range(num_chunks)]
+      return [' '.join(s) for s in chunks]
 
 def mask_text (text, args, ceil_pct=False):
+
 
     tokens = text.split(' ')
     mask_string = '<<<mask>>>'
@@ -33,14 +44,14 @@ def mask_text (text, args, ceil_pct=False):
         if mask_string not in tokens[search_start:search_end]:
             tokens[start:end] = [mask_string]
             n_masks += 1
-    
+    tokens = tokens + [mask_string]
     # replace each occurrence of mask_string with <extra_id_NUM>, where NUM increments
     num_filled = 0
     for idx, token in enumerate(tokens):
         if token == mask_string:
             tokens[idx] = f'<extra_id_{num_filled}>'
             num_filled += 1
-    assert num_filled == n_masks, f"num_filled {num_filled} != n_masks {n_masks}"
+    #assert num_filled == n_masks + 1, f"num_filled {num_filled} != n_masks {n_masks}"
     text = ' '.join(tokens)
     return text
 
@@ -50,73 +61,86 @@ def count_masks(texts):
 
 
 # replace each masked span with a sample from T5 mask_model
-def replace_masks(texts, mask_tokenizer, mask_model, args):
-    n_expected = count_masks(texts)
-    stop_id = mask_tokenizer.encode(f"<extra_id_{max(n_expected)}>")[0]
-    tokens = mask_tokenizer(texts, return_tensors="pt", padding=True).to(args["device"])
-    outputs = mask_model.generate(**tokens, decoder_input_ids = tokens['input_ids'], do_sample=True, top_p=args["mask_top_p"], num_return_sequences=1, eos_token_id=stop_id)
-    decoded_text =  mask_tokenizer.batch_decode(outputs, skip_special_tokens=False)
-    filled_texts = [x.replace("<pad>", "").replace("</s>", "").strip() for x in decoded_text]
-    return filled_texts
-
-
-def extract_fills(texts):
-
+def replace_masks_extract_fills(texts, mask_tokenizer, mask_model, args, printflag=False):
+    filled_texts = []
+    for num in range(len(texts)):
+      if printflag:
+         print(f'filling masked text {num +1}')
+      n_expected = count_masks(texts[num])
+      stop_id = mask_tokenizer.encode(f"<extra_id_{max(n_expected)}>")[0]
+      tokens = mask_tokenizer(texts[num], return_tensors="pt", padding=True).to(args["device"])
+      outputs = mask_model.generate(**tokens, do_sample=True, top_p=args["mask_top_p"], num_return_sequences=1, eos_token_id=stop_id, max_length=3*SPLIT_LEN)
+      decoded_text =  mask_tokenizer.batch_decode(outputs, skip_special_tokens=False)
+      filled_text = [x.replace("<pad>", "").replace("</s>", "").strip() for x in decoded_text]
+      filled_texts.append(filled_text)
+      
+    
     # return the text in between each matched mask token
-    extracted_fills = [pattern.split(x)[1:-1] for x in texts]
-
+    extracted_fills = [[PATTERN.split(chunk)[1:-1] for chunk in text] for text in filled_texts]
     # remove whitespace around each fill
-    extracted_fills = [[y.strip() for y in x] for x in extracted_fills]
-
+    extracted_fills = [[[fill.strip() for fill in chunk] for chunk in text] for text in extracted_fills]
     return extracted_fills
 
-def apply_extracted_fills(masked_texts, extracted_fills):
+def apply_extracted_fills(masked_texts, extracted_fills, printflag=False):
     # split masked text into tokens, only splitting on spaces (not newlines)
-    tokens = [x.split(' ') for x in masked_texts]
+    texts = []
+    for text_id in range(len(masked_texts)):
+      if printflag:
+        print(f'filling in text {text_id}')
+      masked_text = masked_texts[text_id]
+      extracted_fill = extracted_fills[text_id]
+      n_expected = count_masks(masked_text)
 
-    n_expected = count_masks(masked_texts)
-
-    # replace each mask token with the corresponding fill
-    for idx, (text, fills, n) in enumerate(zip(tokens, extracted_fills, n_expected)):
-        if len(fills) < n:
-            tokens[idx] = []
-        else:
-            for fill_idx in range(n):
-                if fill_idx == 77: 
-                    pdb.set_trace()
-                text[text.index(f"<extra_id_{fill_idx}>")] = fills[fill_idx]
-
-    # join tokens back into text
-    texts = [" ".join(x) for x in tokens]
+      # replace each mask token with the corresponding fill
+      text = ''
+      for idx, (masked_chunk, fills, n) in enumerate(zip(masked_text, extracted_fill, n_expected)):
+          # handle case where there are no masks
+          if n == -1: 
+              continue
+          masked_chunk = masked_chunk.split(' ')
+          if printflag:
+            print(f'filling in chunk {idx} of text {text_id}')
+          if len(fills) < n:
+              print('insufficient # of fills on chunk')
+              for fill_idx in range(n):
+                  masked_chunk[masked_chunk.index(f"<extra_id_{fill_idx}>")] = ''
+                  # remove the last mask
+              masked_chunk[masked_chunk.index(f"<extra_id_{n}>")] = ''
+          else:
+              for fill_idx in range(n):
+                masked_chunk[masked_chunk.index(f"<extra_id_{fill_idx}>")] = fills[fill_idx]
+              # remove the last mask
+              masked_chunk[masked_chunk.index(f"<extra_id_{n}>")] = ''
+          
+          text += ' '.join(masked_chunk)
+      texts.append(text)
     return texts
 
 def convert(s):
- 
+
     # initialization of string to ""
     new = ""
- 
+
     # traverse in the string
     for x in s:
         new += x
- 
+
     # return string
     return new
 
 
 def perturb_texts_(texts, args, mask_tokenizer, masked_model, ceil_pct=False):
 
-    masked_texts = [mask_text (x, args, ceil_pct) for x in texts]
-    raw_fills = replace_masks(masked_texts, mask_tokenizer, masked_model, args)
-    extracted_fills = extract_fills(raw_fills)
+    masked_texts = [[mask_text (chunk, args, False) for chunk in split_text(text, SPLIT_LEN)] for text in texts]
+    extracted_fills = replace_masks_extract_fills(masked_texts, mask_tokenizer, masked_model, args)
     perturbed_texts = apply_extracted_fills(masked_texts, extracted_fills)
     # Handle the fact that sometimes the model doesn't generate the right number of fills and we have to try again
     attempts = 1
     while '' in perturbed_texts:
         idxs = [idx for idx, x in enumerate(perturbed_texts) if x == '']
         print(f'WARNING: {len(idxs)} texts have no fills. Trying again [attempt {attempts}].')
-        masked_texts = [mask_text (x, args, ceil_pct) for idx, x in enumerate(texts) if idx in idxs]
-        raw_fills = replace_masks(masked_texts, mask_tokenizer, masked_model, args)
-        extracted_fills = extract_fills(raw_fills)
+        masked_texts = [[mask_text (chunk, args, False) for chunk in split_text(text, SPLIT_LEN)]for idx,text in enumerate(texts) if idx in idxs]
+        extracted_fills = replace_masks_extract_fills(masked_texts, mask_tokenizer, masked_model, args)
         new_perturbed_texts = apply_extracted_fills(masked_texts, extracted_fills)
         for idx, x in zip(idxs, new_perturbed_texts):
             perturbed_texts[idx] = x
@@ -124,33 +148,27 @@ def perturb_texts_(texts, args, mask_tokenizer, masked_model, ceil_pct=False):
 
     return convert(perturbed_texts)
 
-def perturb_input_ids(input_id, args, base_tokenizer, mask_tokenizer, masked_model, ceil_pct=False): 
-    pdb.set_trace()
-    input_ids = [input_id for _ in range(args["num_perts"])]
-    texts = [base_tokenizer.decode(input_id) for input_id in input_ids]
-    masked_texts = [mask_text (x, args, ceil_pct) for x in texts]
-    raw_fills = replace_masks(masked_texts,mask_tokenizer, masked_model, args)
-    extracted_fills = extract_fills(raw_fills)
+
+def perturb_input_ids(input_id, args, base_tokenizer, mask_tokenizer, masked_model): 
+    texts = [base_tokenizer.decode(input_id) for _ in range(args["num_perts"])]
+    masked_texts = [[mask_text (chunk, args, False) for chunk in split_text(text, SPLIT_LEN)] for text in texts]
+    extracted_fills = replace_masks_extract_fills(masked_texts,mask_tokenizer, masked_model, args)
     perturbed_texts = apply_extracted_fills(masked_texts, extracted_fills)
-    pdb.set_trace()
 
     # Handle the fact that sometimes the model doesn't generate the right number of fills and we have to try again
     attempts = 1
     while '' in perturbed_texts:
         idxs = [idx for idx, x in enumerate(perturbed_texts) if x == '']
         print(f'WARNING: {len(idxs)} texts have no fills. Trying again [attempt {attempts}].')
-        masked_texts = [mask_text (x, args, ceil_pct) for idx, x in enumerate(texts) if idx in idxs]
-        raw_fills = replace_masks(masked_texts, mask_tokenizer, masked_model, args)
-        extracted_fills = extract_fills(raw_fills)
+        masked_texts = [[mask_text (chunk, args, False) for chunk in split_text(text, SPLIT_LEN)]for idx,text in enumerate(texts) if idx in idxs]
+        extracted_fills = replace_masks_extract_fills(masked_texts, mask_tokenizer, masked_model, args)
         new_perturbed_texts = apply_extracted_fills(masked_texts, extracted_fills)
         for idx, x in zip(idxs, new_perturbed_texts):
             perturbed_texts[idx] = x
         attempts += 1
-
-
     # convert backt to input_ids 
-    tokens = [base_tokenizer.encode(x, return_tensors="pt", truncation=True) for x in perturbed_texts]
-    max_length = max([t.size(1) for t in tokens])
+    max_length=args["model_max_length"]
+    tokens = [base_tokenizer.encode(x, return_tensors="pt", truncation=True, max_length=max_length) for x in perturbed_texts]
     tokens_padded = [torch.cat([t, t.new_zeros(t.size(0), max_length - t.size(1))], dim=1) for t in tokens]
     tokens_padded = torch.cat(tokens_padded, dim=0)
     return tokens_padded

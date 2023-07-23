@@ -1,10 +1,9 @@
 from Attack import MIA
 from attack_utils import *
-from transformers import GPTNeoXForCausalLM, AutoModelForCausalLM, T5Tokenizer, T5ForConditionalGeneration
+from transformers import GPTNeoXForCausalLM, AutoModelForCausalLM
 import torch
 import os
 import pdb 
-from detect_gpt_utils import *
 
 class DetectGPT(MIA):
     """
@@ -35,9 +34,12 @@ class DetectGPT(MIA):
         if self.config["accelerator"] is not None:
             model, self.config["training_dl"], self.config["validation_dl"]  = self.config["accelerator"].prepare(model, self.config["training_dl"], self.config["validation_dl"])
         
-        pdb.set_trace()
-        self.train_cross_entropy = compute_dataloader_cross_entropy(model, self.config["training_dl"], self.config["device"], self.config["nbatches"], self.config["samplelength"], self.config["accelerator"], half=self.config["model_half"]).cpu() 
-        self.val_cross_entropy = compute_dataloader_cross_entropy(model, self.config["validation_dl"], self.config["device"], self.config["nbatches"], self.config["samplelength"], self.config["accelerator"], half=self.config["model_half"]).cpu()
+        if not self.config["batch"]:
+            self.train_cross_entropy = compute_dataloader_cross_entropy(model, self.config["training_dl"], self.config["device"], self.config["nbatches"], self.config["samplelength"], self.config["accelerator"], half=self.config["model_half"]).cpu() 
+            self.val_cross_entropy = compute_dataloader_cross_entropy(model, self.config["validation_dl"], self.config["device"], self.config["nbatches"], self.config["samplelength"], self.config["accelerator"], half=self.config["model_half"]).cpu()
+        else: 
+            self.train_cross_entropy = compute_dataloader_cross_entropy_batch(model, self.config["training_dl"], self.config["device"], self.config["nbatches"], self.config["samplelength"], self.config["accelerator"], half=self.config["model_half"], detect_args=self.config['detect_args']).cpu() 
+            self.val_cross_entropy = compute_dataloader_cross_entropy_batch(model, self.config["validation_dl"], self.config["device"], self.config["nbatches"], self.config["samplelength"], self.config["accelerator"], half=self.config["model_half"], detect_args=self.config['detect_args']).cpu()
 
     def generate(self,prefixes,config):
         suffix_length = config["suffix_length"]
@@ -46,7 +48,7 @@ class DetectGPT(MIA):
 
 
         generations = []
-        DetectGPTes = []
+        losses = []
         
         model = AutoModelForCausalLM.from_pretrained(self.model_path, revision=self.model_revision, cache_dir=self.cache_dir).half().eval().to(device)
         for off in tqdm(range(0, len(prefixes), bs)):
@@ -74,15 +76,15 @@ class DetectGPT(MIA):
                 )
                 logits = outputs.logits.cpu().detach()
                 logits = logits[:, :-1].reshape((-1, logits.shape[-1])).float()
-                DetectGPT_per_token = torch.nn.functional.cross_entropy(
+                loss_per_token = torch.nn.functional.cross_entropy(
                     logits, generated_tokens[:, 1:].flatten(), reduction='none')
-                DetectGPT_per_token = DetectGPT_per_token.reshape((-1, prefixes.shape[1]+suffix_length - 1))[:,-suffix_length-1:-1]
-                likelihood = DetectGPT_per_token.mean(1)
+                loss_per_token = loss_per_token.reshape((-1, prefixes.shape[1]+suffix_length - 1))[:,-suffix_length-1:-1]
+                likelihood = loss_per_token.mean(1)
                 
                 generations.extend(generated_tokens.numpy())
-                DetectGPTes.extend(likelihood.numpy())
+                losses.extend(likelihood.numpy())
         
-        return np.atleast_2d(generations), np.atleast_2d(DetectGPTes).reshape((len(generations), -1)), np.atleast_2d(DetectGPTes).reshape((len(generations), -1))
+        return np.atleast_2d(generations), np.atleast_2d(losses).reshape((len(generations), -1)), np.atleast_2d(losses).reshape((len(generations), -1))
 
     def get_statistics(self):
         return self.train_cross_entropy, self.val_cross_entropy

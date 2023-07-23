@@ -53,9 +53,6 @@ def compute_input_ids_cross_entropy(model, input_ids, return_pt=True):
   return torch.tensor(ans) if return_pt else ans 
 
 def compute_input_ids_cross_entropy_batch(model, input_ids, return_pt=True):
-
-
-
   model.eval()
 
   mask_batch  = (input_ids > 0).detach() 
@@ -92,7 +89,7 @@ def compute_input_ids_cross_entropy_batch(model, input_ids, return_pt=True):
   torch.cuda.empty_cache()
   torch.cuda.synchronize()
 
-  return torch.mean(torch.tensor(ans)) if return_pt else ans 
+  return torch.mean(torch.tensor(ans)) if return_pt else np.mean(ans) 
 
 def compute_dataloader_cross_entropy_batch(model, dataloader, device=None, nbatches=None, samplelength=None, accelerator=None, half=True, detect_args=None):    
     '''
@@ -129,17 +126,21 @@ def compute_dataloader_cross_entropy_batch(model, dataloader, device=None, nbatc
                 data_x = data_x[:,:samplelength].detach()
             
   
-            data_x_batch = perturb_input_ids(data_x.squeeze(0).to(device), detect_args, base_tokenizer, mask_tokenizer, mask_model, ceil_pct=False).unsqueeze(-1)
+            data_x_batch = perturb_input_ids(data_x.squeeze(0).to(device), detect_args, base_tokenizer, mask_tokenizer, mask_model).unsqueeze(-1)
 
            
    
             ## Compute average log likelihood
             if accelerator is None:
-                loss = compute_input_ids_cross_entropy_batch(model, data_x_batch.to(device)).detach().cpu()
+                avg_perturbed_loss = compute_input_ids_cross_entropy_batch(model, data_x_batch.to(device)).detach().cpu()
+                loss = compute_input_ids_cross_entropy(model, data_x.to(device)).detach().cpu()
+                detect_gpt_score = loss - avg_perturbed_loss
             else:
-                loss = compute_input_ids_cross_entropy_batch(model, data_x_batch.to(device), return_pt = False).detach().cpu()
+                avg_perturbed_loss = compute_input_ids_cross_entropy_batch(model, data_x_batch, return_pt = False)
+                loss = compute_input_ids_cross_entropy(model, data_x, return_pt = False)
+                detect_gpt_score = loss - avg_perturbed_loss
 
-            losses.append(loss)
+            losses.append(detect_gpt_score)
 
             del data_x_batch, data_x
             torch.cuda.empty_cache()
