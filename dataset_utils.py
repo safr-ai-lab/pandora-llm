@@ -13,7 +13,7 @@ def collate_fn(batch,tokenizer,length):
     return {
         "input_ids":tokens_padded,
         "labels":tokens_padded,
-        "attention_mask": torch.tensor(tokens_padded>0,dtype=int)
+        "attention_mask": (tokens_padded>0).int()
     }
 
 def load_train_pile_random_deduped(number=1000, percentage=None, seed=229, num_splits=2):
