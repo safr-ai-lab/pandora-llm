@@ -7,12 +7,15 @@ This is a disk-space-saver since it deletes the perturbed MoPe models after a ru
 and saves all of the results to one central directory in the machine.
 """
 
-MoPe = True
-sizes = ["70m", "160m", "410m", "1b", "1.4b", "2.8b"]
-points = 10000
+attack_type = 'DetectGPT'
+sizes = [ "410m"] #, "410m", "1b", "1.4b", "2.8b"]
+points = 10
 seed = 1930
 
-if MoPe:
+def directory_exists(directory_path):
+    return os.path.exists(directory_path) and os.path.isdir(directory_path)
+
+if attack_type == 'MoPe':
     # MoPe version
 
     for s in sizes:
@@ -35,7 +38,7 @@ if MoPe:
         os.system(f"cp -r {s}/MoPe/{s}_results results")
 
         # os.system(f"cp -r {s}/LOSS/{s}_results results")
-else:
+if attack_type == 'Loss':
     for s in sizes:
         os.mkdir(f"{s}")
         os.chdir(f"{s}")
@@ -52,4 +55,14 @@ else:
         os.system(f"cp *pt {s}_results")
         os.chdir("../..")
         os.system(f"cp -r {s}/LOSS/{s}_results results")
+
+elif attack_type == 'DetectGPT': 
+    for s in sizes:
+        if not directory_exists('DetectGPT'): 
+            os.mkdir('DetectGPT')
+        cmd = f"python3 run_detectgpt.py --mod_size {s} --model_half --pack --n_samples {points} --checkpoint step98000 --deduped --seed {seed} --n_perts 5 &>> out.txt"
+        os.system(cmd)
+        print(cmd)
+
+
             

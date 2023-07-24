@@ -129,6 +129,8 @@ def compute_dataloader_cross_entropy_batch(model, dataloader, device=None, nbatc
             else:
                 data_x = data_x[:,:samplelength].detach()
             
+            if batchno % 5 == 0:
+                mem_stats()
 
             # time this 
             start_pert = timeit.default_timer()
@@ -136,7 +138,9 @@ def compute_dataloader_cross_entropy_batch(model, dataloader, device=None, nbatc
             end_pert = timeit.default_timer()
             elapsed_time = end_pert - start_pert 
             print(f'time to perturb input is {elapsed_time} seconds')
-
+            
+            if batchno % 5 == 0:
+                mem_stats()
             ## Compute average log likelihood
             if accelerator is None:
                 avg_perturbed_loss = compute_input_ids_cross_entropy_batch(model, data_x_batch.to(device)).detach().cpu()
@@ -148,13 +152,13 @@ def compute_dataloader_cross_entropy_batch(model, dataloader, device=None, nbatc
                 detect_gpt_score = loss - avg_perturbed_loss
 
             losses.append(detect_gpt_score)
-            del data_x_batch, data_x
-            
-            torch.cuda.empty_cache()
-            torch.cuda.synchronize()
-
-    # cleanup
-    del mask_model, mask_tokenizer, base_tokenizer
+            if batchno % 5 == 0:
+                mem_stats()
+    del data_x_batch, data_x, mask_model, mask_tokenizer, base_tokenizer        
+    torch.cuda.empty_cache()
+    torch.cuda.synchronize()
+    if batchno % 5 == 0:
+        mem_stats()
 
     if accelerator is None:
         return torch.tensor(losses)
