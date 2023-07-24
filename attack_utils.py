@@ -6,6 +6,7 @@ from torch.nn import CrossEntropyLoss
 from tqdm import tqdm
 import pdb
 from detect_gpt_utils import *
+import timeit
 
 
 def mem_stats():
@@ -113,7 +114,6 @@ def compute_dataloader_cross_entropy_batch(model, dataloader, device=None, nbatc
     mask_model.to(device)
     mask_tokenizer = T5Tokenizer.from_pretrained(model_name)
     base_tokenizer = AutoTokenizer.from_pretrained("EleutherAI/pythia-70m-deduped")
-
     for batchno, data_x in tqdm(enumerate(dataloader),total=len(dataloader)):
         if nbatches is not None and batchno >= nbatches:
             break
@@ -125,11 +125,14 @@ def compute_dataloader_cross_entropy_batch(model, dataloader, device=None, nbatc
             else:
                 data_x = data_x[:,:samplelength].detach()
             
-  
-            data_x_batch = perturb_input_ids(data_x.squeeze(0).to(device), detect_args, base_tokenizer, mask_tokenizer, mask_model).unsqueeze(-1)
 
-           
-   
+            # time this 
+            start_pert = timeit.default_timer()
+            data_x_batch = perturb_input_ids(data_x.squeeze(0).to(device), detect_args, base_tokenizer, mask_tokenizer, mask_model).unsqueeze(-1)
+            end_pert = timeit.default_timer()
+            elapsed_time = end_pert - start_pert 
+            print(f'time to perturb input is {elapsed_time} seconds')
+
             ## Compute average log likelihood
             if accelerator is None:
                 avg_perturbed_loss = compute_input_ids_cross_entropy_batch(model, data_x_batch.to(device)).detach().cpu()
@@ -141,8 +144,8 @@ def compute_dataloader_cross_entropy_batch(model, dataloader, device=None, nbatc
                 detect_gpt_score = loss - avg_perturbed_loss
 
             losses.append(detect_gpt_score)
-
             del data_x_batch, data_x
+            
             torch.cuda.empty_cache()
             torch.cuda.synchronize()
 

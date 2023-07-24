@@ -31,6 +31,7 @@ def main():
     parser.add_argument('--train_pt', action="store", required=False, help='.pt file of train dataset (not dataloader)')
     parser.add_argument('--val_pt', action="store", required=False, help='.pt file of val dataset (not dataloader)')
     parser.add_argument('--model_half', action="store_true", required=False, help='Use half precision (fp16). 1 for use; 0 for not.')
+    parser.add_argument('--n_perts', action="store", type=int, required=False, default=5, help='num of perturbations for detectgpt')
     args = parser.parse_args()
 
     accelerator = Accelerator() if args.accelerate else None
@@ -95,12 +96,11 @@ def main():
         "device": device,
         "accelerator": accelerator,
         "model_half": args.model_half,
-        "batch": args.batch,
         "detect_args": {'buffer_size':1, 
         'mask_top_p': 10, 
         'pct_words_masked':.2, 
         'span_length':2,
-        'num_perts': 2, 
+        'num_perts': args.n_perts, 
         'device': device, 
         "model_max_length": max_length}
     }
