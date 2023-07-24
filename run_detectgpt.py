@@ -3,7 +3,7 @@ from torch.utils.data import DataLoader
 from transformers import GPTNeoXForCausalLM, AutoTokenizer, AutoConfig
 from attack_utils import *
 from dataset_utils import *
-from LOSS import LOSS
+from DetectGPT import DetectGPT
 import time
 import argparse
 from accelerate import Accelerator
@@ -31,6 +31,7 @@ def main():
     parser.add_argument('--train_pt', action="store", required=False, help='.pt file of train dataset (not dataloader)')
     parser.add_argument('--val_pt', action="store", required=False, help='.pt file of val dataset (not dataloader)')
     parser.add_argument('--model_half', action="store_true", required=False, help='Use half precision (fp16). 1 for use; 0 for not.')
+    parser.add_argument('--n_perts', action="store", type=int, required=False, default=5, help='num of perturbations for detectgpt')
     args = parser.parse_args()
 
     accelerator = Accelerator() if args.accelerate else None
@@ -94,10 +95,15 @@ def main():
         "samplelength": args.sample_length,
         "device": device,
         "accelerator": accelerator,
-        "model_half": args.model_half
-        }
-    
-
+        "model_half": args.model_half,
+        "detect_args": {'buffer_size':1, 
+        'mask_top_p': 10, 
+        'pct_words_masked':.2, 
+        'span_length':2,
+        'num_perts': args.n_perts, 
+        'device': device, 
+        "model_max_length": max_length}
+    }
 
     end = time.perf_counter()
     if accelerator is None or accelerator.is_main_process:
@@ -105,7 +111,7 @@ def main():
 
     start = time.perf_counter()
 
-    LOSSer = LOSS(model_name, model_revision=model_revision, cache_dir=model_cache_dir)
+    LOSSer = DetectGPT(model_name, model_revision=model_revision, cache_dir=model_cache_dir)
 
     LOSSer.inference(config_loss)
     LOSSer.save()
@@ -116,7 +122,7 @@ def main():
     end = time.perf_counter()
 
     if accelerator is None or accelerator.is_main_process:
-        print(f"- LOSS at {args.mod_size} and {args.n_samples} samples took {end-start} seconds.")
+        print(f"- DetectGPT at {args.mod_size} and {args.n_samples} samples took {end-start} seconds.")
 
 if __name__ == "__main__":
     main()

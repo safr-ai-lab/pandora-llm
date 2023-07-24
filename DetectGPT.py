@@ -5,16 +5,16 @@ import torch
 import os
 import pdb 
 
-class LOSS(MIA):
+class DetectGPT(MIA):
     """
-    LOSS thresholding attack (vs. pre-training)
+    DetectGPT thresholding attack (vs. pre-training)
     """
     def __init__(self,*args,**kwargs):
         super().__init__(*args, **kwargs)
         self.train_cross_entropy = None
         self.val_cross_entropy = None
-        if not os.path.exists("LOSS"):
-            os.mkdir("LOSS")
+        if not os.path.exists("DetectGPT"):
+            os.mkdir("DetectGPT")
 
     def inference(self, config):
         """
@@ -33,10 +33,9 @@ class LOSS(MIA):
 
         if self.config["accelerator"] is not None:
             model, self.config["training_dl"], self.config["validation_dl"]  = self.config["accelerator"].prepare(model, self.config["training_dl"], self.config["validation_dl"])
-
-        self.train_cross_entropy = compute_dataloader_cross_entropy(model, self.config["training_dl"], self.config["device"], self.config["nbatches"], self.config["samplelength"], self.config["accelerator"], half=self.config["model_half"]).cpu() 
-        self.val_cross_entropy = compute_dataloader_cross_entropy(model, self.config["validation_dl"], self.config["device"], self.config["nbatches"], self.config["samplelength"], self.config["accelerator"], half=self.config["model_half"]).cpu()
-
+     
+        self.train_cross_entropy = compute_dataloader_cross_entropy_batch(model, self.config["training_dl"], self.config["device"], self.config["nbatches"], self.config["samplelength"], self.config["accelerator"], half=self.config["model_half"], detect_args=self.config['detect_args']).cpu() 
+        self.val_cross_entropy = compute_dataloader_cross_entropy_batch(model, self.config["validation_dl"], self.config["device"], self.config["nbatches"], self.config["samplelength"], self.config["accelerator"], half=self.config["model_half"], detect_args=self.config['detect_args']).cpu()
 
     def generate(self,prefixes,config):
         suffix_length = config["suffix_length"]
@@ -87,7 +86,7 @@ class LOSS(MIA):
         return self.train_cross_entropy, self.val_cross_entropy
 
     def get_default_title(self):
-        return "LOSS/LOSS_{}_{}_bs={}_nbatches={}".format(
+        return "DetectGPT/DetectGPT_{}_{}_bs={}_nbatches={}".format(
             self.model_path.replace("/","-"),
             self.model_revision.replace("/","-") if self.model_revision else "LastChkpt",
             self.config["bs"],

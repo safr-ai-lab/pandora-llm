@@ -6,9 +6,12 @@ from sklearn.metrics import roc_curve, auc
 from torch.nn import CrossEntropyLoss
 from torch.nn.functional import cross_entropy
 from tqdm import tqdm
+from detect_gpt_utils import *
+import timeit
 from transformers import AutoTokenizer
 from torch.autograd import Variable
 from deepspeed.utils import safe_get_full_grad
+
 
 def mem_stats():
     '''
@@ -23,7 +26,7 @@ def mem_stats():
           f"---------------------------------\n"
           f"Allocated Memory: {a:.2f} GB ({(100*(a/t)):.2f}%)\n"
           f"Percent of Reserved Allocated: {(100*(a+1e-9)/(r+1e-9)):.2f}%\n")
-
+    
 def compute_input_ids_cross_entropy(model, input_ids, return_pt=True):
   mask  = (input_ids > 0).detach()                                     
 
@@ -39,7 +42,6 @@ def compute_input_ids_cross_entropy(model, input_ids, return_pt=True):
   loss_fn = CrossEntropyLoss()
   input_ids_without_first_token = input_ids[:, 1:].long()
   logits_without_last_token = logits[:, :-1, :]
-
   ans = []
   for i in range(len(logits_without_last_token)):
     length = len(input_ids_without_first_token[i,:])
@@ -54,6 +56,113 @@ def compute_input_ids_cross_entropy(model, input_ids, return_pt=True):
   torch.cuda.synchronize()
 
   return torch.tensor(ans) if return_pt else ans 
+
+def compute_input_ids_cross_entropy_batch(model, input_ids, return_pt=True):
+  model.eval()
+
+  mask_batch  = (input_ids > 0).detach() 
+
+  with torch.no_grad():
+    outputs = model(input_ids=input_ids.to(torch.long).squeeze(-1), attention_mask = mask_batch.squeeze(-1))
+    logits = outputs.logits
+    del outputs
+    torch.cuda.empty_cache()
+    torch.cuda.synchronize()
+
+  loss_fn = CrossEntropyLoss()
+
+  # convert to long type as cross entropy will expect integer indices 
+  input_ids_without_first_token = input_ids[:, 1:].long()
+  # drop the last token because it is an EOS token?
+  logits_without_last_token_batch = logits[:, :-1, :]
+
+  ans = []
+  # loop through each example in the batch 
+  for i in range(len(logits_without_last_token_batch)):
+    # only compute the cross entropy loss up until the first input_id = 0 (why? is this padding?)
+    if len(torch.where(input_ids_without_first_token[i,:,:] == 0)[0]) > 0:
+        length = torch.where(input_ids_without_first_token[i,:,:] == 0)[0].min()
+    else: 
+        length = len(input_ids_without_first_token[i,:,:])
+    
+    # truncate the logits & input_ids to length prior to computing CE loss
+    ce_loss = loss_fn(logits_without_last_token_batch[i, :length, :], input_ids_without_first_token[i, :length].squeeze(-1))
+    ans.append(ce_loss)
+
+  ## Clean up 
+  del logits, input_ids_without_first_token, logits_without_last_token_batch
+  torch.cuda.empty_cache()
+  torch.cuda.synchronize()
+
+  return torch.mean(torch.tensor(ans)) if return_pt else np.mean(ans) 
+
+def compute_dataloader_cross_entropy_batch(model, dataloader, device=None, nbatches=None, samplelength=None, accelerator=None, half=True, detect_args=None):    
+    '''
+    Computes dataloader cross entropy with additional support for specifying the full data loader and full sample length.
+    Warning: using samplelength is discouraged
+    '''
+    if samplelength is not None:
+        print("Warning: using sample length is discouraged. Please avoid using this parameter.")
+    if accelerator is None:
+        if half:
+            print("Using model.half() ....")
+            model.half()
+        else:
+            print("Not using model.half() ....")
+        model.eval()
+        model.to(device)
+
+    losses = []
+    model_name = 't5-small'
+    mask_model = T5ForConditionalGeneration.from_pretrained(model_name)
+    mask_model.to(device)
+    mask_tokenizer = T5Tokenizer.from_pretrained(model_name)
+    base_tokenizer = AutoTokenizer.from_pretrained("EleutherAI/pythia-70m-deduped")
+    for batchno, data_x in tqdm(enumerate(dataloader),total=len(dataloader)):
+        if nbatches is not None and batchno >= nbatches:
+            break
+        with torch.no_grad():    
+            ## Get predictions on training data 
+            data_x = data_x["input_ids"]
+            if samplelength is None:
+                data_x = data_x.detach()                
+            else:
+                data_x = data_x[:,:samplelength].detach()
+            
+
+            # time this 
+            start_pert = timeit.default_timer()
+            data_x_batch = perturb_input_ids(data_x.squeeze(0).to(device), detect_args, base_tokenizer, mask_tokenizer, mask_model).unsqueeze(-1)
+            end_pert = timeit.default_timer()
+            elapsed_time = end_pert - start_pert 
+            print(f'time to perturb input is {elapsed_time} seconds')
+
+            ## Compute average log likelihood
+            if accelerator is None:
+                avg_perturbed_loss = compute_input_ids_cross_entropy_batch(model, data_x_batch.to(device)).detach().cpu()
+                loss = compute_input_ids_cross_entropy(model, data_x.to(device)).detach().cpu()
+                detect_gpt_score = loss - avg_perturbed_loss
+            else:
+                avg_perturbed_loss = compute_input_ids_cross_entropy_batch(model, data_x_batch, return_pt = False)
+                loss = compute_input_ids_cross_entropy(model, data_x, return_pt = False)
+                detect_gpt_score = loss - avg_perturbed_loss
+
+            losses.append(detect_gpt_score)
+            del data_x_batch, data_x
+            
+            torch.cuda.empty_cache()
+            torch.cuda.synchronize()
+
+    # cleanup
+    del mask_model, mask_tokenizer, base_tokenizer
+
+    if accelerator is None:
+        return torch.tensor(losses)
+    else:
+        losses = accelerator.gather_for_metrics(losses)
+        losses = torch.cat([loss[0] for loss in losses])
+        return losses
+
 
 def compute_dataloader_cross_entropy(model, dataloader, device=None, nbatches=None, samplelength=None, accelerator=None, half=True):    
     '''
