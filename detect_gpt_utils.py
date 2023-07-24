@@ -81,6 +81,37 @@ def replace_masks_extract_fills(texts, mask_tokenizer, mask_model, args, printfl
     extracted_fills = [[[fill.strip() for fill in chunk] for chunk in text] for text in extracted_fills]
     return extracted_fills
 
+def chunk_list(lst, sizes):
+    iterator = iter(lst)
+    return [[next(iterator) for _ in range(size)] for size in sizes]
+
+def replace_masks_extract_fills_vec(texts, mask_tokenizer, mask_model, args, printflag=False):
+    # prepare the inputs
+    tokenized_texts = mask_tokenizer(texts, return_tensors="pt", padding=True).to(args["device"])
+
+    # compute maximum number of expected tokens for each text
+    n_expected = [count_masks(text) for text in texts]
+    #max_n_expected = max(n_expected)
+    #stop_id = mask_tokenizer.encode(f"<extra_id_{max_n_expected}>")[0]
+    
+    # generate the outputs in a single call
+    outputs = mask_model.generate(**tokenized_texts, do_sample=True, top_p=args["mask_top_p"], num_return_sequences=1, max_length=3*SPLIT_LEN)
+    
+    # decode the outputs
+    decoded_text = mask_tokenizer.batch_decode(outputs, skip_special_tokens=False)
+    filled_text = [x.replace("<pad>", "").replace("</s>", "").strip() for x in decoded_text]
+    
+    # reshape the list to the original structure
+    filled_texts = list(chunk_list(filled_text, n_expected))
+    
+    # return the text in between each matched mask token
+    extracted_fills = [[PATTERN.split(chunk)[1:-1] for chunk in text] for text in filled_texts]
+    
+    # remove whitespace around each fill
+    extracted_fills = [[[fill.strip() for fill in chunk] for chunk in text] for text in extracted_fills]
+    
+    return extracted_fills
+
 def apply_extracted_fills(masked_texts, extracted_fills, printflag=False):
     # split masked text into tokens, only splitting on spaces (not newlines)
     texts = []
