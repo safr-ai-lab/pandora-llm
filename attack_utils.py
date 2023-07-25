@@ -13,19 +13,17 @@ from torch.autograd import Variable
 from deepspeed.utils import safe_get_full_grad
 
 
-def mem_stats():
+def mem_stats(return_string=False):
     '''
     Memory statistics for memory management
     '''
     t = torch.cuda.get_device_properties(0).total_memory / 1024**3
     r = torch.cuda.memory_reserved(0) / 1024**3
     a = torch.cuda.memory_allocated(0) / 1024**3
-    print(f"Total Memory: {t:.2f} GB\n"
-          f"Reserved Memory: {r:.2f} GB ({(100*(r/t)):.2f}%)\n"
-          f"Remaining Memory: {t-r:.2f} GB ({(100*(t-r)/t):.2f}%)\n"
-          f"---------------------------------\n"
-          f"Allocated Memory: {a:.2f} GB ({(100*(a/t)):.2f}%)\n"
-          f"Percent of Reserved Allocated: {(100*(a+1e-9)/(r+1e-9)):.2f}%\n")
+    mem_string = f"Total Memory: {t:.2f} GB\n" + f"Reserved Memory: {r:.2f} GB ({(100*(r/t)):.2f}%)\n" + f"Remaining Memory: {t-r:.2f} GB ({(100*(t-r)/t):.2f}%)\n" + f"---------------------------------\n" + f"Allocated Memory: {a:.2f} GB ({(100*(a/t)):.2f}%)\n" + f"Percent of Reserved Allocated: {(100*(a+1e-9)/(r+1e-9)):.2f}%\n"
+    print(mem_string)
+    if return_string: 
+        return(mem_string)
     
 def compute_input_ids_cross_entropy(model, input_ids, return_pt=True):
   mask  = (input_ids > 0).detach()                                     
