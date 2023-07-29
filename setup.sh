@@ -4,6 +4,7 @@ pip install zstandard
 pip install deepspeed
 pip install accelerate
 pip install mpi4py
-pip install scikit-learn # for ROC curves
-pip install matplotlib # for plotting
-pip install plotly # for plotting MoPe vs LOSS (dynamic)
+pip install scikit-learn 
+pip install matplotlib 
+pip install plotly 
+pip install torch
