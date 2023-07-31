@@ -70,8 +70,9 @@ def replace_masks_extract_fills(texts, mask_tokenizer, mask_model, args, printfl
     tokenized_texts = mask_tokenizer(flattened_texts, return_tensors="pt", padding=True).to(args["device"])
 
     # generate the outputs in a single call
+    mem_stats()
     outputs = mask_model.generate(**tokenized_texts, do_sample=True, top_p=args["mask_top_p"], num_return_sequences=1, max_length=3*SPLIT_LEN)
-    
+    mem_stats()
     # decode the outputs
     decoded_text = mask_tokenizer.batch_decode(outputs, skip_special_tokens=False)
     filled_text = [x.replace("<pad>", "").replace("</s>", "").strip() for x in decoded_text]
@@ -156,28 +157,29 @@ def perturb_texts_(texts, args, mask_tokenizer, masked_model, ceil_pct=False):
 
 
 def perturb_input_ids(input_id, args, base_tokenizer, mask_tokenizer, masked_model): 
-    texts = [base_tokenizer.decode(input_id) for _ in range(args["num_perts"])]
-    masked_texts = [[mask_text (chunk, args, False) for chunk in split_text(text, SPLIT_LEN)] for text in texts]
-    extracted_fills = replace_masks_extract_fills(masked_texts,mask_tokenizer, masked_model, args)
-    perturbed_texts = apply_extracted_fills(masked_texts, extracted_fills)
+    with torch.no_grad():
+        texts = [base_tokenizer.decode(input_id) for _ in range(args["num_perts"])]
+        masked_texts = [[mask_text (chunk, args, False) for chunk in split_text(text, SPLIT_LEN)] for text in texts]
+        extracted_fills = replace_masks_extract_fills(masked_texts,mask_tokenizer, masked_model, args)
+        perturbed_texts = apply_extracted_fills(masked_texts, extracted_fills)
 
-    # Handle the fact that sometimes the model doesn't generate the right number of fills and we have to try again
-    attempts = 1
-    while '' in perturbed_texts:
-        idxs = [idx for idx, x in enumerate(perturbed_texts) if x == '']
-        print(f'WARNING: {len(idxs)} texts have no fills. Trying again [attempt {attempts}].')
-        masked_texts = [[mask_text (chunk, args, False) for chunk in split_text(text, SPLIT_LEN)]for idx,text in enumerate(texts) if idx in idxs]
-        extracted_fills = replace_masks_extract_fills(masked_texts, mask_tokenizer, masked_model, args)
-        new_perturbed_texts = apply_extracted_fills(masked_texts, extracted_fills)
-        for idx, x in zip(idxs, new_perturbed_texts):
-            perturbed_texts[idx] = x
-        attempts += 1
-    # convert backt to input_ids 
-    max_length=args["model_max_length"]
-    tokens = [base_tokenizer.encode(x, return_tensors="pt", truncation=True, max_length=max_length) for x in perturbed_texts]
-    tokens_padded = [torch.cat([t, t.new_zeros(t.size(0), max_length - t.size(1))], dim=1) for t in tokens]
-    tokens_padded = torch.cat(tokens_padded, dim=0)
-    return tokens_padded
+        # Handle the fact that sometimes the model doesn't generate the right number of fills and we have to try again
+        attempts = 1
+        while '' in perturbed_texts:
+            idxs = [idx for idx, x in enumerate(perturbed_texts) if x == '']
+            print(f'WARNING: {len(idxs)} texts have no fills. Trying again [attempt {attempts}].')
+            masked_texts = [[mask_text (chunk, args, False) for chunk in split_text(text, SPLIT_LEN)]for idx,text in enumerate(texts) if idx in idxs]
+            extracted_fills = replace_masks_extract_fills(masked_texts, mask_tokenizer, masked_model, args)
+            new_perturbed_texts = apply_extracted_fills(masked_texts, extracted_fills)
+            for idx, x in zip(idxs, new_perturbed_texts):
+                perturbed_texts[idx] = x
+            attempts += 1
+        # convert backt to input_ids 
+        max_length=args["model_max_length"]
+        tokens = [base_tokenizer.encode(x, return_tensors="pt", truncation=True, max_length=max_length) for x in perturbed_texts]
+        tokens_padded = [torch.cat([t, t.new_zeros(t.size(0), max_length - t.size(1))], dim=1) for t in tokens]
+        tokens_padded = torch.cat(tokens_padded, dim=0)
+        return tokens_padded
 
 
 if __name__ == "__main__":

@@ -5,6 +5,18 @@ from itertools import groupby
 from tqdm import tqdm
 import math
 
+def mem_stats(return_string=False):
+    '''
+    Memory statistics for memory management
+    '''
+    t = torch.cuda.get_device_properties(0).total_memory / 1024**3
+    r = torch.cuda.memory_reserved(0) / 1024**3
+    a = torch.cuda.memory_allocated(0) / 1024**3
+    mem_string = f"Total Memory: {t:.2f} GB\n" + f"Reserved Memory: {r:.2f} GB ({(100*(r/t)):.2f}%)\n" + f"Remaining Memory: {t-r:.2f} GB ({(100*(t-r)/t):.2f}%)\n" + f"---------------------------------\n" + f"Allocated Memory: {a:.2f} GB ({(100*(a/t)):.2f}%)\n" + f"Percent of Reserved Allocated: {(100*(a+1e-9)/(r+1e-9)):.2f}%\n"
+    print(mem_string)
+    if return_string: 
+        return(mem_string)
+    
 def collate_fn(batch,tokenizer,length):
     tokens = [tokenizer.encode(example, return_tensors="pt", truncation=True, max_length=length) for example in batch]
     max_length = max([t.size(1) for t in tokens])

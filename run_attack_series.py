@@ -12,9 +12,19 @@ and saves all of the results to one central directory in the machine.
 
 attack_type = 'DetectGPT'
 sizes = [ "70m", "160m", "410m", "1b", "1.4b", "2.8b"]
-points = 1000
+points = 2000
 seed = 1930
 email_flag = True
+dir_name = attack_type
+
+def run_command(command):
+    process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    # .communicate() will wait for the process to finish before moving to the next command
+    output, error = process.communicate()
+    if process.returncode != 0:
+        print(f'Error occurred: {error.decode()}')
+    else:
+        print(f'Output: {output.decode()}')
 
 def directory_exists(directory_path):
     return os.path.exists(directory_path) and os.path.isdir(directory_path)
@@ -67,22 +77,18 @@ elif attack_type == 'DetectGPT':
         send_email_message(email, password, "Starting Run on Cluster", body='')
         run_start = timeit.default_timer()
     for s in sizes:
-        if not directory_exists('DetectGPT'): 
-            os.mkdir('DetectGPT')
-        cmd = f"python3 run_detectgpt.py --mod_size {s} --model_half --pack --n_samples {points} --checkpoint step98000 --deduped --seed {seed} --n_perts 5 &>> out.txt"
+        if not directory_exists(dir_name): 
+            os.mkdir(dir_name)
+        
+        cmd = f"python3 run_detectgpt.py --mod_size {s} --model_half --pack --n_samples {points} --checkpoint step98000 --deduped --seed {seed} --n_perts 5 "
         start = timeit.default_timer()
-        try: 
-            subprocess.call(cmd, shell=True)
-            print(cmd)
-        except Exception as e:
-            # Print any error messages
-            print(e)
-            break
-        end = timeit.default_timer()
         print(cmd)
+        run_command(cmd)
+        end = timeit.default_timer()
+        
         if email_flag:
             mem_string = mem_stats(return_string=True)
-            send_email_message(email, password, f"Run Update: Size {s} Finished", body=f"cmd run: {cmd} \n time elapsed: {start-end}. /n {mem_string}")
+            send_email_message(email, password, f"Run Update: Size {s} Finished", body=f"cmd run: {cmd} \n time elapsed: {start-end}. /n {mem_string}", attach_dir=None)
     if email_flag: 
         run_end = timeit.default_timer()
         send_email_message(email, password, "URGENT: Shut down instance", body=f'Cluster run finished in {run_start-run_end} seconds. The command run was {cmd} over {points} points, and {sizes} sized models.')

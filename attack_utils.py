@@ -13,17 +13,7 @@ from torch.autograd import Variable
 from deepspeed.utils import safe_get_full_grad
 
 
-def mem_stats(return_string=False):
-    '''
-    Memory statistics for memory management
-    '''
-    t = torch.cuda.get_device_properties(0).total_memory / 1024**3
-    r = torch.cuda.memory_reserved(0) / 1024**3
-    a = torch.cuda.memory_allocated(0) / 1024**3
-    mem_string = f"Total Memory: {t:.2f} GB\n" + f"Reserved Memory: {r:.2f} GB ({(100*(r/t)):.2f}%)\n" + f"Remaining Memory: {t-r:.2f} GB ({(100*(t-r)/t):.2f}%)\n" + f"---------------------------------\n" + f"Allocated Memory: {a:.2f} GB ({(100*(a/t)):.2f}%)\n" + f"Percent of Reserved Allocated: {(100*(a+1e-9)/(r+1e-9)):.2f}%\n"
-    print(mem_string)
-    if return_string: 
-        return(mem_string)
+
     
 def compute_input_ids_cross_entropy(model, input_ids, return_pt=True):
   mask  = (input_ids > 0).detach()                                     
@@ -101,21 +91,25 @@ def compute_dataloader_cross_entropy_batch(model, dataloader, device=None, nbatc
     '''
     if samplelength is not None:
         print("Warning: using sample length is discouraged. Please avoid using this parameter.")
+
+    model.eval()
+    model.to(device)
+    model_name = 't5-small'
+    mask_model = T5ForConditionalGeneration.from_pretrained(model_name)
+    mask_model.eval()
+    mask_model.to(device)
     if accelerator is None:
         if half:
             print("Using model.half() ....")
             model.half()
+            mask_model.half()
         else:
             print("Not using model.half() ....")
-        model.eval()
-        model.to(device)
 
     losses = []
-    model_name = 't5-small'
-    mask_model = T5ForConditionalGeneration.from_pretrained(model_name)
-    mask_model.to(device)
     mask_tokenizer = T5Tokenizer.from_pretrained(model_name)
     base_tokenizer = AutoTokenizer.from_pretrained("EleutherAI/pythia-70m-deduped")
+
     for batchno, data_x in tqdm(enumerate(dataloader),total=len(dataloader)):
         if nbatches is not None and batchno >= nbatches:
             break
@@ -127,8 +121,6 @@ def compute_dataloader_cross_entropy_batch(model, dataloader, device=None, nbatc
             else:
                 data_x = data_x[:,:samplelength].detach()
             
-            if batchno % 5 == 0:
-                mem_stats()
 
             # time this 
             start_pert = timeit.default_timer()
@@ -137,8 +129,6 @@ def compute_dataloader_cross_entropy_batch(model, dataloader, device=None, nbatc
             elapsed_time = end_pert - start_pert 
             print(f'time to perturb input is {elapsed_time} seconds')
             
-            if batchno % 5 == 0:
-                mem_stats()
             ## Compute average log likelihood
             if accelerator is None:
                 avg_perturbed_loss = compute_input_ids_cross_entropy_batch(model, data_x_batch.to(device)).detach().cpu()
@@ -150,13 +140,11 @@ def compute_dataloader_cross_entropy_batch(model, dataloader, device=None, nbatc
                 detect_gpt_score = loss - avg_perturbed_loss
 
             losses.append(detect_gpt_score)
-            if batchno % 5 == 0:
-                mem_stats()
+
     del data_x_batch, data_x, mask_model, mask_tokenizer, base_tokenizer        
     torch.cuda.empty_cache()
     torch.cuda.synchronize()
-    if batchno % 5 == 0:
-        mem_stats()
+
 
     if accelerator is None:
         return torch.tensor(losses)
