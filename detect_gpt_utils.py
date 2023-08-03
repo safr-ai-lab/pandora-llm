@@ -85,11 +85,9 @@ def chunk_list(lst, sizes):
     iterator = iter(lst)
     return [[next(iterator) for _ in range(size)] for size in sizes]
 
-def replace_masks_extract_fills(texts, mask_tokenizer, mask_model, args, printflag=False):
-    # prepare the inputs
-    flattened_texts = [c for text in texts for c in text]
-    seq_len = len(flattened_texts)
 
+def get_batch_outputs(flattened_texts, mask_tokenizer, mask_model, args, num_texts=BSIZE_MULT):
+    seq_len = len(flattened_texts)
     max_len_gen = 0
     seq_index = 0
     batch_outputs = []
@@ -100,7 +98,14 @@ def replace_masks_extract_fills(texts, mask_tokenizer, mask_model, args, printfl
         max_len_gen = max([max_len_gen, part_outputs.size()[1]])
         batch_outputs.append(part_outputs)
         seq_index += BSIZE_MULT
-        
+    return batch_outputs, max_len_gen
+
+def replace_masks_extract_fills(texts, mask_tokenizer, mask_model, args, printflag=False):
+    # prepare the inputs
+    flattened_texts = [c for text in texts for c in text]
+    
+    batch_outputs, max_len_gen = get_batch_outputs(flattened_texts, mask_tokenizer, mask_model, args, num_texts=BSIZE_MULT)
+
         
     # pad all the outputs and concatenate 
     outputs = pad_sequences_to_length(batch_outputs[0], desired_length=max_len_gen, pad_token_id=mask_tokenizer.pad_token_id)

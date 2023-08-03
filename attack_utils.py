@@ -128,9 +128,9 @@ def compute_dataloader_cross_entropy_batch(model, dataloader, device=None, nbatc
             #print('memory stats after loading batch')
             #mem_stats()
             data_x_batch = perturb_input_ids(data_x.squeeze(0).to(device), detect_args, base_tokenizer, mask_tokenizer, mask_model).unsqueeze(-1)
-            end_pert = timeit.default_timer()
-            elapsed_time = end_pert - start_pert 
-            print(f'time to perturb input is {elapsed_time} seconds')
+            # end_pert = timeit.default_timer()
+            # elapsed_time = end_pert - start_pert 
+            # print(f'time to perturb input is {elapsed_time} seconds')
             
             ## Compute average log likelihood
             if accelerator is None:
