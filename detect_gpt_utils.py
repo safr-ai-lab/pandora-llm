@@ -15,7 +15,7 @@ from torch.profiler import profile, record_function, ProfilerActivity
 
 PATTERN = re.compile(r"<extra_id_\d+>")
 SPLIT_LEN = 64
-BSIZE_MULT = 64
+BSIZE_MULT = 32
 
 
 def pad_sequences_to_length(model_output, desired_length, pad_token_id):
