@@ -109,7 +109,8 @@ def compute_dataloader_cross_entropy_batch(model, dataloader, device=None, nbatc
     losses = []
     mask_tokenizer = T5Tokenizer.from_pretrained(model_name)
     base_tokenizer = AutoTokenizer.from_pretrained("EleutherAI/pythia-70m-deduped")
-
+    #print('memory stats after loading models')
+    #mem_stats()
     for batchno, data_x in tqdm(enumerate(dataloader),total=len(dataloader)):
         if nbatches is not None and batchno >= nbatches:
             break
@@ -124,6 +125,8 @@ def compute_dataloader_cross_entropy_batch(model, dataloader, device=None, nbatc
 
             # time this 
             start_pert = timeit.default_timer()
+            #print('memory stats after loading batch')
+            #mem_stats()
             data_x_batch = perturb_input_ids(data_x.squeeze(0).to(device), detect_args, base_tokenizer, mask_tokenizer, mask_model).unsqueeze(-1)
             end_pert = timeit.default_timer()
             elapsed_time = end_pert - start_pert 

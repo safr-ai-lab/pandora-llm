@@ -10,9 +10,30 @@ from dataset_utils import *
 import pdb 
 from transformers import T5Tokenizer, T5ForConditionalGeneration, AutoTokenizer, AutoConfig
 import time
+import torch.nn.functional as F
+from torch.profiler import profile, record_function, ProfilerActivity
 
 PATTERN = re.compile(r"<extra_id_\d+>")
 SPLIT_LEN = 64
+BSIZE_MULT = 64
+
+
+def pad_sequences_to_length(model_output, desired_length, pad_token_id):
+    """
+    Pads each sequence in the model's output tensor to a certain length.
+
+    Parameters:
+    model_output (torch.Tensor): The output tensor from the model
+    desired_length (int): The desired length for each sequence
+    pad_token_id (int): The token ID to use for padding
+
+    Returns:
+    torch.Tensor: The padded output tensor
+    """
+    # Pad sequences to the desired length
+    padded_output = F.pad(model_output, pad=(0, desired_length - model_output.shape[1]), mode='constant', value=pad_token_id)
+    
+    return padded_output
 
 def split_text(text, maxlen=64):
     text = text.split(' ')
@@ -67,13 +88,27 @@ def chunk_list(lst, sizes):
 def replace_masks_extract_fills(texts, mask_tokenizer, mask_model, args, printflag=False):
     # prepare the inputs
     flattened_texts = [c for text in texts for c in text]
-    tokenized_texts = mask_tokenizer(flattened_texts, return_tensors="pt", padding=True).to(args["device"])
+    seq_len = len(flattened_texts)
 
-    # generate the outputs in a single call
-    mem_stats()
-    outputs = mask_model.generate(**tokenized_texts, do_sample=True, top_p=args["mask_top_p"], num_return_sequences=1, max_length=3*SPLIT_LEN)
-    mem_stats()
-    # decode the outputs
+    max_len_gen = 0
+    seq_index = 0
+    batch_outputs = []
+    while seq_index < seq_len:
+        flattened_texts_part = flattened_texts[seq_index:min([seq_len, seq_index + BSIZE_MULT])]
+        tokenized_texts = mask_tokenizer(flattened_texts_part, return_tensors="pt", padding=True).to(args["device"])
+        part_outputs = mask_model.generate(**tokenized_texts, do_sample=True, top_p=args["mask_top_p"], num_return_sequences=1, num_beams=1, max_length=3*SPLIT_LEN)
+        max_len_gen = max([max_len_gen, part_outputs.size()[1]])
+        batch_outputs.append(part_outputs)
+        seq_index += BSIZE_MULT
+        
+        
+    # pad all the outputs and concatenate 
+    outputs = pad_sequences_to_length(batch_outputs[0], desired_length=max_len_gen, pad_token_id=mask_tokenizer.pad_token_id)
+    for k in range(1, len(batch_outputs)):
+        next_padded_output = pad_sequences_to_length(batch_outputs[k], desired_length=max_len_gen, pad_token_id=mask_tokenizer.pad_token_id)
+        outputs = torch.cat([outputs, next_padded_output], dim=0)
+
+    # decode all the outputs
     decoded_text = mask_tokenizer.batch_decode(outputs, skip_special_tokens=False)
     filled_text = [x.replace("<pad>", "").replace("</s>", "").strip() for x in decoded_text]
     
@@ -162,7 +197,7 @@ def perturb_input_ids(input_id, args, base_tokenizer, mask_tokenizer, masked_mod
         masked_texts = [[mask_text (chunk, args, False) for chunk in split_text(text, SPLIT_LEN)] for text in texts]
         extracted_fills = replace_masks_extract_fills(masked_texts,mask_tokenizer, masked_model, args)
         perturbed_texts = apply_extracted_fills(masked_texts, extracted_fills)
-
+        
         # Handle the fact that sometimes the model doesn't generate the right number of fills and we have to try again
         attempts = 1
         while '' in perturbed_texts:

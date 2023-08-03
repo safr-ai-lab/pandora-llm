@@ -5,17 +5,33 @@ from itertools import groupby
 from tqdm import tqdm
 import math
 
-def mem_stats(return_string=False):
-    '''
-    Memory statistics for memory management
-    '''
-    t = torch.cuda.get_device_properties(0).total_memory / 1024**3
-    r = torch.cuda.memory_reserved(0) / 1024**3
-    a = torch.cuda.memory_allocated(0) / 1024**3
-    mem_string = f"Total Memory: {t:.2f} GB\n" + f"Reserved Memory: {r:.2f} GB ({(100*(r/t)):.2f}%)\n" + f"Remaining Memory: {t-r:.2f} GB ({(100*(t-r)/t):.2f}%)\n" + f"---------------------------------\n" + f"Allocated Memory: {a:.2f} GB ({(100*(a/t)):.2f}%)\n" + f"Percent of Reserved Allocated: {(100*(a+1e-9)/(r+1e-9)):.2f}%\n"
-    print(mem_string)
-    if return_string: 
-        return(mem_string)
+
+import torch
+import GPUtil as GPU
+
+def mem_stats():
+    # Ensure CUDA is available
+    if not torch.cuda.is_available():
+        print("CUDA is not available. No GPU detected.")
+        return
+
+    # Get the current GPU where tensors are allocated
+    device = torch.cuda.current_device()
+
+    # Get the total memory allocated
+    allocated = torch.cuda.memory_allocated(device) / 1e9
+    print(f'Memory Allocated (in GB): {allocated}')
+
+    # Get the total memory cached
+    reserved = torch.cuda.memory_reserved(device) / 1e9
+    print(f'Memory Cached (Reserved) (in GB): {reserved}')
+    
+    # Get the total available memory
+    gpus = GPU.getGPUs()
+    gpu = gpus[device]
+    total_memory = gpu.memoryTotal
+    print(f'Total Available Memory (in GB): {total_memory/1024}')
+
     
 def collate_fn(batch,tokenizer,length):
     tokens = [tokenizer.encode(example, return_tensors="pt", truncation=True, max_length=length) for example in batch]
