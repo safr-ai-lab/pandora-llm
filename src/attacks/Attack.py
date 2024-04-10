@@ -2,7 +2,7 @@ from transformers import AutoModelForCausalLM
 from ..utils.attack_utils import *
 from ..utils.dataset_utils import *
 # from ..utils.detect_gpt_utils import *
-from ..utils.plot_utils import *
+# from ..utils.plot_utils import *
 
 class MIA:
     def __init__(self, model_path, model_revision=None, cache_dir=None):

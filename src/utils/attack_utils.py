@@ -6,7 +6,7 @@ from sklearn.metrics import roc_curve, auc
 from torch.nn import CrossEntropyLoss
 from torch.nn.functional import cross_entropy
 from tqdm import tqdm
-from detect_gpt_utils import *
+# from detect_gpt_utils import *
 from transformers import AutoTokenizer
 from torch.autograd import Variable
 from deepspeed.utils import safe_get_full_grad
