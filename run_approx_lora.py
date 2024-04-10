@@ -7,12 +7,15 @@ from src.attacks.approx_LoRa import approx_LoRa
 import time
 import os
 import argparse
+import sys
 
 """
 Sample command line prompt (no acceleration): 
 python run_approx_lora.py --mod_size 70m --deduped --checkpoint step98000 --pack --n_samples 100 --lr 0.00005
 
-Note that this routine requires input pt's. 
+Note that this routine requires input pt's. The data input for this is a bit lossy because it goes:
+train: tokens -> string -> tokens [tokenizer.encode in this file]
+validation: string -> tokens (pack) -> string -> tokens [tokenizer.encode in this file]
 """
 
 def main():
@@ -52,14 +55,29 @@ def main():
         fixed_input = args.train_pt + ".pt" if not args.train_pt.endswith(".pt") else args.train_pt
         training_dataset = torch.load(fixed_input)[:args.n_samples]
     else:
-        print("Requires input pt!")
+        if args.deduped and args.unpack:
+            training_dataset = load_train_pile_random_deduped_unpacked(number=args.n_samples,seed=seed,num_splits=1,min_length=args.min_length)[0]
+        elif args.deduped and not args.unpack: # this gets invoked
+            training_dataset = load_train_pile_random_deduped(number=args.n_samples,seed=seed,num_splits=1)[0] 
+        elif not args.deduped and args.unpack:
+            training_dataset = load_train_pile_random_duped_unpacked(number=args.n_samples,seed=seed,num_splits=1,min_length=args.min_length)[0]
+        else:
+            training_dataset = load_train_pile_random_duped(number=args.n_samples,seed=seed,num_splits=1)[0]
+    
     if args.val_pt:
         fixed_input = args.val_pt + ".pt" if not args.val_pt.endswith(".pt") else args.val_pt
         print("You are using a self-specified validation dataset...")
         validation_dataset = torch.load(fixed_input)[:args.n_samples]
     else:
-        print("Requires input pt!")
+        if args.pack: # this gets invoked 
+            validation_dataset = load_val_pile_packed(number=args.n_samples, seed=seed, num_splits=1)[0]
+        else:
+            validation_dataset = load_val_pile(number=args.n_samples, seed=seed, num_splits=1)[0]
 
+    train_ids = [tokenizer.encode(t, return_tensors='pt') for t in training_dataset]
+    val_ids = [tokenizer.encode(t, return_tensors='pt') for t in validation_dataset]
+
+    # End timer
     end = time.perf_counter()
     print(f"- Data initialization time was {end-start} seconds.")
 
@@ -73,9 +91,6 @@ def main():
 
     start = time.perf_counter()
 
-    train_ids = [tokenizer.encode(t, return_tensors='pt') for t in training_dataset]
-    val_ids = [tokenizer.encode(t, return_tensors='pt') for t in validation_dataset]
-
     config_lora = {
         "train_ids": train_ids,
         "val_ids": val_ids,
@@ -87,6 +102,7 @@ def main():
         "nbatches": args.n_samples # purely for naming 
     }
 
+    # Run attack and collect stats
     aLoRaer = approx_LoRa(model_name, model_revision=model_revision, cache_dir=model_cache_dir)
     aLoRaer.inference(config_lora)
 
