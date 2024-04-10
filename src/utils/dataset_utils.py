@@ -6,11 +6,6 @@ from tqdm import tqdm
 import math
 import torch
 import GPUtil as GPU
-
-"""
-TODO
-DONT COMMIT
-"""
     
 def collate_fn(batch, tokenizer, length):
     """
@@ -160,8 +155,8 @@ def load_val_pile_packed(number=1000, percentage=None, seed=229, num_splits=2, w
     Returns:
         list[list]: List of lists containing text samples.
     """
-    if num_splits % 2 !=0:
-        print(f"Warning! If using shadow models, use an even number of splits! You specified {num_splits} splits.")
+    # if num_splits % 2 !=0:
+    #     print(f"Warning! If using shadow models, use an even number of splits! You specified {num_splits} splits.")
 
     dataset = load_dataset("mit-han-lab/pile-val-backup", split="validation").shuffle(seed=seed)
     clip_len = number if percentage is None else int(len(dataset)*percentage)
@@ -200,8 +195,8 @@ def load_val_pile(number=1000, percentage=None, seed=229, num_splits=2):
     Returns:
         list[list]: List of lists containing text samples.
     """
-    if num_splits % 2 !=0:
-        print(f"Warning! If using shadow models, use an even number of splits! You specified {num_splits} splits.")
+    # if num_splits % 2 !=0:
+    #     print(f"Warning! If using shadow models, use an even number of splits! You specified {num_splits} splits.")
     
     dataset = load_dataset("mit-han-lab/pile-val-backup", split="validation").shuffle(seed=seed)
     clip_len = number if percentage is None else int(len(dataset)*percentage)
