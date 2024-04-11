@@ -1,16 +1,18 @@
+from typing import Optional
 from transformers import AutoModelForCausalLM
 from ..utils.attack_utils import *
 from ..utils.dataset_utils import *
-# from ..utils.detect_gpt_utils import *
-# from ..utils.plot_utils import *
+from ..utils.plot_utils import *
 
 class MIA:
     def __init__(self, model_path, model_revision=None, cache_dir=None):
         """
         Base class for all membership inference attacks. Contains a "base" model image. 
-            model_path: path to the model to be attacked
-            model_revision: revision of the model to be attacked
-            cache_dir: directory to cache the model
+
+        Args:
+            model_path (str): path to the model to be attacked
+            model_revision (str): revision of the model to be attacked
+            cache_dir (str): directory to cache the model
         """
         self.model_path      = model_path
         self.model_name      = self.model_path.split("/")[-1]

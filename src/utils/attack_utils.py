@@ -2,19 +2,18 @@ import torch
 import matplotlib.pyplot as plt
 import numpy as np
 from joblib import dump, load
-from sklearn.metrics import roc_curve, auc
 from torch.nn import CrossEntropyLoss
 from torch.nn.functional import cross_entropy
 from tqdm import tqdm
 # from detect_gpt_utils import *
-from transformers import AutoTokenizer
+from transformers import AutoTokenizer, AutoModelForCausalLM
 from torch.autograd import Variable
 from deepspeed.utils import safe_get_full_grad
 import psutil
 import subprocess
 import torch.nn.functional as F
 
-def compute_input_ids_cross_entropy(model, input_ids, return_pt=True, token=False):
+def compute_input_ids_cross_entropy(model: AutoModelForCausalLM, input_ids: torch.Tensor, return_pt: bool=True, token: bool=False):
     """
     Compute the cross-entropy loss between the logits from the model and provided input IDs.
 
@@ -644,178 +643,6 @@ def compute_dataloader_logits_embedding(model, dataloader, device=None, nbatches
         torch.cuda.synchronize()
     
     return torch.stack(losses)
-
-
-def plot_hist(train_perplexity, val_perplexity, show_plot = True, save_plot=False, plot_title = "Histogram", plot_name="hist.png"):
-    """
-    Plot histogram of membership inference statistic on train and validation datasets
-    """
-
-    # generate two sets of random values
-    with torch.no_grad():
-        valuestraining   = torch.flatten(train_perplexity) 
-        valuesvalidation = torch.flatten(val_perplexity)
-
-    ## Remove nan values (usually in validation set, i.e. really low prob)
-    notnan = torch.logical_and(~valuestraining.isnan(), ~valuesvalidation.isnan())
-    valuestraining = valuestraining[notnan]
-    valuesvalidation = valuesvalidation[notnan]
-
-    # create a figure and axis object
-    fig, ax = plt.subplots()
-
-    # plot a histogram of the first set of values with 20 bins
-    ax.hist(valuestraining, bins=20, alpha=0.5, label='training')
-
-    # plot a histogram of the second set of values with 20 bins
-    ax.hist(valuesvalidation, bins=20, alpha=0.5, label='validation')
-
-    # add a legend to the plot
-    ax.legend(loc='upper right')
-
-    # add labels and a title to the plot
-    ax.set_xlabel('Value')
-    ax.set_ylabel('Frequency')
-    ax.set_title(plot_title)
-
-    # show the plot
-    if save_plot:
-        plt.savefig(plot_name)
-    if show_plot:
-        plt.show()
-
-def plot_ROC(train_statistic,val_statistic,title,log_scale=False,show_plot=True,save_name=None):
-    '''
-    Plots ROC with train and validation test statistics. Note that we assume train statistic < test statistic. Negate before using if otherwise.
-    '''
-    if torch.is_tensor(train_statistic):
-        train_statistic = train_statistic.flatten()
-    else:
-        train_statistic = torch.tensor(train_statistic).flatten()
-    train_statistic = train_statistic[~train_statistic.isnan()]
-    if torch.is_tensor(val_statistic):
-        val_statistic = val_statistic.flatten()
-    else:
-        val_statistic = torch.tensor(val_statistic).flatten()
-    val_statistic = val_statistic[~val_statistic.isnan()]
-
-    fpr, tpr, thresholds = roc_curve(torch.cat((torch.ones_like(train_statistic),torch.zeros_like(val_statistic))).flatten(),
-                                    torch.cat((-train_statistic,-val_statistic)).flatten())
-    roc_auc = auc(fpr, tpr)
-    plt.figure()
-    if not log_scale:
-        plt.plot(fpr, tpr, color='darkorange', label='ROC curve (area = %0.4f)' % roc_auc)
-    else:
-        plt.plot(fpr, tpr, color='darkorange', label='ROC curve (area = %0.4f)' % roc_auc)
-        plt.xscale("log",base=10,subs=list(range(11)))
-        plt.yscale("log",base=10,subs=list(range(11)))
-        plt.xlim(9e-4,1.1)
-        plt.ylim(9e-4,1.1)
-    plt.plot([0, 1], [0, 1], color='navy', linestyle='--')
-    plt.title(title)
-    plt.legend(loc="lower right")
-    plt.xlabel('False Positive Rate')
-    plt.ylabel('True Positive Rate')
-    print(f"AUC of Experiment {title}\n{roc_auc}")
-    if save_name is not None:
-        if "png" not in save_name:
-            save_name = save_name + ".png"
-        plt.savefig(save_name, bbox_inches="tight")
-    if show_plot:
-        plt.show()
-
-def plot_ROC_multiple(train_statistics,val_statistics,title,labels,log_scale=False,show_plot=True,save_name=None,keep_first=None):
-    '''
-    Plots multiple ROC curves in a single plot
-    '''
-    plt.figure()
-    plt.plot([0, 1], [0, 1], linestyle='--')
-    for train_statistic, val_statistic, label in zip(train_statistics, val_statistics,labels):
-        train_statistic = torch.tensor(train_statistic).flatten()[:keep_first]
-        train_statistic = train_statistic[~train_statistic.isnan()]
-        val_statistic = torch.tensor(val_statistic).flatten()[:keep_first]
-        val_statistic = val_statistic[~val_statistic.isnan()]
-
-        fpr, tpr, thresholds = roc_curve(torch.cat((torch.ones_like(train_statistic),torch.zeros_like(val_statistic))).flatten(),
-                                        torch.cat((-train_statistic,-val_statistic)).flatten())
-        roc_auc = auc(fpr, tpr)
-        if not log_scale:
-            plt.plot(fpr, tpr, label=f'{label} (AUC = {roc_auc:0.4f})')
-        else:
-            plt.loglog(fpr, tpr, label=f'{label} (AUC = {roc_auc:0.4f})')
-    print(title)
-    plt.title(title)
-    plt.legend(loc="lower right")
-    plt.xlabel('False Positive Rate')
-    plt.ylabel('True Positive Rate')
-    plt.xlim([0.001,1])
-    plt.ylim([0.001,1])
-    if save_name is not None:
-        if "png" not in save_name:
-            save_name = save_name + ".png"
-        plt.savefig(save_name, bbox_inches="tight")
-    if show_plot:
-        plt.show()
-
-def print_AUC(train_statistic, val_statistic, title="AUC", log_scale=False):
-    if torch.is_tensor(train_statistic):
-        train_statistic = train_statistic.flatten()
-    else:
-        train_statistic = torch.tensor(train_statistic).flatten()
-    train_statistic = train_statistic[~train_statistic.isnan()]
-    if torch.is_tensor(val_statistic):
-        val_statistic = val_statistic.flatten()
-    else:
-        val_statistic = torch.tensor(val_statistic).flatten()
-    val_statistic = val_statistic[~val_statistic.isnan()]
-
-    fpr, tpr, thresholds = roc_curve(torch.cat((torch.ones_like(train_statistic),torch.zeros_like(val_statistic))).flatten(),
-                                    torch.cat((-train_statistic,-val_statistic)).flatten())
-    roc_auc = auc(fpr, tpr)
-    return roc_auc
-
-def plot_ROC_files(files,title,labels=None,log_scale=False,show_plot=True,save_name=None):
-    """
-    Plots ROCs from saved statistic .pt files
-    """
-    train_statistics = []
-    val_statistics = []
-    for file in files:
-        t_stat, v_stat = torch.load(file)
-        train_statistics.append(t_stat)
-        val_statistics.append(v_stat)
-    if labels is None:
-        labels = files
-    plot_ROC_multiple(train_statistics,val_statistics,title,labels,log_scale=log_scale,show_plot=show_plot,save_name=save_name)
-
-def get_TPR_multiple(train_statistics,val_statistics,fprs,keep_first=None):
-    """
-    Calculate the TPRs at given FPRs for multiple models
-    """
-    tprs = []
-    for train_statistic, val_statistic in zip(train_statistics, val_statistics):
-        train_statistic = torch.tensor(train_statistic).flatten()[:keep_first]
-        train_statistic = train_statistic[~train_statistic.isnan()]
-        val_statistic = torch.tensor(val_statistic).flatten()[:keep_first]
-        val_statistic = val_statistic[~val_statistic.isnan()]
-
-        fpr, tpr, thresholds = roc_curve(torch.cat((torch.ones_like(train_statistic),torch.zeros_like(val_statistic))).flatten(),
-                                        torch.cat((-train_statistic,-val_statistic)).flatten())
-
-        tprs.append([tpr[np.max(np.argwhere(fpr<=fpr_val))] for fpr_val in fprs])
-    return tprs
-
-def get_TPR_files(files,fprs):
-    '''
-    Calculates TPRs at given values from saved statistic .pt files
-    '''
-    train_statistics = []
-    val_statistics = []
-    for file in files:
-        t_stat, v_stat = torch.load(file)
-        train_statistics.append(-t_stat)
-        val_statistics.append(-v_stat)
-    return get_TPR_multiple(train_statistics,val_statistics,fprs)
 
 def rademacher(shape):
     """

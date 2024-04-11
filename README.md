@@ -4,4 +4,18 @@ The goal of this repo is to have the productionized codebase that we want to run
 
 ## Documentation
 
-Follows. 
+
+## Completed Files
+
+`Attack.py`
+
+`dataset_utils.py`
+
+`plot_utils.py` - add bootstrapping
+
+
+
+## Issues
+
+Model half sometimes results in NaN logits.
+Accelerator support needs to be tested.
