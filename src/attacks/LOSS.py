@@ -12,7 +12,6 @@ class LOSS(MIA):
         super().__init__(*args, **kwargs)
         self.train_statistics = None
         self.val_statistics = None
-        os.makedirs("LOSS", exist_ok=True)
 
     def inference(self, config):
         """
@@ -87,20 +86,19 @@ class LOSS(MIA):
         """
         return self.train_statistics, self.val_statistics
 
+    @classmethod
+    def get_default_name(cls,model_name, model_revision, nbatches, seed):
+        os.makedirs("results/LOSS", exist_ok=True)
+        return f"results/LOSS/LOSS_{model_name.replace('/','-')}_{model_revision.replace('/','-')}_nbatches={nbatches}_seed={seed}"
+
     def get_default_title(self):
         """
         Get the default title used for saving files with LOSS. Files assumed saved to LOSS directory.
 
         Returns:
-            str: LOSS/LOSS_{model_name}_{checkpoint}_{batchsize}_{nbatches}_{seed}
+            str: results/LOSS/LOSS_{model_name}_{checkpoint}_{batchsize}_{nbatches}_{seed}
         """
-        return "LOSS/LOSS_{}_{}_bs={}_nbatches={}_seed={}".format(
-            self.model_path.replace("/","-"),
-            self.model_revision.replace("/","-") if self.model_revision else "LastChkpt",
-            self.config["bs"],
-            self.config["nbatches"],
-            self.config["seed"],
-        )
+        return self.get_default_name(self.model_path,self.model_revision,self.config["nbatches"],self.config["seed"])
 
     def save(self, title=None):
         """

@@ -67,7 +67,8 @@ def plot_ROC(train_statistics, val_statistics, plot_title, keep_first=None, show
     
     # Process FPRs
     if fprs is None:
-        fprs = np.arange(0,1.1,0.1)
+        fprs = [0.01,0.05,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9]
+        # fprs = np.arange(0,1.1,0.1)
     tpr_at_fprs = [tpr[np.max(np.argwhere(fpr<=fpr_val))] for fpr_val in fprs]
 
     # Plot
@@ -114,7 +115,8 @@ def plot_ROC_multiple(train_statistics_list, val_statistics_list, plot_title, la
         tpr_at_fprs_map (dict[str,list[float]]): map of labels to the tprs at the given fprs
     '''
     if fprs is None:
-        fprs = np.arange(0,1.1,0.1)
+        fprs = [0.01,0.05,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9]
+        # fprs = np.arange(0,1.1,0.1)
     
     roc_auc_map = {}
     tpr_at_fprs_map = {}
