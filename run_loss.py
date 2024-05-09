@@ -1,4 +1,5 @@
 import time
+import math
 import argparse
 import torch
 from torch.utils.data import DataLoader
@@ -46,7 +47,7 @@ def main():
     accelerator = Accelerator() if args.accelerate else None
     set_seed(args.seed)
     args.model_cache_dir = args.model_cache_dir if args.model_cache_dir is not None else f"models/{args.model_name.replace('/','-')}"
-    args.experiment_name = args.experiment_name if args.experiment_name is not None else LOSS.get_default_name(args.model_name.replace('/','-'),args.model_revision.replace('/','-'),args.n_samples,args.seed)
+    args.experiment_name = args.experiment_name if args.experiment_name is not None else LOSS.get_default_name(args.model_name,args.model_revision,args.n_samples,args.seed)
     logger = get_my_logger(log_file=f"{args.experiment_name}.log")
     ####################################################################################################
     # LOAD DATA
@@ -61,6 +62,7 @@ def main():
     if not (args.pack ^ args.unpack):
         logger.info(f"WARNING: for an apples-to-apples comparison, we recommend setting exactly one of pack ({args.pack}) and unpack ({args.unpack})")
     
+    # Load training data
     if args.train_pt:
         logger.info("You are using a self-specified training dataset...")
         fixed_input = args.train_pt + ".pt" if not args.train_pt.endswith(".pt") else args.train_pt
@@ -70,6 +72,7 @@ def main():
         training_dataset = load_train_pile_random(number=args.n_samples,seed=args.seed,num_splits=1,min_length=args.min_length,deduped="deduped" in args.model_name,unpack=args.unpack)[0]
         training_dataloader = DataLoader(training_dataset, batch_size = args.bs, collate_fn=lambda batch: collate_fn(batch, tokenizer=tokenizer, max_length=max_length))
 
+    # Load validation data
     if args.val_pt:
         fixed_input = args.val_pt + ".pt" if not args.val_pt.endswith(".pt") else args.val_pt
         logger.info("You are using a self-specified validation dataset...")
@@ -87,28 +90,20 @@ def main():
     start = time.perf_counter()
     logger.info("Running Attack")
 
-    config_loss = {
-        "training_dl": training_dataloader,
-        "validation_dl": validation_dataloader,
-        "bs": args.bs,
-        "nbatches": args.n_samples,
-        "samplelength": args.max_length,
-        "device": device,
-        "accelerator": accelerator,
-        "model_half": args.model_half,
-        "seed": args.seed
-    }
-
-    # Init
-    LOSSer = LOSS(args.model_name, model_revision=args.model_revision, cache_dir=args.model_cache_dir)
-
-    # Run inference and save statistics
-    LOSSer.inference(config_loss)
-    LOSSer.save()
+    # Initialize attack
+    LOSSer = LOSS(args.model_name, model_revision=args.model_revision, model_cache_dir=args.model_cache_dir)
+    
+    # Compute statistics
+    LOSSer.load_model()
+    train_statistics = LOSSer.compute_statistic(training_dataloader,num_batches=math.ceil(args.n_samples/args.bs),device=device,model_half=args.model_half,accelerator=accelerator)
+    torch.save(train_statistics,f"{args.experiment_name}_train.pt")
+    val_statistics = LOSSer.compute_statistic(validation_dataloader,num_batches=math.ceil(args.n_samples/args.bs),device=device,model_half=args.model_half,accelerator=accelerator)
+    torch.save(val_statistics,f"{args.experiment_name}_val.pt")
+    LOSSer.unload_model()
 
     # Plot ROCs
-    LOSSer.attack_plot_ROC(log_scale = False, show_plot=False)
-    LOSSer.attack_plot_ROC(log_scale = True, show_plot=False)
+    LOSSer.attack_plot_ROC(train_statistics, val_statistics, title=args.experiment_name, log_scale=False, show_plot=False)
+    LOSSer.attack_plot_ROC(train_statistics, val_statistics, title=args.experiment_name, log_scale=True, show_plot=False)
 
     end = time.perf_counter()
 

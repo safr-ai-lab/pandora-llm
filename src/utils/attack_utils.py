@@ -276,7 +276,7 @@ def compute_dataloader_cross_entropy_batch(model, dataloader, device=None, nbatc
         return losses
 
 
-def compute_dataloader_cross_entropy(model, dataloader, device=None, nbatches=None, samplelength=None, accelerator=None, half=True):    
+def compute_dataloader_cross_entropy(model, dataloader, device=None, num_batches=None, samplelength=None, accelerator=None, model_half=True):    
     '''
     Computes dataloader cross entropy with additional support for specifying the full data loader and full sample length.
     Warning: using samplelength is discouraged
@@ -285,7 +285,7 @@ def compute_dataloader_cross_entropy(model, dataloader, device=None, nbatches=No
         model (transformers.AutoModelForCausalLM): HuggingFace model.
         dataloader (torch.utils.data.dataloader.DataLoader): DataLoader with tokens.
         device (str): CPU or GPU 
-        nbatches (int): Number of batches to consider
+        num_batches (int): Number of batches to consider
         samplelength (int or NoneType): cut all samples to a given length
         accelerator (accelerate.Accelerator or NoneType): enable distributed training
         half (bool): use half precision floats for model
@@ -297,7 +297,7 @@ def compute_dataloader_cross_entropy(model, dataloader, device=None, nbatches=No
     if samplelength is not None:
         print("Warning: using sample length is discouraged. Please avoid using this parameter.")
     if accelerator is None:
-        if half:
+        if model_half:
             print("Using model.half() ....")
             model.half()
         else:
@@ -307,7 +307,7 @@ def compute_dataloader_cross_entropy(model, dataloader, device=None, nbatches=No
 
     losses = []
     for batchno, data_x in tqdm(enumerate(dataloader),total=len(dataloader)):
-        if nbatches is not None and batchno >= nbatches:
+        if num_batches is not None and batchno >= num_batches:
             break
         with torch.no_grad():    
             ## Get predictions on training data 
