@@ -17,6 +17,8 @@ class LOSS(MIA):
         """
         if self.model is None:
             self.model = AutoModelForCausalLM.from_pretrained(self.model_name, revision=self.model_revision, cache_dir=self.model_cache_dir)
+        else:
+            raise Exception("Model has already been loaded; please call .unload_model() first!")
 
     def unload_model(self):
         """
