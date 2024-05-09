@@ -15,6 +15,8 @@ LOSS - maybe move compute_loss_entropy from attack_utils to @classmethod in LOSS
 MinK
 MoPe - add other plots
 GradNorm - max_length
+ZLIB - dataset name also add as arg for everything else
+Load/unload go to Attack.py?
 
 `plot_utils.py` - add bootstrapping
 

@@ -12,6 +12,7 @@ from deepspeed.utils import safe_get_full_grad
 import psutil
 import subprocess
 import torch.nn.functional as F
+import zlib
 
 def compute_input_ids_cross_entropy(model: AutoModelForCausalLM, input_ids: torch.Tensor, return_pt: bool=True, tokens: bool=False):
     """
@@ -644,23 +645,6 @@ def compute_dataloader_logits_embedding(model, dataloader, device=None, nbatches
     
     return torch.stack(losses)
 
-def rademacher(shape):
-    """
-    Generates rademacher noise
-    """
-    return 2*(torch.rand(shape) > 0.5) - 1
-
-def flat_grad(y, x, retain_graph=False, create_graph=False):
-    """
-    Flattens gradient into one vectoe
-    """
-    if create_graph:
-        retain_graph = True
-
-    g = torch.autograd.grad(y, x, retain_graph=retain_graph, create_graph=create_graph)
-    g = torch.cat([t.view(-1) for t in g])
-    return g
-
 def z_standardize_together(tensor1, tensor2):
     """
     Standardize two arrays together
@@ -741,6 +725,25 @@ def split_unsplit_pt(pt_file):
     train_stat, val_stat = split_pt_into_dict(pt_file)
     return torch.cat(list(train_stat.values()),axis=0), torch.cat(list(val_stat.values()),axis=0)
 
+
+def compute_zlib_entropy(data_x: str):
+    """
+    Code taken from https://github.com/ftramer/LM_Memorization/blob/main/extraction.py
+    """
+    return len(zlib.compress(bytes(data_x, 'utf-8')))
+
+def compute_dataloader_cross_entropy_zlib(dataset, num_samples=None, samplelength=None):
+    """
+    Compute the zlib cross entropy. All you need is the dataset. Does not batch.
+    """
+    losses = []
+    for sampleno, data_x in tqdm(enumerate(dataset),total=len(dataset)):
+        if num_samples is not None and sampleno >= num_samples:
+            break
+        losses.append(compute_zlib_entropy(data_x))
+
+    return torch.tensor(losses)
+
 # def mem_stats():
 #     """
 #     Memory statistics for memory management
@@ -755,7 +758,19 @@ def split_unsplit_pt(pt_file):
 #           f"---------------------------------\n"
 #           f"Allocated Memory: {a:.2f} GB ({(100*(a/t)):.2f}%)\n"
 #           f"Percent of Reserved Allocated: {(100*(a+1e-9)/(r+1e-9)):.2f}%\n")
-    
+# 
+# 
+# def flat_grad(y, x, retain_graph=False, create_graph=False):
+#     """
+#     Flattens gradient into one vectoe
+#     """
+#     if create_graph:
+#         retain_graph = True
+
+#     g = torch.autograd.grad(y, x, retain_graph=retain_graph, create_graph=create_graph)
+#     g = torch.cat([t.view(-1) for t in g])
+#     return g
+# 
 # def compute_dataloader_probe(model, dataloader, probe, device=None, nbatches=None, samplelength=None, accelerator=None, half=False):    
 #     '''
 #     Computes z^THz where H is the Hessian for a probe z
