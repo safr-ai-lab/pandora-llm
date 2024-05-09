@@ -11,8 +11,10 @@ The goal of this repo is to have the productionized codebase that we want to run
 
 `dataset_utils.py`
 
-LOSS
+LOSS - maybe move compute_loss_entropy from attack_utils to @classmethod in LOSS.py, and similarly for others? maybe not
 MinK
+MoPe - add other plots
+GradNorm - max_length
 
 `plot_utils.py` - add bootstrapping
 

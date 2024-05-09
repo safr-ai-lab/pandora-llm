@@ -336,7 +336,7 @@ def compute_dataloader_cross_entropy(model, dataloader, device=None, num_batches
         losses = torch.cat([loss[0] for loss in losses])
         return losses
 
-def compute_input_ids_all_norms(model, embedding_layer, input_ids, ps, extraction_mia, device=None, accelerator=None):
+def compute_input_ids_all_norms(model, embedding_layer, input_ids, norms, device=None, accelerator=None):
     """
     Compute norms of gradients with respect x, theta
     
@@ -344,8 +344,8 @@ def compute_input_ids_all_norms(model, embedding_layer, input_ids, ps, extractio
         model (transformers.AutoModelForCausalLM): HuggingFace model.
         embedding_layer (torch.nn.parameter.Parameter): computes embeddings from tokens, useful for taking grad wrt x
         input_ids (torch.Tensor): tensor of input IDs.
-        ps (list): gradient norm types
-        extraction_mia (bool): flag to cut samples for extraction mia data collection
+        norms (list): gradient norm types
+        # extraction_mia (bool): flag to cut samples for extraction mia data collection
         device (str): CPU or GPU 
         accelerator (accelerate.Accelerator or NoneType): enable distributed training
         
@@ -353,10 +353,10 @@ def compute_input_ids_all_norms(model, embedding_layer, input_ids, ps, extractio
         torch.Tensor or list: gradient norms of input ID
     """
     
-    if extraction_mia:
-        print("cutting to 100")
-        input_ids = input_ids[:,:100]
-        print(input_ids.shape)
+    # if extraction_mia:
+    #     print("cutting to 100")
+    #     input_ids = input_ids[:,:100]
+    #     print(input_ids.shape)
 
 
     ## Compute gradient with respect to x
@@ -387,7 +387,7 @@ def compute_input_ids_all_norms(model, embedding_layer, input_ids, ps, extractio
     else:
         outputs.loss.backward()
     
-    layer_norms = {p:[] for p in ps}
+    layer_norms = {p:[] for p in norms}
     for i, (name,param) in enumerate(model.named_parameters()):
         if accelerator is None:
             grad = param.grad.flatten()
@@ -395,7 +395,7 @@ def compute_input_ids_all_norms(model, embedding_layer, input_ids, ps, extractio
             grad = safe_get_full_grad(param).flatten()
         
         ## Append all norms of layers to dictionary
-        for p in ps:
+        for p in norms:
             layer_norms[p].append(torch.norm(grad,p=p))
     
     del outputs, input_embeds, input_ids, mask
@@ -403,11 +403,11 @@ def compute_input_ids_all_norms(model, embedding_layer, input_ids, ps, extractio
     torch.cuda.synchronize()
 
     ## Compute norms of entire gradients and append norms of each layer
-    output = torch.tensor([torch.norm(x_grad,p=p,dim=(1,2)) for p in ps] + [torch.norm(torch.tensor(layer_norms[p]),p=p) for p in ps])
-    output = torch.concat((output, torch.tensor([l for p in ps for l in layer_norms[p]])))
+    output = torch.tensor([torch.norm(x_grad,p=p,dim=(1,2)) for p in norms] + [torch.norm(torch.tensor(layer_norms[p]),p=p) for p in norms])
+    output = torch.concat((output, torch.tensor([l for p in norms for l in layer_norms[p]])))
     return output
 
-def compute_dataloader_all_norms(model, embedding_layer, dataloader, ps, extraction_mia, device=None, nbatches=None, samplelength=None, accelerator=None, half=True):
+def compute_dataloader_all_norms(model, embedding_layer, dataloader, norms, device=None, num_batches=None, samplelength=None, accelerator=None, model_half=True):
     '''
     Computes gradient norms of text in dataloader.
     Warning: using samplelength is discouraged
@@ -416,8 +416,8 @@ def compute_dataloader_all_norms(model, embedding_layer, dataloader, ps, extract
         model (transformers.AutoModelForCausalLM): HuggingFace model.
         embedding_layer (torch.nn.parameter.Parameter): computes embeddings from tokens, useful for taking grad wrt x
         dataloader (torch.utils.data.dataloader.DataLoader): DataLoader of samples.
-        ps (list): gradient norm types
-        extraction_mia (bool): flag to cut samples for extraction mia data collection
+        norms (list): gradient norm types
+        # extraction_mia (bool): flag to cut samples for extraction mia data collection
         device (str): CPU or GPU 
         nbatches (int): Number of batches to consider
         samplelength (int or NoneType): cut all samples to a given length
@@ -431,7 +431,7 @@ def compute_dataloader_all_norms(model, embedding_layer, dataloader, ps, extract
     if samplelength is not None:
         print("Warning: using sample length is discouraged. Please avoid using this parameter.")
     if accelerator is None:
-        if half:
+        if model_half:
             print("Using model.half() ....")
             model.half()
         else:
@@ -441,7 +441,7 @@ def compute_dataloader_all_norms(model, embedding_layer, dataloader, ps, extract
 
     losses = []
     for batchno, data_x in tqdm(enumerate(dataloader),total=len(dataloader)):
-        if nbatches is not None and batchno >= nbatches:
+        if num_batches is not None and batchno >= num_batches:
             break
         ## Get predictions on data 
         if type(data_x) is dict:
@@ -456,10 +456,10 @@ def compute_dataloader_all_norms(model, embedding_layer, dataloader, ps, extract
 
         ## Compute norms on data_x
         if accelerator is None:
-            loss = compute_input_ids_all_norms(model, embedding_layer, data_x, ps, extraction_mia, 
+            loss = compute_input_ids_all_norms(model, embedding_layer, data_x, norms, 
                                                device=device,accelerator=accelerator).detach().cpu()
         else:
-            loss = compute_input_ids_all_norms(model, embedding_layer, data_x, ps, extraction_mia, 
+            loss = compute_input_ids_all_norms(model, embedding_layer, data_x, norms, 
                                                device=device,accelerator=accelerator).to(accelerator.device)
 
         losses.append(loss)
