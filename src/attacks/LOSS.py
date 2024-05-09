@@ -1,5 +1,4 @@
 import os
-import torch
 from transformers import AutoModelForCausalLM
 from .Attack import MIA
 from ..utils.attack_utils import *
@@ -43,13 +42,7 @@ class LOSS(MIA):
             raise Exception("Please call .load_model() to load the model first.")
         if accelerator is not None:
             self.model, dataloader, = accelerator.prepare(self.model, dataloader)
-        return compute_dataloader_cross_entropy(
-            model=self.model,
-            dataloader=dataloader,
-            num_batches=num_batches,
-            device=device,
-            model_half=model_half,
-        ).cpu()
+        return compute_dataloader_cross_entropy(model=self.model,dataloader=dataloader,num_batches=num_batches,device=device,model_half=model_half).cpu()
 
     @classmethod
     def get_default_name(cls, model_name, model_revision, num_samples, seed):

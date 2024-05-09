@@ -13,7 +13,7 @@ import psutil
 import subprocess
 import torch.nn.functional as F
 
-def compute_input_ids_cross_entropy(model: AutoModelForCausalLM, input_ids: torch.Tensor, return_pt: bool=True, token: bool=False):
+def compute_input_ids_cross_entropy(model: AutoModelForCausalLM, input_ids: torch.Tensor, return_pt: bool=True, tokens: bool=False):
     """
     Compute the cross-entropy loss between the logits from the model and provided input IDs.
 
@@ -38,7 +38,7 @@ def compute_input_ids_cross_entropy(model: AutoModelForCausalLM, input_ids: torc
         torch.cuda.empty_cache()
         torch.cuda.synchronize()
 
-    if token:
+    if tokens:
         loss_fn = CrossEntropyLoss(reduction="none")
     else:
         loss_fn = CrossEntropyLoss()
@@ -58,12 +58,12 @@ def compute_input_ids_cross_entropy(model: AutoModelForCausalLM, input_ids: torc
     torch.cuda.empty_cache()
     torch.cuda.synchronize()
     
-    if token:
+    if tokens:
         return torch.tensor(ans) if return_pt else ans[0] 
     else:
         return torch.tensor(ans) if return_pt else ans 
 
-def compute_dataloader_cross_entropy_tokens(model, dataloader, device=None, nbatches=None, samplelength=None, accelerator=None, half=True):    
+def compute_dataloader_cross_entropy_tokens(model, dataloader, device=None, num_batches=None, samplelength=None, accelerator=None, model_half=True):    
     '''
     Computes dataloader cross entropy with additional support for specifying the full data loader and full sample length.
     Warning: using samplelength is discouraged
@@ -84,7 +84,7 @@ def compute_dataloader_cross_entropy_tokens(model, dataloader, device=None, nbat
     if samplelength is not None:
         print("Warning: using sample length is discouraged. Please avoid using this parameter.")
     if accelerator is None:
-        if half:
+        if model_half:
             print("Using model.half() ....")
             model.half()
         else:
@@ -94,7 +94,7 @@ def compute_dataloader_cross_entropy_tokens(model, dataloader, device=None, nbat
 
     losses = []
     for batchno, data_x in tqdm(enumerate(dataloader),total=len(dataloader)):
-        if nbatches is not None and batchno >= nbatches:
+        if num_batches is not None and batchno >= num_batches:
             break
         with torch.no_grad():    
             ## Get predictions on training data 
@@ -106,9 +106,9 @@ def compute_dataloader_cross_entropy_tokens(model, dataloader, device=None, nbat
    
             ## Compute average log likelihood
             if accelerator is None:
-                loss = compute_input_ids_cross_entropy(model, data_x.to(device), return_pt = False,tokens=True).detach().cpu()
+                loss = compute_input_ids_cross_entropy(model, data_x.to(device), return_pt=False, tokens=True).detach().cpu()
             else:
-                loss = compute_input_ids_cross_entropy(model, data_x, return_pt = False,tokens=True)
+                loss = compute_input_ids_cross_entropy(model, data_x, return_pt=False, tokens=True)
 
             losses.append(loss)
 

@@ -121,6 +121,8 @@ def load_val_pile(number=1000, percentage=None, seed=229, num_splits=1, window=2
         for i in tqdm(range(int(math.ceil(len(collated_docs_with_eos_split) / window)))):
             dataset.append(tokenizer.decode(collated_docs_with_eos_split[window * i:window * (i+1)]))
         dataset = dataset[:clip_len]
+        if len(dataset)!=clip_len:
+            print("WARNING: Packing resulted in less samples than expected!!!")
     splits = [dataset[i * len(dataset)//num_splits : (i+1) * len(dataset) // num_splits] for i in range(num_splits)]
 
     return splits
