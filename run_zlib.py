@@ -26,6 +26,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--experiment_name', action="store", type=str, required=False, help='Experiment name. Used to determine save location.')
     # Dataset Arguments
+    parser.add_argument('--dataset_name', action="store", type=str, required=True, help='Dataset name')
     parser.add_argument('--num_samples', action="store", type=int, required=True, help='Dataset size')
     parser.add_argument('--min_length', action="store", type=int, required=False, default=20, help='Min number of tokens (filters)')
     parser.add_argument('--max_length', action="store", type=int, required=False, help='Max number of tokens (truncates)')
@@ -37,18 +38,13 @@ def main():
     parser.add_argument('--seed', action="store", type=int, required=False, default=229, help='Seed')
     args = parser.parse_args()
     
-    accelerator = Accelerator() if args.accelerate else None
     set_seed(args.seed)
-    args.model_cache_dir = args.model_cache_dir if args.model_cache_dir is not None else f"models/{args.model_name.replace('/','-')}"
-    args.experiment_name = args.experiment_name if args.experiment_name is not None else ZLIB.get_default_name("pile",args.num_samples,args.seed)
+    args.experiment_name = args.experiment_name if args.experiment_name is not None else ZLIB.get_default_name(args.dataset_name,args.num_samples,args.seed)
     logger = get_my_logger(log_file=f"{args.experiment_name}.log")
     ####################################################################################################
     # LOAD DATA
     ####################################################################################################
     start = time.perf_counter()
-
-    max_length = AutoConfig.from_pretrained(args.model_name).max_position_embeddings
-    tokenizer = AutoTokenizer.from_pretrained(args.model_name)
     
     logger.info("Loading Data")    
 
@@ -60,20 +56,24 @@ def main():
         logger.info("You are using a self-specified training dataset...")
         fixed_input = args.train_pt + ".pt" if not args.train_pt.endswith(".pt") else args.train_pt
         training_dataset = torch.load(fixed_input)[:args.num_samples]
-        # training_dataloader = DataLoader(training_dataset, batch_size = args.bs, collate_fn=lambda batch: collate_fn(batch, tokenizer=tokenizer, max_length=max_length))
     else:
-        training_dataset = load_train_pile_random(number=args.num_samples,seed=args.seed,num_splits=1,min_length=args.min_length,deduped="deduped" in args.model_name,unpack=args.unpack)[0]
-        # training_dataloader = DataLoader(training_dataset, batch_size = args.bs, collate_fn=lambda batch: collate_fn(batch, tokenizer=tokenizer, max_length=max_length))
+        if args.dataset_name=="pile":
+            training_dataset = load_train_pile_random(number=args.num_samples,seed=args.seed,num_splits=1,min_length=args.min_length,deduped=False,unpack=args.unpack)[0]
+        elif args.dataset_name=="pile-deduped":
+            training_dataset = load_train_pile_random(number=args.num_samples,seed=args.seed,num_splits=1,min_length=args.min_length,deduped=True,unpack=args.unpack)[0]
+        else:
+            raise NotImplementedError(f"Dataset unsupported: {args.dataset_name}")
 
     # Load validation data
     if args.val_pt:
         fixed_input = args.val_pt + ".pt" if not args.val_pt.endswith(".pt") else args.val_pt
         logger.info("You are using a self-specified validation dataset...")
         validation_dataset = torch.load(fixed_input)[:args.num_samples]
-        # validation_dataloader = DataLoader(validation_dataset, batch_size = args.bs, collate_fn=lambda batch: collate_fn(batch, tokenizer=tokenizer, max_length=max_length))
     else:
-        validation_dataset = load_val_pile(number=args.num_samples, seed=args.seed, num_splits=1, window=2048 if args.pack else 0)[0]
-        # validation_dataloader = DataLoader(validation_dataset, batch_size = args.bs, collate_fn=lambda batch: collate_fn(batch, tokenizer=tokenizer, max_length=max_length))
+        if args.dataset_name=="pile" or args.dataset_name=="pile-deduped":
+            validation_dataset = load_val_pile(number=args.num_samples, seed=args.seed, num_splits=1, window=2048 if args.pack else 0)[0]
+        else:
+            raise NotImplementedError(f"Dataset unsupported: {args.dataset_name}")
 
     end = time.perf_counter()
     logger.info(f"- Dataset loading took {end-start} seconds.")
