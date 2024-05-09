@@ -340,6 +340,7 @@ def compute_dataloader_cross_entropy(model, dataloader, device=None, num_batches
 def compute_input_ids_all_norms(model, embedding_layer, input_ids, norms, device=None, accelerator=None):
     """
     Compute norms of gradients with respect x, theta
+    Note: takes advantage of the fact that norm([a,b])=norm([norm(a),norm(b)])
     
     Args:
         model (transformers.AutoModelForCausalLM): HuggingFace model.
@@ -352,6 +353,7 @@ def compute_input_ids_all_norms(model, embedding_layer, input_ids, norms, device
         
     Returns:
         torch.Tensor or list: gradient norms of input ID
+            [x_grad_norm_p1, ..., x_grad_norm_pN, theta_grad_norm_p1, ..., theta_grad_norm_pN, layer1_grad_norm_p1, ..., layerM_grad_norm_p1, ..., layer1_grad_norm_pN, ..., layerM_grad_norm_pN]
     """
     
     # if extraction_mia:
@@ -360,7 +362,7 @@ def compute_input_ids_all_norms(model, embedding_layer, input_ids, norms, device
     #     print(input_ids.shape)
 
 
-    ## Compute gradient with respect to x
+    # Compute gradient with respect to x
     mask  = (input_ids > 0).detach()
     input_embeds=Variable(embedding_layer[input_ids.cpu()],requires_grad=True)
     if accelerator is not None:
@@ -375,7 +377,7 @@ def compute_input_ids_all_norms(model, embedding_layer, input_ids, norms, device
         outputs.loss.backward()
     x_grad = input_embeds.grad.detach()
 
-    ## Compute gradients with respect to different layers
+    # Compute gradients with respect to different layers
     mask  = (input_ids > 0).detach()
     if accelerator is not None:
         model.zero_grad()
@@ -388,14 +390,14 @@ def compute_input_ids_all_norms(model, embedding_layer, input_ids, norms, device
     else:
         outputs.loss.backward()
     
-    layer_norms = {p:[] for p in norms}
+    layer_norms = {p:[] for p in norms} # p: [layer_1_norm, layer_2_norm, ...]
     for i, (name,param) in enumerate(model.named_parameters()):
         if accelerator is None:
             grad = param.grad.flatten()
         else:
             grad = safe_get_full_grad(param).flatten()
         
-        ## Append all norms of layers to dictionary
+        # Append all norms of layers to dictionary
         for p in norms:
             layer_norms[p].append(torch.norm(grad,p=p))
     
@@ -403,10 +405,18 @@ def compute_input_ids_all_norms(model, embedding_layer, input_ids, norms, device
     torch.cuda.empty_cache()
     torch.cuda.synchronize()
 
-    ## Compute norms of entire gradients and append norms of each layer
-    output = torch.tensor([torch.norm(x_grad,p=p,dim=(1,2)) for p in norms] + [torch.norm(torch.tensor(layer_norms[p]),p=p) for p in norms])
-    output = torch.concat((output, torch.tensor([l for p in norms for l in layer_norms[p]])))
-    return output
+    for p in norms: # p: [x_grad_norm, theta_grad_norm, layer_1_grad_norm, ... layer_N_grad_norm]
+        layer_norms[p] = [torch.norm(x_grad,p=p,dim=(1,2))] + [torch.norm(torch.tensor(layer_norms[p]),p=p)] + layer_norms[p]
+    
+    # layer_norms = torch.tensor([l for p in norms for l in layer_norms[p]]) # [p1 first grad, ..., p1 last grad, ..., pM first grad, ... pM last grad]
+    layer_norms = torch.tensor([layer_norms[p][l] for l in range(len(layer_norms[norms[0]])) for p in norms]) # [x_grad_norm_p1, ..., x_grad_norm_pM, theta_grad_norm_p1, ..., theta_grad_norm_pM, layer1_grad_norm_p1, ..., layer1_grad_norm_pM, ..., layerN_grad_norm_p1, ..., layerN_grad_norm_pM]
+    return layer_norms
+    # # Compute norms of entire gradients and append norms of each layer
+    # ## Total norms is [x_grad_norm_p1, ..., x_grad_norm_pN, theta_grad_norm_p1, ..., theta_grad_norm_pN]
+    # total_norms = torch.tensor([torch.norm(x_grad,p=p,dim=(1,2)) for p in norms] + [torch.norm(torch.tensor(layer_norms[p]),p=p) for p in norms])
+    # ## Total and layer norms is [x_grad_norm_p1, ..., x_grad_norm_pN, theta_grad_norm_p1, ..., theta_grad_norm_pN, layer1_grad_norm_p1, ..., layer1_grad_norm_pN, ..., layerM_grad_norm_p1, ..., layerM_grad_norm_pN]
+    # total_and_layer_norms = torch.concat((total_norms, torch.tensor([layer_norms[p][l] for l in range(len(layer_norms[norms[0]])) for p in norms])))
+    # return total_and_layer_norms
 
 def compute_dataloader_all_norms(model, embedding_layer, dataloader, norms, device=None, num_batches=None, samplelength=None, accelerator=None, model_half=True):
     '''
@@ -426,7 +436,7 @@ def compute_dataloader_all_norms(model, embedding_layer, dataloader, norms, devi
         half (bool): use half precision floats for model
 
     Returns:
-        torch.Tensor: norms of gradients for input IDs
+        dict[Numeric,dict[str,torch.Tensor]]: gradients for each norm type. The gradient is a dictionary of x_grad, theta_grad, and layerwise_grads
     '''
     
     if samplelength is not None:
@@ -449,7 +459,6 @@ def compute_dataloader_all_norms(model, embedding_layer, dataloader, norms, devi
             data_x = data_x["input_ids"]
         else:
             data_x = data_x[None,:]
-        print(data_x.shape)
         if samplelength is None:
             data_x = data_x.detach()                
         else:
@@ -473,7 +482,9 @@ def compute_dataloader_all_norms(model, embedding_layer, dataloader, norms, devi
         losses = accelerator.gather_for_metrics(losses)
         losses = torch.cat(losses)
     
-    return torch.stack(losses)
+    total_grads = torch.nan_to_num(torch.stack(losses)).cpu()
+    grad_norms = {p:{"x_grad": total_grads[:,i], "theta_grad": total_grads[:,len(norms)+i], "layerwise_grad": total_grads[:,2*len(norms)+i::len(norms)]} for i,p in enumerate(norms)}
+    return grad_norms
 
 def compute_input_ids_jl(model, embedding_layer, input_ids,  projector, last_layer, device=None):
     """
