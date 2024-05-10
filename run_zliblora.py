@@ -7,16 +7,16 @@ from transformers import AutoModelForCausalLM, AutoTokenizer, AutoConfig, Traini
 from src.utils.attack_utils import *
 from src.utils.dataset_utils import *
 from src.utils.log_utils import get_my_logger
-from src.attacks.FLoRa import FLoRa
+from src.attacks.ZLIBLoRa import ZLIBLoRa
 from accelerate import Accelerator
 from accelerate.utils import set_seed
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 """
 Sample command line prompt (no acceleration)
-python run_flora.py --model_name EleutherAI/pythia-70m-deduped --model_revision step98000 --n_samples 1000 --pack --seed 229
+python run_zliblora.py --model_name EleutherAI/pythia-70m-deduped --model_revision step98000 --n_samples 1000 --pack --seed 229
 Sample command line prompt (with acceleration)
-accelerate launch run_flora.py --accelerate --model_name EleutherAI/pythia-70m-deduped --model_revision step98000 --n_samples 1000 --pack --seed 229
+accelerate launch run_zliblora.py --accelerate --model_name EleutherAI/pythia-70m-deduped --model_revision step98000 --n_samples 1000 --pack --seed 229
 """
 
 def main():
@@ -46,7 +46,7 @@ def main():
     accelerator = Accelerator() if args.accelerate else None
     set_seed(args.seed)
     args.model_cache_dir = args.model_cache_dir if args.model_cache_dir is not None else f"models/{args.model_name.replace('/','-')}"
-    args.experiment_name = args.experiment_name if args.experiment_name is not None else FLoRa.get_default_name(args.model_name,args.model_revision,args.num_samples,args.seed)
+    args.experiment_name = args.experiment_name if args.experiment_name is not None else ZLIBLoRa.get_default_name(args.model_name,args.model_revision,args.num_samples,args.seed)
     logger = get_my_logger(log_file=f"{args.experiment_name}.log")
     ####################################################################################################
     # LOAD DATA
@@ -80,7 +80,7 @@ def main():
     # FINE-TUNE MODEL
     ####################################################################################################
     start = time.perf_counter()
-    training_args = TrainingArguments(output_dir=f"models/FLoRa/{args.model_name.replace('/','-')}-ft",
+    training_args = TrainingArguments(output_dir=f"models/ZLIBLoRa/{args.model_name.replace('/','-')}-ft",
                                       do_train=True,
                                       do_eval=True,
                                       num_train_epochs=1,
@@ -108,14 +108,14 @@ def main():
                     data_collator=lambda batch: collate_fn(batch, tokenizer=tokenizer, max_length=max_length),
                 )
         trainer.train()
-        trainer.save_model(f"models/FLoRa/{args.model_name.replace('/','-')}-ft")
+        trainer.save_model(f"models/ZLIBLoRa/{args.model_name.replace('/','-')}-ft")
     else:
         torch.save(training_dataset,"train_data.pt")
         torch.save(validation_dataset,"val_data.pt")
-        torch.save(training_args,"models/FLoRa/train_args.pt")
+        torch.save(training_args,"models/ZLIBLoRa/train_args.pt")
         subprocess.call(["accelerate", "launch", "-m", "src.scripts.model_train",
-            "--args_path", "models/FLoRa/train_args.pt",
-            "--save_path", f"models/FLoRa/{args.model_name.replace('/','-')}-ft",
+            "--args_path", "models/ZLIBLoRa/train_args.pt",
+            "--save_path", f"models/ZLIBLoRa/{args.model_name.replace('/','-')}-ft",
             "--model_path", args.model_name,
             "--model_revision", args.model_revision,
             "--model_cache_dir", args.model_cache_dir,
@@ -133,26 +133,19 @@ def main():
     logger.info("Running Attack")
 
     # Initialize attack
-    FloRaer = FLoRa(args.model_name, f"models/FLoRa/{args.model_name.replace('/','-')}-ft", model_revision=args.model_revision, model_cache_dir=args.model_cache_dir)
+    ZLIBLoRaer = ZLIBLoRa(f"models/ZLIBLoRa/{args.model_name.replace('/','-')}-ft")
     
     # Compute statistics
-    FloRaer.load_model("base")
-    train_statistics_base = FloRaer.compute_statistic(training_dataloader,num_batches=math.ceil(args.num_samples/args.bs),device=device,model_half=args.model_half,accelerator=accelerator)
-    val_statistics_base = FloRaer.compute_statistic(validation_dataloader,num_batches=math.ceil(args.num_samples/args.bs),device=device,model_half=args.model_half,accelerator=accelerator)
-    FloRaer.unload_model()
-    FloRaer.load_model("ft")
-    train_statistics_ft = FloRaer.compute_statistic(training_dataloader,num_batches=math.ceil(args.num_samples/args.bs),device=device,model_half=args.model_half,accelerator=accelerator)
-    val_statistics_ft = FloRaer.compute_statistic(validation_dataloader,num_batches=math.ceil(args.num_samples/args.bs),device=device,model_half=args.model_half,accelerator=accelerator)
-    FloRaer.unload_model()
-
-    train_statistics = train_statistics_ft/train_statistics_base
-    torch.save(train_statistics,f"{args.experiment_name}_train.pt")
-    val_statistics = val_statistics_ft/val_statistics_base
+    ZLIBLoRaer.load_model()
+    train_statistics = ZLIBLoRaer.compute_statistic(training_dataloader,num_samples=args.num_samples,device=device,model_half=args.model_half,accelerator=accelerator)
+    torch.save(train_statistics,f"{args.experiment_name}_train.pt")    
+    val_statistics = ZLIBLoRaer.compute_statistic(validation_dataloader,num_samples=args.num_samples,device=device,model_half=args.model_half,accelerator=accelerator)
     torch.save(val_statistics,f"{args.experiment_name}_val.pt")
+    ZLIBLoRaer.unload_model()
 
     # Plot ROCs
-    FloRaer.attack_plot_ROC(train_statistics, val_statistics, title=args.experiment_name, log_scale=False, show_plot=False)
-    FloRaer.attack_plot_ROC(train_statistics, val_statistics, title=args.experiment_name, log_scale=True, show_plot=False)
+    ZLIBLoRaer.attack_plot_ROC(train_statistics, val_statistics, title=args.experiment_name, log_scale=False, show_plot=False)
+    ZLIBLoRaer.attack_plot_ROC(train_statistics, val_statistics, title=args.experiment_name, log_scale=True, show_plot=False)
 
     end = time.perf_counter()
 
