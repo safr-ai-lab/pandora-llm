@@ -4,10 +4,10 @@ import argparse
 import torch
 from torch.utils.data import DataLoader
 from transformers import AutoModelForCausalLM, AutoTokenizer, AutoConfig, TrainingArguments, Trainer
-from src.utils.attack_utils import *
-from src.utils.dataset_utils import *
-from src.utils.log_utils import get_my_logger
-from src.attacks.ZLIBLoRa import ZLIBLoRa
+from llmprivacy.utils.attack_utils import *
+from llmprivacy.utils.dataset_utils import *
+from llmprivacy.utils.log_utils import get_my_logger
+from llmprivacy.attacks.ZLIBLoRa import ZLIBLoRa
 from accelerate import Accelerator
 from accelerate.utils import set_seed
 device = "cuda" if torch.cuda.is_available() else "cpu"
