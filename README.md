@@ -16,11 +16,14 @@ MinK
 MoPe - add other plots
 GradNorm - max_length
 ZLIB - dataset name also add as arg for everything else
+FLoRa
+ALoRa
+DetectGPT - uncleaned
 Load/unload go to Attack.py?
 
 `plot_utils.py` - add bootstrapping
 
-
+pip install sentencepiece
 
 ## Issues
 
