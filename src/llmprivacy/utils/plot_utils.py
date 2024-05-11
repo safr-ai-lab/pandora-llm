@@ -180,3 +180,31 @@ def plot_ROC_files(files, plot_title, labels=None, keep_first=None, show_plot=Tr
     if labels is None:
         labels = files
     plot_ROC_multiple(train_statistics_list, val_statistics_list, plot_title, labels, keep_first=keep_first, show_plot=show_plot, save_name=save_name, log_scale=log_scale, fprs=fprs)
+
+def print_AUC(train_statistic, val_statistic):
+    """
+    Print the AUC given train and val stats.
+
+    Args:
+        train_statistics (list[float]): list of train statistics
+        val_statistics (list[float]): list of val statistics
+    
+    Returns:
+        roc_auc (float): ROC-AUC score
+    """
+    if torch.is_tensor(train_statistic):
+        train_statistic = train_statistic.flatten()
+    else:
+        train_statistic = torch.tensor(train_statistic).flatten()
+
+    train_statistic = train_statistic[~train_statistic.isnan()]
+    if torch.is_tensor(val_statistic):
+        val_statistic = val_statistic.flatten()
+    else:
+        val_statistic = torch.tensor(val_statistic).flatten()
+    val_statistic = val_statistic[~val_statistic.isnan()]
+
+    fpr, tpr, thresholds = roc_curve(torch.cat((torch.ones_like(train_statistic),torch.zeros_like(val_statistic))).flatten(),
+                                    torch.cat((-train_statistic,-val_statistic)).flatten())
+    roc_auc = auc(fpr, tpr)
+    return roc_auc
