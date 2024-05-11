@@ -6,6 +6,7 @@ from torch.utils.data import DataLoader
 from transformers import AutoTokenizer, AutoConfig
 from llmprivacy.utils.attack_utils import *
 from llmprivacy.utils.dataset_utils import *
+from llmprivacy.utils.plot_utils import *
 from llmprivacy.utils.log_utils import get_my_logger
 from llmprivacy.attacks.NN import NN
 from accelerate import Accelerator
