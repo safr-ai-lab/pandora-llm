@@ -32,6 +32,24 @@ def collate_fn(batch, tokenizer, max_length):
         "attention_mask": (tokens_padded>0).int()
     }
 
+def process_domain_specific_data(dataset, seed=229, num_splits=1,window=100):
+    tokenizer = AutoTokenizer.from_pretrained("EleutherAI/pythia-70m-deduped")
+    
+    # Get tokens for everything, and add EOS_token between examples
+    tokens = [tokenizer.encode(example, return_tensors="pt", truncation=True) for example in dataset]
+    collated_docs_with_eos_split = []
+    for item in tqdm(tokens):
+        collated_docs_with_eos_split += item.tolist()[0] + [tokenizer.eos_token_id]
+
+    # Turn tokens back into strings. 
+    dataset = []
+    for i in tqdm(range(int(math.ceil(len(collated_docs_with_eos_split) / window)))):
+        dataset.append(tokenizer.decode(collated_docs_with_eos_split[window * i:window * (i+1)]))
+    splits = [dataset[i * len(dataset)//num_splits : (i+1) * len(dataset) // num_splits] for i in range(num_splits)]
+
+    return splits
+
+
 def load_train_pile_random(number=1000, percentage=None, seed=229, num_splits=1, deduped=True, unpack=False, min_length=20):
     """
     Load train pile samples from random deduped sampler.

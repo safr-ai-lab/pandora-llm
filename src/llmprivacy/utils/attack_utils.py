@@ -301,6 +301,7 @@ def compute_dataloader_all_norms(model, embedding_layer, dataloader, norms, devi
     for batchno, data_x in tqdm(enumerate(dataloader),total=len(dataloader)):
         if num_batches is not None and batchno >= num_batches:
             break
+    
         ## Get predictions on data 
         if type(data_x) is dict:
             data_x = data_x["input_ids"]
@@ -310,7 +311,7 @@ def compute_dataloader_all_norms(model, embedding_layer, dataloader, norms, devi
             data_x = data_x.detach()                
         else:
             data_x = data_x[:,:samplelength].detach()
-
+        
         ## Compute norms on data_x
         if accelerator is None:
             loss = compute_input_ids_all_norms(model, embedding_layer, data_x, norms, 
