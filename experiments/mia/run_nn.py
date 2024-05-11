@@ -76,10 +76,14 @@ def main():
     else:
         tstat, vstat = split_unsplit_pt(args.data_loc, only_x = args.only_x, only_theta=args.only_theta)
 
-    tstat = tstat[torch.randperm(tstat.size()[0])]
-    vstat = vstat[torch.randperm(vstat.size()[0])]
+    all_train = tstat[torch.randperm(tstat.size()[0])]
+    all_valid = vstat[torch.randperm(vstat.size()[0])]
+    n_samples = all_train.shape[0] if not args.num_samples else args.num_samples
 
-    n_samples = all_train.shape[0]
+    # Resize
+    all_train = all_train[:n_samples]
+    all_valid = all_valid[:n_samples]
+
     end_of_train_index = int(n_samples * (1-test_percent))
 
     all_train_np = all_train.numpy()
@@ -116,8 +120,8 @@ def main():
 
     NNer = NN(args.model_name, model_revision=args.model_revision, model_cache_dir=args.model_cache_dir)
     train_stat, val_stat = LogReger.train_model(XTrain, Xtest, ytrain, ytest, args.big_nn, args.nn_epochs, 
-                                            f"{args.experiment_name}_nn_model_nn_epochs={args.nn_epochs}_nn_bs={args.nn_bs}.pt", 
-                                            f"{args.experiment_name}_nn_data_nn_epochs={args.nn_epochs}_nn_bs={args.nn_bs}.pt")
+                                            f"{args.experiment_name}_nn_model_samps={n_samples}_epochs={args.nn_epochs}_bs={args.nn_bs}.pt", 
+                                            f"{args.experiment_name}_nn_data_samps={n_samples}_epochs={args.nn_epochs}_bs={args.nn_bs}.pt")
     
     # Plot ROCs
     LogReger.attack_plot_ROC(train_stat, val_stat, args.experiment_name, log_scale=False, show_plot=False)
