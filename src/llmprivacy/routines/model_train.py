@@ -1,6 +1,6 @@
 import argparse
 import torch
-from src.utils.dataset_utils import collate_fn
+from ..utils.dataset_utils import collate_fn
 from transformers import AutoModelForCausalLM, AutoTokenizer, Trainer
 from deepspeed.utils.zero_to_fp32 import load_state_dict_from_zero_checkpoint
 from transformers.trainer_utils import get_last_checkpoint
