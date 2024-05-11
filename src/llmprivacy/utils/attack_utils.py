@@ -283,7 +283,7 @@ def compute_dataloader_all_norms(model, embedding_layer, dataloader, norms, devi
         half (bool): use half precision floats for model
 
     Returns:
-        dict[Numeric,dict[str,torch.Tensor]]: gradients for each norm type. The gradient is a dictionary of x_grad, theta_grad, and layerwise_grads
+        dict[str,torch.Tensor]: gradients for each norm type. The gradient is a dictionary of x_grad_p, theta_grad_p, and layerwise_grads_p for each norm order p
     '''
     
     if samplelength is not None:
@@ -331,7 +331,8 @@ def compute_dataloader_all_norms(model, embedding_layer, dataloader, norms, devi
         losses = torch.cat(losses)
     
     total_grads = torch.nan_to_num(torch.stack(losses)).cpu()
-    grad_norms = {p:{"x_grad": total_grads[:,i], "theta_grad": total_grads[:,len(norms)+i], "layerwise_grad": total_grads[:,2*len(norms)+i::len(norms)]} for i,p in enumerate(norms)}
+    grad_norms = [{f"x_grad_{p}": total_grads[:,i], f"theta_grad_{p}": total_grads[:,len(norms)+i], f"layerwise_grad_{p}": total_grads[:,2*len(norms)+i::len(norms)]} for i,p in enumerate(norms)]
+    grad_norms = {feature:value for grad_norms_p in grad_norms for feature,value in grad_norms_p.items()}
     return grad_norms
 
 def compute_input_ids_jl(model, embedding_layer, input_ids,  projector, last_layer, device=None):

@@ -30,6 +30,9 @@ ALoRa
 DetectGPT - uncleaned
 Generation utils - uncleaned
 Load/unload go to Attack.py?
+MIA should probably have train/test split as well? No, since there is no training being done
+Rename all train/val to pos/neg where train/val does not refer to the actual step in the meta pipeline
+
 
 `plot_utils.py` - add bootstrapping
 

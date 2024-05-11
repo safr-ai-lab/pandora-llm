@@ -66,7 +66,7 @@ class GradNorm(MIA):
         return compute_dataloader_all_norms(model=self.model,embedding_layer=embedding_layer,norms=norms,dataloader=dataloader,num_batches=num_batches,device=device,model_half=model_half)
 
     @classmethod
-    def get_default_name(cls, model_name, model_revision, num_samples, seed):
+    def get_default_name(cls, model_name, model_revision, num_samples, start_index, seed):
         """
         Generates a default experiment name. Also ensures its validity with makedirs.
 
@@ -79,7 +79,7 @@ class GradNorm(MIA):
             string: informative name of experiment
         """
         os.makedirs("results/GradNorm", exist_ok=True)
-        return f"results/GradNorm/GradNorm_{model_name.replace('/','-')}_{model_revision.replace('/','-')}_N={num_samples}_seed={seed}"
+        return f"results/GradNorm/GradNorm_{model_name.replace('/','-')}_{model_revision.replace('/','-')}_N={num_samples}_S={start_index}_seed={seed}"
 
 
     def attack_plot_ROC(self, train_gradients, val_gradients, title, log_scale=False, show_plot=False, save_name=None):
@@ -93,8 +93,8 @@ class GradNorm(MIA):
         shown directly, or saved to a file.
 
         Args:
-            train_statistics (dict[Numeric,dict[str,float]]): Gradients of the training set. Lower means more like train.
-            val_statistics (dict[Numeric,dict[str,float]]): Gradients of the training set. Lower means more like train.
+            train_statistics (dict[str,float]]): Gradients of the training set. Lower means more like train.
+            val_statistics (dict[str,float]]): Gradients of the training set. Lower means more like train.
             title (str): The title for the ROC plot.
             log_scale (bool, optional): Whether to plot the ROC curve on a logarithmic scale. 
                 Defaults to False.
@@ -110,11 +110,10 @@ class GradNorm(MIA):
         train_statistics = []
         val_statistics = []
         labels = []
-        for p in train_gradients.keys():
-            for grad_type in ["x_grad","theta_grad"]:
-                train_stats = train_gradients[p][grad_type]
-                val_stats = val_gradients[p][grad_type]
-                train_statistics.append(train_stats)
-                val_statistics.append(val_stats)
-                labels.append(f"p={p},type={grad_type}")
+        for grad_type in train_gradients.keys():
+            train_stats = train_gradients[grad_type]
+            val_stats = val_gradients[grad_type]
+            train_statistics.append(train_stats)
+            val_statistics.append(val_stats)
+            labels.append(grad_type)
         plot_ROC_multiple(train_statistics, val_statistics, title, labels, log_scale=log_scale, show_plot=show_plot, save_name=save_name)

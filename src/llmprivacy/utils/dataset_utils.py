@@ -50,7 +50,7 @@ def process_domain_specific_data(dataset, seed=229, num_splits=1,window=100):
     return splits
 
 
-def load_train_pile_random(number=1000, percentage=None, seed=229, num_splits=1, deduped=True, unpack=False, min_length=20):
+def load_train_pile_random(number=1000, percentage=None, start_index=0, seed=229, num_splits=1, deduped=True, unpack=False, min_length=20):
     """
     Load train pile samples from random deduped sampler.
 
@@ -59,6 +59,7 @@ def load_train_pile_random(number=1000, percentage=None, seed=229, num_splits=1,
     Args:
         number (int): Number of samples
         percentage (float): Percentage of total samples (if number not specified). Default to None
+        start_index (int): What index to start counting samples from. Default to 0
         seed (int): Random seed
         num_splits (int): Number of splits to separate data into. Usually set to 1 in most methods
         deduped (bool): Whether to load the deduped (True) or duped (False) Pile
@@ -88,7 +89,7 @@ def load_train_pile_random(number=1000, percentage=None, seed=229, num_splits=1,
             chunks.extend(result)
         return chunks
 
-    dataset = dataset.select(range(clip_len))
+    dataset = dataset.select(range(start_index,start_index+clip_len))
     tokenizer = AutoTokenizer.from_pretrained("EleutherAI/pythia-70m-deduped")
 
     if unpack:
@@ -101,7 +102,7 @@ def load_train_pile_random(number=1000, percentage=None, seed=229, num_splits=1,
 
     return splits
 
-def load_val_pile(number=1000, percentage=None, seed=229, num_splits=1, window=2048):
+def load_val_pile(number=1000, percentage=None, start_index=0, seed=229, num_splits=1, window=2048):
     """
     Loads the validation pile (NOT deduped), does an exact match deduplication and shuffling, 
     packs samples into 2048-sized chunks, and returns the specified number of splits. 
@@ -109,6 +110,7 @@ def load_val_pile(number=1000, percentage=None, seed=229, num_splits=1, window=2
     Args:
         number (int): Number of samples
         percentage (float): Percentage of total samples (if number not specified). Default to None
+        start_index (int): What index to start counting samples from. Default to 0
         seed (int): Random seed
         num_splits (int): Number of splits to separate data into. Usually set to 1 in most methods
         window (int): number of tokens to pack up to. If not packing, set to 0.
@@ -120,14 +122,14 @@ def load_val_pile(number=1000, percentage=None, seed=229, num_splits=1, window=2
     clip_len = number if percentage is None else int(len(dataset)*percentage)
 
     if window==0: # No packing
-        dataset = dataset.select(range(clip_len))
+        dataset = dataset.select(range(start_index,start_index+clip_len))
         dataset = list(dict.fromkeys(entry["text"] for entry in dataset))[:clip_len]
     else:
         # Use twice clip_len to ensure enough samples after packing
         if not (1<=clip_len*2<=len(dataset)):
             raise IndexError(f"Number or percentage out of bounds. You specified {clip_len} samples but there are only {len(dataset)} samples.")
         tokenizer = AutoTokenizer.from_pretrained("EleutherAI/pythia-70m-deduped")
-        dataset = dataset.select(range(clip_len*2))
+        dataset = dataset.select(range(start_index,start_index+clip_len*2))
         dataset = dataset.map(lambda x: {"tokens": tokenizer(x["text"])["input_ids"]}, remove_columns=["text","meta"])["tokens"]
 
         # Get tokens for everything, and add EOS_token between examples

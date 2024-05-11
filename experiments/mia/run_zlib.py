@@ -15,7 +15,7 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 """
 Sample command line prompt (no acceleration)
 python run_zlib.py --n_samples 1000 --pack --seed 229
-Sample command laine prompt (with acceleration)
+Sample command line prompt (with acceleration)
 accelerate launch run_zlib.py --accelerate --model_name EleutherAI/pythia-70m-deduped --model_revision step98000 --n_samples 1000 --pack --seed 229
 """
 
@@ -28,6 +28,7 @@ def main():
     # Dataset Arguments
     parser.add_argument('--dataset_name', action="store", type=str, required=True, help='Dataset name')
     parser.add_argument('--num_samples', action="store", type=int, required=True, help='Dataset size')
+    parser.add_argument('--start_index', action="store", type=int, required=False, default=0, help='Slice dataset starting from this index')
     parser.add_argument('--min_length', action="store", type=int, required=False, default=20, help='Min number of tokens (filters)')
     parser.add_argument('--max_length', action="store", type=int, required=False, help='Max number of tokens (truncates)')
     parser.add_argument('--pack', action="store_true", required=False, help='Pack validation set')
@@ -55,12 +56,12 @@ def main():
     if args.train_pt:
         logger.info("You are using a self-specified training dataset...")
         fixed_input = args.train_pt + ".pt" if not args.train_pt.endswith(".pt") else args.train_pt
-        training_dataset = torch.load(fixed_input)[:args.num_samples]
+        training_dataset = torch.load(fixed_input)[args.start_index:args.start_index+args.num_samples]
     else:
         if args.dataset_name=="pile":
-            training_dataset = load_train_pile_random(number=args.num_samples,seed=args.seed,num_splits=1,min_length=args.min_length,deduped=False,unpack=args.unpack)[0]
+            training_dataset = load_train_pile_random(number=args.num_samples,start_index=args.start_index,seed=args.seed,num_splits=1,min_length=args.min_length,deduped=False,unpack=args.unpack)[0]
         elif args.dataset_name=="pile-deduped":
-            training_dataset = load_train_pile_random(number=args.num_samples,seed=args.seed,num_splits=1,min_length=args.min_length,deduped=True,unpack=args.unpack)[0]
+            training_dataset = load_train_pile_random(number=args.num_samples,start_index=args.start_index,seed=args.seed,num_splits=1,min_length=args.min_length,deduped=True,unpack=args.unpack)[0]
         else:
             raise NotImplementedError(f"Dataset unsupported: {args.dataset_name}")
 
@@ -68,10 +69,10 @@ def main():
     if args.val_pt:
         fixed_input = args.val_pt + ".pt" if not args.val_pt.endswith(".pt") else args.val_pt
         logger.info("You are using a self-specified validation dataset...")
-        validation_dataset = torch.load(fixed_input)[:args.num_samples]
+        validation_dataset = torch.load(fixed_input)[args.start_index:args.start_index+args.num_samples]
     else:
         if args.dataset_name=="pile" or args.dataset_name=="pile-deduped":
-            validation_dataset = load_val_pile(number=args.num_samples, seed=args.seed, num_splits=1, window=2048 if args.pack else 0)[0]
+            validation_dataset = load_val_pile(number=args.num_samples,start_index=args.start_index,seed=args.seed,num_splits=1,window=2048 if args.pack else 0)[0]
         else:
             raise NotImplementedError(f"Dataset unsupported: {args.dataset_name}")
 

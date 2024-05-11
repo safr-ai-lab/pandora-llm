@@ -31,6 +31,7 @@ def main():
     parser.add_argument('--model_cache_dir', action="store", type=str, required=False, help='Model cache directory. If not specified, uses main.')
     # Dataset Arguments
     parser.add_argument('--num_samples', action="store", type=int, required=True, help='Dataset size')
+    parser.add_argument('--start_index', action="store", type=int, required=False, default=0, help='Slice dataset starting from this index')
     parser.add_argument('--bs', action="store", type=int, required=False, default=1, help='Batch size')
     parser.add_argument('--min_length', action="store", type=int, required=False, default=20, help='Min number of tokens (filters)')
     parser.add_argument('--max_length', action="store", type=int, required=False, help='Max number of tokens (truncates)')
@@ -63,11 +64,11 @@ def main():
         logger.info("You are using a self-specified validation dataset...")
         
         fixed_input = args.train_pt + ".pt" if not args.train_pt.endswith(".pt") else args.train_pt
-        training_dataset = torch.load(fixed_input)[:args.num_samples]
+        training_dataset = torch.load(fixed_input)[args.start_index:args.start_index+args.num_samples]
         training_dataloader = DataLoader(training_dataset, batch_size = args.bs, collate_fn=lambda batch: collate_fn(batch, tokenizer=tokenizer, max_length=max_length))
         
         fixed_input = args.val_pt + ".pt" if not args.val_pt.endswith(".pt") else args.val_pt
-        validation_dataset = torch.load(fixed_input)[:args.num_samples]
+        validation_dataset = torch.load(fixed_input)[args.start_index:args.start_index+args.num_samples]
         validation_dataloader = DataLoader(validation_dataset, batch_size = args.bs, collate_fn=lambda batch: collate_fn(batch, tokenizer=tokenizer, max_length=max_length))
     else:
         training_dataset, validation_dataset = load_val_pile(number=2*args.num_samples, seed=args.seed, num_splits=2, window=2048 if args.pack else 0)

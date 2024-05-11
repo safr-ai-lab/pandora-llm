@@ -16,7 +16,7 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 """
 Sample command line prompt (no acceleration)
 python run_gradnorm.py --model_name EleutherAI/pythia-70m-deduped --model_revision step98000 --num_samples 1000 --pack --seed 229
-Sample command laine prompt (with acceleration)
+Sample command line prompt (with acceleration)
 accelerate launch run_gradnorm.py --accelerate --model_name EleutherAI/pythia-70m-deduped --model_revision step98000 --num_samples 1000 --pack --seed 229
 """
 
@@ -32,6 +32,7 @@ def main():
     parser.add_argument('--model_cache_dir', action="store", type=str, required=False, help='Model cache directory. If not specified, uses main.')
     # Dataset Arguments
     parser.add_argument('--num_samples', action="store", type=int, required=True, help='Dataset size')
+    parser.add_argument('--start_index', action="store", type=int, required=False, default=0, help='Slice dataset starting from this index')
     parser.add_argument('--bs', action="store", type=int, required=False, default=1, help='Batch size')
     parser.add_argument('--min_length', action="store", type=int, required=False, default=20, help='Min number of tokens (filters)')
     parser.add_argument('--max_length', action="store", type=int, required=False, help='Max number of tokens (truncates)')
@@ -56,7 +57,7 @@ def main():
     accelerator = Accelerator() if args.accelerate else None
     set_seed(args.seed)
     args.model_cache_dir = args.model_cache_dir if args.model_cache_dir is not None else f"models/{args.model_name.replace('/','-')}"
-    args.experiment_name = args.experiment_name if args.experiment_name is not None else GradNorm.get_default_name(args.model_name,args.model_revision,args.num_samples,args.seed)
+    args.experiment_name = args.experiment_name if args.experiment_name is not None else GradNorm.get_default_name(args.model_name,args.model_revision,args.num_samples,args.start_index,args.seed)
     logger = get_my_logger(log_file=f"{args.experiment_name}.log")
     ####################################################################################################
     # LOAD DATA
@@ -89,20 +90,20 @@ def main():
         if args.train_pt:
             logger.info("You are using a self-specified training dataset...")
             fixed_input = args.train_pt + ".pt" if not args.train_pt.endswith(".pt") else args.train_pt
-            training_dataset = torch.load(fixed_input)[:args.num_samples]
+            training_dataset = torch.load(fixed_input)[args.start_index:args.start_index+args.num_samples]
             training_dataloader = DataLoader(training_dataset, batch_size = args.bs, collate_fn=lambda batch: collate_fn(batch, tokenizer=tokenizer, max_length=max_length))
         else:
-            training_dataset = load_train_pile_random(number=args.num_samples,seed=args.seed,num_splits=1,min_length=args.min_length,deduped="deduped" in args.model_name,unpack=args.unpack)[0]
+            training_dataset = load_train_pile_random(number=args.num_samples,start_index=args.start_index,seed=args.seed,num_splits=1,min_length=args.min_length,deduped="deduped" in args.model_name,unpack=args.unpack)[0]
             training_dataloader = DataLoader(training_dataset, batch_size = args.bs, collate_fn=lambda batch: collate_fn(batch, tokenizer=tokenizer, max_length=max_length))
 
         # Load validation data
         if args.val_pt:
             fixed_input = args.val_pt + ".pt" if not args.val_pt.endswith(".pt") else args.val_pt
             logger.info("You are using a self-specified validation dataset...")
-            validation_dataset = torch.load(fixed_input)[:args.num_samples]
+            validation_dataset = torch.load(fixed_input)[args.start_index:args.start_index+args.num_samples]
             validation_dataloader = DataLoader(validation_dataset, batch_size = args.bs, collate_fn=lambda batch: collate_fn(batch, tokenizer=tokenizer, max_length=max_length))
         else:
-            validation_dataset = load_val_pile(number=args.num_samples, seed=args.seed, num_splits=1, window=2048 if args.pack else 0)[0]
+            validation_dataset = load_val_pile(number=args.num_samples,start_index=args.start_index,seed=args.seed,num_splits=1,window=2048 if args.pack else 0)[0]
             validation_dataloader = DataLoader(validation_dataset, batch_size = args.bs, collate_fn=lambda batch: collate_fn(batch, tokenizer=tokenizer, max_length=max_length))
 
     end = time.perf_counter()
@@ -119,9 +120,9 @@ def main():
     # Compute statistics
     GradNormer.load_model()
     train_gradients = GradNormer.compute_gradients(training_dataloader,norms=args.norms,num_batches=math.ceil(args.num_samples/args.bs),device=device,model_half=args.model_half,accelerator=accelerator)
-    torch.save(train_gradients,f"results/GradNorm/{args.experiment_name}_train.pt")
+    torch.save(train_gradients,f"{args.experiment_name}_train.pt")
     val_gradients = GradNormer.compute_gradients(validation_dataloader,norms=args.norms,num_batches=math.ceil(args.num_samples/args.bs),device=device,model_half=args.model_half,accelerator=accelerator)
-    torch.save(val_gradients,f"results/GradNorm/{args.experiment_name}_val.pt")
+    torch.save(val_gradients,f"{args.experiment_name}_val.pt")
     GradNormer.unload_model()
 
     # Plot ROCs
