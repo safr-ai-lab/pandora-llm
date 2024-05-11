@@ -1,4 +1,4 @@
-from generation_utils import generate_suffixes, compute_actual_prob
+from llmprivacy.utils.generation_utils import generate_suffixes, compute_actual_prob
 import argparse
 from transformers.generation.utils import GenerationMixin, GenerationConfig
 from transformers import AutoModelForCausalLM, AutoTokenizer, AutoConfig, TrainingArguments, Trainer
@@ -116,7 +116,9 @@ if not os.path.exists(directory_path):
 else:
     print(f"Directory '{directory_path}' already exists. Using it!")
 
+print(dataset)
 print(f"Dataset Length: {len(dataset)}")
+print(type(dataset))
 
 i = 0
 
