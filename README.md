@@ -38,6 +38,14 @@ pip install setuptools
 
 pip install -e .
 
+pip install sphinx
+pip install myst-parser
+pip install furo
+
+sphinx-apidoc -f -o docs/source src/llmprivacy
+cd docs
+make html
+
 ## Issues
 
 Model half sometimes results in NaN logits.
