@@ -3,6 +3,7 @@ results/
 slurm_scripts/
 *.DS_Store
 docs/build
+*.out
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

@@ -1,14 +1,13 @@
 #!/bin/bash
 
 ## Gather data
-datasets=("\"arxiv\"" "\"dm_mathematics\"" "\"github\"" "\"hackernews\"" "\"pile_cc\"" "\"pubmed_central\"" "\"wikipedia_(en)\"")
+datasets=("arxiv" "dm_mathematics" "github" "hackernews" "pile_cc" "pubmed_central")
 
 # for subset in "${datasets[@]}"
 # do 
 #     echo "python experiments/mia/run_gradnorm.py  --model_name EleutherAI/pythia-70m-deduped   --model_revision step98000 --num_samples 3000 --seed 229 --pack --data_subset $subset"
 #     python experiments/mia/run_gradnorm.py  --model_name EleutherAI/pythia-70m-deduped   --model_revision step98000 --num_samples 3000 --seed 229 --pack --data_subset $subset
 # done 
-
 
 # Base command for the logistic regression model
 base_cmd_logreg="python experiments/mia/run_logreg.py --model_name EleutherAI/pythia-70m-deduped --model_revision step98000 --clf_num_samples 25000 --mia_num_samples 2500 --seed 229 --feature_set x_grad_inf theta_grad_inf layerwise_grad_inf x_grad_2 theta_grad_2 layerwise_grad_2 x_grad_1 theta_grad_1 layerwise_grad_1"
@@ -41,8 +40,8 @@ for mia_dataset in "${datasets[@]}"; do
     mia_val_features="results/GradNorm/GradNorm_EleutherAI-pythia-70m-deduped_step98000_N=3000_S=0_seed=229_datasubset=${mia_dataset}_val.pt"
 
     # Construct full commands
-    cmd_logreg="${base_cmd_logreg} --clf_pos_features ${clf_pos_features} --clf_neg_features ${clf_neg_features} --mia_train_features ${mia_train_features} --mia_val_features ${mia_val_features} --tag \"test_with_${mia_dataset}\""
-    cmd_nn="${base_cmd_nn} --clf_pos_features ${clf_pos_features} --clf_neg_features ${clf_neg_features} --mia_train_features ${mia_train_features} --mia_val_features ${mia_val_features} --tag \"test_with_${mia_dataset}\""
+    cmd_logreg="${base_cmd_logreg} --clf_pos_features ${clf_pos_features} --clf_neg_features ${clf_neg_features} --mia_train_features ${mia_train_features} --mia_val_features ${mia_val_features} --tag \"test_on_${mia_dataset}\""
+    cmd_nn="${base_cmd_nn} --clf_pos_features ${clf_pos_features} --clf_neg_features ${clf_neg_features} --mia_train_features ${mia_train_features} --mia_val_features ${mia_val_features} --tag \"test_on_${mia_dataset}\""
 
     # Echo the dataset being processed for MIA
     echo "Processing MIA on ${mia_dataset} with classifier on all other datasets"
