@@ -333,7 +333,84 @@ def compute_dataloader_all_norms(model, embedding_layer, dataloader, norms, devi
     grad_norms = {p:{"x_grad": total_grads[:,i], "theta_grad": total_grads[:,len(norms)+i], "layerwise_grad": total_grads[:,2*len(norms)+i::len(norms)]} for i,p in enumerate(norms)}
     return grad_norms
 
-def compute_input_ids_jl(model, embedding_layer, input_ids,  projector, last_layer, device=None):
+def compute_basis_change(model, input_ids, projector, device=None):
+    """
+    This computes the basis change for the last layer (Carlini gray-box attack), and returns it
+    with the norms of that layer.
+
+    Args:
+        model (transformers.AutoModelForCausalLM): HuggingFace model.
+        input_ids (torch.Tensor): tensor of input IDs.
+        projector (dict): dictionary of dimensionality reduction functions
+        device (str): CPU or GPU 
+    
+    Returns:
+        torch.Tensor or list: data from input IDs
+    """
+    mask  = (input_ids > 0).detach()
+    model.zero_grad()
+    outputs = model(input_ids=input_ids.to(device),attention_mask=mask.to(device),labels=input_ids.to(device))
+    outputs.loss.backward()
+    
+    for i, (name,param) in enumerate(model.named_parameters()):
+        if name == "embed_out.weight":
+            copied_grad = param.grad.detach().clone()
+            grad = (copied_grad @ projector["random_basis_change"]).flatten().view(-1,1).T
+            L = torch.tensor([torch.norm(grad,p=p) for p in [float("inf"),1,2]])    # get norms
+            projected = projector["embed_out"].project(grad,1).to(device).flatten() # get projection of embedding_out layer
+            
+            del outputs, input_ids, mask
+            torch.cuda.empty_cache()
+            torch.cuda.synchronize()
+            return torch.concat((L.cpu(),projected.cpu()),dim=0).flatten()
+
+def compute_dataloader_basis_changes(model, dataloader, projector, device=None, nbatches=None, half=True):
+    '''
+    Computes dataloader gradients with jl dimensionality reduction.
+    Args:
+        model (transformers.AutoModelForCausalLM): HuggingFace model.
+        dataloader (torch.utils.data.dataloader.DataLoader): DataLoader of samples.
+        projector (dict): dictionary of dimensionality reduction functions        
+        device (str): CPU or GPU 
+        nbatches (int): Number of batches to consider
+        half (bool): use half precision floats for model
+
+    Returns:
+        torch.Tensor or list: data for input IDs
+    '''
+    projector["random_basis_change"] = projector["random_basis_change"].to(device)
+    if half:
+        print("Using model.half() ....")
+        model.half()
+        projector["random_basis_change"].half()
+    else:
+        print("Not using model.half() ....")
+
+    model.eval()
+    model.to(device)
+
+    grads = []
+    for batchno, data_x in tqdm(enumerate(dataloader),total=len(dataloader)):
+        if nbatches is not None and batchno >= nbatches:
+            break
+        ## Get predictions on data 
+        if type(data_x) is dict:
+            data_x = data_x["input_ids"]
+        else:
+            data_x = data_x[None,:]
+        data_x = data_x.detach()                
+
+        ## Compute features on input data
+        grad = compute_basis_change(model, data_x, projector, device).detach().cpu()
+        grads.append(grad)
+
+        del data_x
+        torch.cuda.empty_cache()
+        torch.cuda.synchronize()
+    
+    return torch.stack(grads)
+
+def compute_input_ids_grad_jl(model, embedding_layer, input_ids,  projector, device=None):
     """
     Compute JL of gradients with respect x and/or theta
     Args:
@@ -341,59 +418,38 @@ def compute_input_ids_jl(model, embedding_layer, input_ids,  projector, last_lay
         embedding_layer (torch.nn.parameter.Parameter): computes embeddings from tokens, useful for taking grad wrt x
         input_ids (torch.Tensor): tensor of input IDs.
         projector (dict): dictionary of dimensionality reduction functions
-        last_layer (bool): flag to only use JL features of embedding projection gradient
         device (str): CPU or GPU 
                 
     Returns:
         torch.Tensor or list: data from input IDs
     """
+
+    mask  = (input_ids > 0).detach()
+    input_embeds=Variable(embedding_layer[input_ids.cpu()],requires_grad=True)
+
+    ## Get gradient with respect to x    
+    model.zero_grad()
+    outputs = model(inputs_embeds=input_embeds.to(device),attention_mask=mask.to(device),labels=input_ids.to(device))    
+    outputs.loss.backward()
+    x_grad = input_embeds.grad.detach().to(device)
+    x_grad = F.pad(x_grad, (0,0,0, 2048-x_grad.shape[1],0,2048-x_grad.shape[2]), "constant", 0).flatten().view(-1,1).T
+    all_grads = projector["x"].project(x_grad,1).to(device).flatten()
+
+    ## Get gradient with respect to theta
+    model.zero_grad()
+    outputs = model(input_ids=input_ids.to(device),attention_mask=mask.to(device),labels=input_ids.to(device))
+    outputs.loss.backward()
+
+    for i, (name,param) in enumerate(model.named_parameters()):
+        grad = param.grad.flatten().view(-1,1).T
+        all_grads = torch.concat((all_grads, projector[(i,name)].project(grad,1).flatten()),dim=0)
     
-    if last_layer:
-        mask  = (input_ids > 0).detach()
-        model.zero_grad()
-        outputs = model(input_ids=input_ids.to(device),attention_mask=mask.to(device),labels=input_ids.to(device))
-        outputs.loss.backward()
-        
-        for i, (name,param) in enumerate(model.named_parameters()):
-            if name == "embed_out.weight":
-                copied_grad = param.grad.detach().clone()
-                grad = (copied_grad @ projector["random_basis_change"]).flatten().view(-1,1).T
-                L = torch.tensor([torch.norm(grad,p=p) for p in [float("inf"),1,2]])
-                projected = projector["embed_out"].project(grad,1).to(device).flatten()
-                
-                del outputs, input_ids, mask
-                torch.cuda.empty_cache()
-                torch.cuda.synchronize()
-                return torch.concat((L.cpu(),projected.cpu()),dim=0).flatten()
+    del outputs, input_embeds, input_ids, mask
+    torch.cuda.empty_cache()
+    torch.cuda.synchronize()
+    return all_grads
 
-    else:
-        mask  = (input_ids > 0).detach()
-        input_embeds=Variable(embedding_layer[input_ids.cpu()],requires_grad=True)
-
-        ## Get gradient with respect to x    
-        model.zero_grad()
-        outputs = model(inputs_embeds=input_embeds.to(device),attention_mask=mask.to(device),labels=input_ids.to(device))    
-        outputs.loss.backward()
-        x_grad = input_embeds.grad.detach().to(device)
-        x_grad = F.pad(x_grad, (0,0,0, 2048-x_grad.shape[1],0,2048-x_grad.shape[2]), "constant", 0).flatten().view(-1,1).T
-        all_grads = projector["x"].project(x_grad,1).to(device).flatten()
-
-        ## Get gradient with respect to theta
-        model.zero_grad()
-        outputs = model(input_ids=input_ids.to(device),attention_mask=mask.to(device),labels=input_ids.to(device))
-        outputs.loss.backward()
-        
-
-        for i, (name,param) in enumerate(model.named_parameters()):
-            grad = param.grad.flatten().view(-1,1).T
-            all_grads = torch.concat((all_grads, projector[(i,name)].project(grad,1).flatten()),dim=0)
-        
-        del outputs, input_embeds, input_ids, mask
-        torch.cuda.empty_cache()
-        torch.cuda.synchronize()
-        return all_grads
-
-def compute_dataloader_jl(model, embedding_layer, dataloader, projector, last_layer, device=None, nbatches=None, half=True):
+def compute_dataloader_jl(model, embedding_layer, dataloader, projector, device=None, nbatches=None, half=True):
     '''
     Computes dataloader gradients with jl dimensionality reduction.
     Args:
@@ -401,7 +457,6 @@ def compute_dataloader_jl(model, embedding_layer, dataloader, projector, last_la
         embedding_layer (torch.nn.parameter.Parameter): computes embeddings from tokens, useful for taking grad wrt x
         dataloader (torch.utils.data.dataloader.DataLoader): DataLoader of samples.
         projector (dict): dictionary of dimensionality reduction functions        
-        last_layer (bool): flag to only use JL features of embedding projection features
         device (str): CPU or GPU 
         nbatches (int): Number of batches to consider
         half (bool): use half precision floats for model
@@ -416,10 +471,10 @@ def compute_dataloader_jl(model, embedding_layer, dataloader, projector, last_la
         print("Not using model.half() ....")
     model.eval()
     model.to(device)
-    if "random_basis_change" in projector:
-        projector["random_basis_change"] = projector["random_basis_change"].to(device).half()
+    # if "random_basis_change" in projector:
+    #     projector["random_basis_change"] = projector["random_basis_change"].to(device).half()
 
-    losses = []
+    grads = []
     for batchno, data_x in tqdm(enumerate(dataloader),total=len(dataloader)):
         if nbatches is not None and batchno >= nbatches:
             break
@@ -432,14 +487,14 @@ def compute_dataloader_jl(model, embedding_layer, dataloader, projector, last_la
         data_x = data_x.detach()                
 
         ## Compute features on input data
-        loss = compute_input_ids_jl(model, embedding_layer, data_x, projector, last_layer, device=device).detach().cpu()
-        losses.append(loss)
+        grad = compute_input_ids_grad_jl(model, embedding_layer, data_x, projector, device=device).detach().cpu()
+        grads.append(grad)
 
         del data_x
         torch.cuda.empty_cache()
         torch.cuda.synchronize()
     
-    return torch.stack(losses)
+    return torch.stack(grads)
 
 
 def compute_input_ids_logits(model, input_ids, device=None):
