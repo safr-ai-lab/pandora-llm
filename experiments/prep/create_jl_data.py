@@ -17,12 +17,11 @@ import argparse
 This script serves a few functions:
 1) It creates the JL'ized gradients with respect to train/val data. By default it will project each layer ot some fixed num dimensions (proj_each_layer_to; default=3). 
 
-[Example] python create_jl_data.py --model_name EleutherAI/pythia-70m-deduped --pack --num_samples 10 --proj_each_layer_to 4 --wrt theta --model_half --project_type normal
+[Example] python create_jl_data.py --model_name EleutherAI/pythia-1b-deduped --pack --num_samples 10 --proj_each_layer_to 4 --wrt theta --model_half --project_type normal
 
 2) It creates the JL'ized embedding layer (up to symmetries) that is used in our gray-box model-stealing attack. This info also contains p=1,2,inf norms of those gradients.
 
-[Example]
-
+[Example] python create_jl_data.py --model_name EleutherAI/pythia-1b-deduped --pack --num_samples 10 --last_layer --project_type normal
 """
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -65,14 +64,14 @@ def main():
 
     # Title and setup
     if args.last_layer:
-        title_str = f"Data/lastlayer_model={args.model_name}_samp={args.num_samples}_seed={args.seed}_projseed={args.proj_seed}_half={args.model_half}"
+        title_str = f"Data/lastlayer_model={args.model_name.replace('/','-')}_samp={args.num_samples}_seed={args.seed}_projseed={args.proj_seed}_half={args.model_half}"
     else:
         if args.total_dim >= 0:
-            title_str = f"Data/lastlayer_model={args.model_name}_samp={args.num_samples}_wrt={args.wrt}_totalproj={args.total_dim}_seed={args.seed}_projseed={args.proj_seed}_half={args.model_half}"
+            title_str = f"Data/gradjl_model={args.model_name.replace('/','-')}_samp={args.num_samples}_wrt={args.wrt}_totalproj={args.total_dim}_seed={args.seed}_projseed={args.proj_seed}_half={args.model_half}"
             print("total_dim is not yet supported; exiting....")
             sys.exit(0)
         else:
-            title_str = f"Data/lastlayer_model={args.model_name}_samp={args.num_samples}_wrt={args.wrt}_projeach={args.proj_each_layer_to}_seed={args.seed}_projseed={args.proj_seed}_half={args.model_half}"
+            title_str = f"Data/gradjl_model={args.model_name.replace('/','-')}_samp={args.num_samples}_wrt={args.wrt}_projeach={args.proj_each_layer_to}_seed={args.seed}_projseed={args.proj_seed}_half={args.model_half}"
     model = AutoModelForCausalLM.from_pretrained(args.model_name, revision=args.model_revision, cache_dir=args.model_cache_dir)
 
     # Load training data
@@ -101,8 +100,6 @@ def main():
             args.val_pt = "data/JL/val_dataset.pt"
             torch.save(validation_dataset,args.val_pt)
 
-    print(training_dataset[:5])
-
     # Initialization
     embedding_layer = model.get_input_embeddings().weight
     max_length = AutoConfig.from_pretrained(args.model_name).max_position_embeddings
@@ -117,14 +114,14 @@ def main():
         projectors["embed_out"] = CudaProjector(input_size, args.last_layer_proj_dim, 
                                                         args.proj_seed, ProjectionType(args.project_type), 'cuda', 8)
 
-        if config["no_rotation"]: # debugging, just use the godeye view
+        if args.no_rotation: # debugging, just use the godeye view
             projectors["random_basis_change"] = torch.eye(next(model.parameters()).shape[1])
         else:
             ## Generate data to run Carlini data extraction attack
             # mechanically, this is an equivalent projection to the carlini paper
 
-            svd_dataset = load_val_pile_packed_uncopyrighted(number=next(model.parameters()).shape[1], seed=1, num_splits=1)[0]
-            svd_dataloader = DataLoader(svd_dataset, batch_size = 1, collate_fn=lambda batch: collate_fn(batch, tokenizer=tokenizer, length=max_length))
+            svd_dataset = load_val_pile(number=next(model.parameters()).shape[1], seed=314159, num_splits=1, window=2048 if args.pack else 0)[0]
+            svd_dataloader = DataLoader(svd_dataset, batch_size = 1, collate_fn=lambda batch: collate_fn(batch, tokenizer=tokenizer, max_length=max_length))
 
             dataloader_logits = compute_dataloader_logits_embedding(model, svd_dataloader, device).T.float().to(device)
             last_layer = [m for m in model.parameters()][-1]
@@ -156,8 +153,9 @@ def main():
             train_info = compute_dataloader_jl(model, embedding_layer, training_dataloader, projectors, device=device, nbatches=args.num_samples, half=args.model_half).cpu() 
             val_info = compute_dataloader_jl(model, embedding_layer, validation_dataloader, projectors, device=device, nbatches=args.num_samples, half=args.model_half).cpu() 
 
-    # Combined object
-    # comb_data = {"jl-concat-train_info, val_info)
+    # Data
+    train_dict = {"jl-train": train_info}
+    val_dict = {"jl-val": val_info}
 
     # Save Information
     directory_path = "Data"
