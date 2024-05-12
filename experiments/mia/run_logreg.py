@@ -45,15 +45,12 @@ def main():
     parser.add_argument('--mia_val_features',  action="store", type=str, required=True, help='Location of .pt file with val white-box features')
     # Device Arguments
     parser.add_argument('--seed', action="store", type=int, required=False, default=229, help='Seed')
-    parser.add_argument('--accelerate', action="store_true", required=False, help='Use accelerate')
-    parser.add_argument('--model_half', action="store_true", required=False, help='Use half precision (fp16). 1 for use; 0 for not.')
     args = parser.parse_args()
 
-    accelerator = Accelerator() if args.accelerate else None
     set_seed(args.seed)
     args.model_cache_dir = args.model_cache_dir if args.model_cache_dir is not None else f"models/{args.model_name.replace('/','-')}"
     args.clf_path = args.clf_path if args.clf_path is not None else f"models/LogReg/{'_'.join(sorted(args.feature_set))}_N={args.clf_num_samples}"
-    args.experiment_name = args.experiment_name if args.experiment_name is not None else LogReg.get_default_name(args.clf_path,args.feature_set,args.model_name,args.model_revision,args.seed)
+    args.experiment_name = args.experiment_name if args.experiment_name is not None else LogReg.get_default_name(args.clf_path,args.model_name,args.model_revision,args.seed)
     logger = get_my_logger(log_file=f"{args.experiment_name}.log")
     ####################################################################################################
     # OBTAIN FEATURES

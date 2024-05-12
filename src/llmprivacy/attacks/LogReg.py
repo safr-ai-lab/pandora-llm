@@ -1,10 +1,7 @@
+import os
+import torch
 from .Attack import MIA
 from ..utils.attack_utils import *
-from transformers import AutoModelForCausalLM
-from torch.utils.data import DataLoader
-import torch
-import os
-from typing import Optional
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
 
@@ -19,7 +16,7 @@ class LogReg(MIA):
         self.model_cache_dir = model_cache_dir
     
     @classmethod
-    def get_default_name(cls, clf_name, feature_set, model_name, model_revision, seed):
+    def get_default_name(cls, clf_name, model_name, model_revision, seed):
         """
         Generates a default experiment name. Also ensures its validity with makedirs.
 
