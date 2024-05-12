@@ -1,5 +1,6 @@
 models/
 results/
+slurm_scripts/
 *.DS_Store
 docs/build
 

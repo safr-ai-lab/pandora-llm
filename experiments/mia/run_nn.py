@@ -35,16 +35,18 @@ def main():
     ### Train Classifier Arguments
     parser.add_argument('--feature_set', action="store", nargs='+', type=str, required=False, help='Features to use (keys of feature dict to use)')
     parser.add_argument('--clf_num_samples', action="store", type=int, required=False, help='Dataset size')
-    parser.add_argument('--clf_pos_features', action="store", type=str, required=False, help='Location of .pt file with train white-box features to train classifier')
-    parser.add_argument('--clf_neg_features', action="store", type=str, required=False, help='Location of .pt file with val white-box features to train classifier')
+    parser.add_argument('--clf_pos_features', action="store", type=str, nargs="+", required=False, help='Location of .pt files with train white-box features to train classifier')
+    parser.add_argument('--clf_neg_features', action="store", type=str, nargs="+", required=False, help='Location of .pt files with val white-box features to train classifier')
     parser.add_argument('--clf_test_frac', action="store", type=float, required=False, default=0.1, help='Fraction of input features to use to validate classifier performance')
     parser.add_argument('--clf_epochs', action="store", type=int, required=False, default=100, help='Epochs to train neural net')
     parser.add_argument('--clf_bs', action="store", type=int, required=False, default=64, help='Batch size to train neural net')
     parser.add_argument('--clf_size', action="store", type=str, required=False, default="small", help='Size of neural net')
     # MIA Arguments
     parser.add_argument('--mia_num_samples', action="store", type=int, required=False, help='Dataset size')
-    parser.add_argument('--mia_train_features',  action="store", type=str, required=True, help='Location of .pt file with train white-box features')
-    parser.add_argument('--mia_val_features',  action="store", type=str, required=True, help='Location of .pt file with val white-box features')
+    parser.add_argument('--mia_train_features',  action="store", type=str, nargs="+", required=True, help='Location of .pt files with train white-box features')
+    parser.add_argument('--mia_val_features',  action="store", type=str, nargs="+", required=True, help='Location of .pt files with val white-box features')
+    # Include tag to filename
+    parser.add_argument('--tag', action="store", type=str, required=False, help='Information to include in filename')
     # Device Arguments
     parser.add_argument('--seed', action="store", type=int, required=False, default=229, help='Seed')
     args = parser.parse_args()
@@ -52,7 +54,7 @@ def main():
     set_seed(args.seed)
     args.model_cache_dir = args.model_cache_dir if args.model_cache_dir is not None else f"models/{args.model_name.replace('/','-')}"
     args.clf_path = args.clf_path if args.clf_path is not None else f"models/NN/{'_'.join(sorted(args.feature_set))}_size={args.clf_size}_N={args.clf_num_samples}"
-    args.experiment_name = args.experiment_name if args.experiment_name is not None else NN.get_default_name(args.clf_path,args.model_name,args.model_revision,args.seed)
+    args.experiment_name = args.experiment_name if args.experiment_name is not None else NN.get_default_name(args.clf_path,args.model_name,args.model_revision,args.seed,args.tag)
     logger = get_my_logger(log_file=f"{args.experiment_name}.log")
     ####################################################################################################
     # OBTAIN FEATURES
@@ -76,8 +78,8 @@ def main():
     else:
         NNer = NN(args.clf_path, args.feature_set, args.clf_size, args.model_name, model_revision=args.model_revision, model_cache_dir=args.model_cache_dir)
         # Load features
-        pos_features = torch.load(args.clf_pos_features)
-        neg_features = torch.load(args.clf_neg_features)
+        pos_features = load_data_from_pt_files(args.clf_pos_features)
+        neg_features = load_data_from_pt_files(args.clf_neg_features)
         # Combine features
         features = {}
         for feature_name in args.feature_set:
@@ -98,8 +100,8 @@ def main():
     start = time.perf_counter()
 
     # Load data
-    train_features = torch.load(args.mia_train_features)
-    val_features = torch.load(args.mia_val_features)
+    train_features = load_data_from_pt_files(args.mia_train_features)
+    val_features = load_data_from_pt_files(args.mia_val_features)
     train_features = {feature:value[:args.clf_num_samples] for feature,value in train_features.items()}
     val_features = {feature:value[:args.clf_num_samples] for feature,value in val_features.items()}
     # Preprocess data

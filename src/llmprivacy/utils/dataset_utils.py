@@ -148,6 +148,35 @@ def load_val_pile(number=1000, percentage=None, start_index=0, seed=229, num_spl
 
     return splits
 
+def load_data_from_pt_files(list_of_filenames):
+    """
+    Loads data from different .pt files and combines them into one file 
+    Args:
+        list_of_filenames (list[str]): Number of samples
+        
+    Returns:
+        dict[torch.Tensor]: List of data from all pt_files
+    """
+
+    ## Load data across different files
+    data = {key: None for key in torch.load(list_of_filenames[0]).keys()}
+    for file in list_of_filenames:
+        curr_file = torch.load(file)
+        if set(curr_file.keys()) != set(data):
+            raise Exception("different files have different keys")
+        for key in curr_file.keys():
+            if data[key] is None:
+                data[key] = curr_file[key].clone()
+            else:
+                data[key] = torch.concat((data[key], curr_file[key]))
+    
+    ## Apply random permutation to data and sort
+    randperm = torch.randperm(len(list(data.values())[0]))
+    for key in data.keys():
+        data[key] = torch.tensor(data[key])[randperm]
+    return data
+
+
 def split_pt_into_dict(pt_file, only_x=False, only_theta=False, divideby = 10000000):
     '''
     Convert .pt of norms into dictionary. Divide L1 norms by divideby 

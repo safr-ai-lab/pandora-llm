@@ -21,7 +21,7 @@ class NN(MIA):
         self.model_cache_dir = model_cache_dir
     
     @classmethod
-    def get_default_name(cls, clf_name, model_name, model_revision, seed):
+    def get_default_name(cls, clf_name, model_name, model_revision, seed, tag):
         """
         Generates a default experiment name. Also ensures its validity with makedirs.
 
@@ -34,7 +34,7 @@ class NN(MIA):
             string: informative name of experiment
         """
         os.makedirs("results/NN", exist_ok=True)
-        return f"results/NN/NN_{clf_name.replace('/','-')}_{model_name.replace('/','-')}_{model_revision.replace('/','-')}_seed={seed}"
+        return f"results/NN/NN_{clf_name.replace('/','-')}_{model_name.replace('/','-')}_{model_revision.replace('/','-')}_seed={seed}_tag={tag}"
 
     def preprocess_features(self, features, labels = None, fit_scaler=False):
         """
