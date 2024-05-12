@@ -122,8 +122,8 @@ def main():
 
             svd_dataset = load_val_pile(number=next(model.parameters()).shape[1], seed=314159, num_splits=1, window=2048 if args.pack else 0)[0]
             svd_dataloader = DataLoader(svd_dataset, batch_size = 1, collate_fn=lambda batch: collate_fn(batch, tokenizer=tokenizer, max_length=max_length))
-
-            dataloader_logits = compute_dataloader_logits_embedding(model, svd_dataloader, device).T.float().to(device)
+            
+            dataloader_logits = compute_dataloader_logits_embedding(model, svd_dataloader, device, half=args.model_half).T.float().to(device)
             last_layer = [m for m in model.parameters()][-1]
             
             ## Generate matrix U @ torch.diag(S) which is equal to embedding projection up to symmetries
@@ -136,7 +136,6 @@ def main():
 
         train_info = compute_dataloader_basis_changes(model, training_dataloader, projectors, device=device, nbatches=args.num_samples, half=args.model_half).cpu() 
         val_info = compute_dataloader_basis_changes(model, validation_dataloader, projectors, device=device, nbatches=args.num_samples, half=args.model_half).cpu() 
-
     else: # JL of all layers
         if args.total_dim >= 0:
             print(f"In total, the number of features will be: {args.total_dim}. This feature is not yet implemented.")
