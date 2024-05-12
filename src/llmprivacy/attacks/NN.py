@@ -126,7 +126,7 @@ class NN(MIA):
         os.makedirs(os.path.dirname(self.clf_name), exist_ok=True)
         torch.save((self.clf,self.feature_set),self.clf_name if self.clf_name.endswith(".pt") else self.clf_name+".pt")
 
-        return -torch.cat(all_probs)
+        return -torch.cat(all_probs), torch.cat(all_labels)
 
     def compute_statistic(self, dataset, batch_size, num_samples=None, device="cuda" if torch.cuda.is_available() else "cpu"):
         """

@@ -88,9 +88,9 @@ def main():
         # Preprocess features
         features, labels = NNer.preprocess_features(features,labels,fit_scaler=True)
         # Train on features
-        predictions = NNer.train_clf(features, labels, args.clf_size, args.clf_epochs, args.clf_bs, device=device)
-        NNer.attack_plot_ROC(predictions[labels==1], predictions[labels==0], title=f"{args.experiment_name}_train", log_scale=False, show_plot=False)
-        NNer.attack_plot_ROC(predictions[labels==1], predictions[labels==0], title=f"{args.experiment_name}_train", log_scale=True, show_plot=False)
+        predictions, shuffled_labels = NNer.train_clf(features, labels, args.clf_size, args.clf_epochs, args.clf_bs, device=device)
+        NNer.attack_plot_ROC(predictions[shuffled_labels==1], predictions[shuffled_labels==0], title=f"{args.experiment_name}_train", log_scale=False, show_plot=False)
+        NNer.attack_plot_ROC(predictions[shuffled_labels==1], predictions[shuffled_labels==0], title=f"{args.experiment_name}_train", log_scale=True, show_plot=False)
 
     end = time.perf_counter()
     logger.info(f"- Classifier training took {end-start} seconds.")
