@@ -36,11 +36,15 @@ Rename all train/val to pos/neg where train/val does not refer to the actual ste
 
 `plot_utils.py` - add bootstrapping
 
+Make the docs yummy:
+```
 pip install sentencepiece
 pip install setuptools
 
 pip install -e .
+```
 
+```
 pip install sphinx
 pip install myst-parser
 pip install furo
@@ -48,6 +52,7 @@ pip install furo
 sphinx-apidoc -f -o docs/source src/llmprivacy
 cd docs
 make html
+```
 
 ## Issues
 
