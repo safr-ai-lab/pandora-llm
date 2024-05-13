@@ -357,6 +357,7 @@ def compute_basis_change(model, input_ids, projector, device=None):
     for i, (name,param) in enumerate(model.named_parameters()):
         if name == "embed_out.weight":
             copied_grad = param.grad.detach().clone()
+
             grad = (copied_grad @ projector["random_basis_change"]).flatten().view(-1,1).T
             L = torch.tensor([torch.norm(grad,p=p) for p in [float("inf"),1,2]])    # get norms
             projected = projector["embed_out"].project(grad,1).to(device).flatten() # get projection of embedding_out layer
@@ -404,6 +405,91 @@ def compute_dataloader_basis_changes(model, dataloader, projector, device=None, 
 
         ## Compute features on input data
         grad = compute_basis_change(model, data_x, projector, device).detach().cpu()
+        grads.append(grad)
+
+        del data_x
+        torch.cuda.empty_cache()
+        torch.cuda.synchronize()
+    
+    return torch.stack(grads)
+
+def compute_input_ids_grad_jl_enhanced(model, embedding_layer, input_ids, projector, group_indices, device=None):
+    """
+    Compute JL of gradients, augment with the norms. 
+    Idea: concat all norms, add in JL of the biggest layers with some of the smaller ones concatenated. 
+    """
+
+    mask  = (input_ids > 0).detach()
+    input_embeds=Variable(embedding_layer[input_ids.cpu()],requires_grad=True)
+
+    ## Get gradient with respect to x    
+    model.zero_grad()
+    outputs = model(inputs_embeds=input_embeds.to(device),attention_mask=mask.to(device),labels=input_ids.to(device))    
+    outputs.loss.backward()
+    x_grad = input_embeds.grad.detach().to(device)
+    x_grad = F.pad(x_grad, (0,0,0, 2048-x_grad.shape[1],0,2048-x_grad.shape[2]), "constant", 0).flatten().view(-1,1).T
+    all_grads = projector["x"].project(x_grad,1).to(device).flatten()
+
+    ## Get gradient with respect to theta
+    model.zero_grad()
+    outputs = model(input_ids=input_ids.to(device),attention_mask=mask.to(device),labels=input_ids.to(device))
+    outputs.loss.backward()
+
+    for j, indexarr in enumerate(group_indices):
+        catelems = []
+        for i, (name,param) in enumerate(model.named_parameters()):
+            if i in indexarr:
+                grad = param.grad.flatten()
+                # print(f"Grad shape: {grad.shape}")
+                catelems.append(grad)
+        result_tensor = torch.cat(catelems, dim=0).view(-1,1).T # pre transform: torch.Size([128188416])
+        # print(f"Res Tens Shape: {result_tensor.shape}")
+        all_grads = torch.concat((all_grads, projector[j].project(result_tensor,1).flatten()),dim=0)
+    
+    del outputs, input_embeds, input_ids, mask
+    torch.cuda.empty_cache()
+    torch.cuda.synchronize()
+    return all_grads
+
+def compute_dataloader_jl_enhanced(model, embedding_layer, dataloader, projector, indices, device=None, nbatches=None, half=True):
+    '''
+    Computes dataloader gradients with jl dimensionality reduction.
+    Args:
+        model (transformers.AutoModelForCausalLM): HuggingFace model.
+        embedding_layer (torch.nn.parameter.Parameter): computes embeddings from tokens, useful for taking grad wrt x
+        dataloader (torch.utils.data.dataloader.DataLoader): DataLoader of samples.
+        projector (dict): dictionary of dimensionality reduction functions        
+        device (str): CPU or GPU 
+        nbatches (int): Number of batches to consider
+        half (bool): use half precision floats for model
+
+    Returns:
+        torch.Tensor or list: data for input IDs
+    '''
+    if half:
+        print("Using model.half() ....")
+        model.half()
+    else:
+        print("Not using model.half() ....")
+    model.eval()
+    model.to(device)
+    # if "random_basis_change" in projector:
+    #     projector["random_basis_change"] = projector["random_basis_change"].to(device).half()
+
+    grads = []
+    for batchno, data_x in tqdm(enumerate(dataloader),total=len(dataloader)):
+        if nbatches is not None and batchno >= nbatches:
+            break
+        ## Get predictions on data 
+        if type(data_x) is dict:
+            data_x = data_x["input_ids"]
+        else:
+            data_x = data_x[None,:]
+        print(data_x.shape)
+        data_x = data_x.detach()                
+
+        ## Compute features on input data
+        grad = compute_input_ids_grad_jl_enhanced(model, embedding_layer, data_x, projector, indices, device=device).detach().cpu()
         grads.append(grad)
 
         del data_x
@@ -517,7 +603,7 @@ def compute_input_ids_logits(model, input_ids, device=None):
     return outputs.logits[0,-1,:]
 
 
-def compute_dataloader_logits_embedding(model, dataloader, device=None, nbatches=None, half=True):
+def compute_dataloader_logits_embedding(model, dataloader, device=None, nbatches=None, half=False):
     '''
     Computes logits of text in dataloader
 
