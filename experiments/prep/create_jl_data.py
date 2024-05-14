@@ -93,6 +93,11 @@ def main():
     title_str = f"model={args.model_name.replace('/','-')}_samp={args.num_samples}_seed={args.seed}_projseed={args.proj_seed}_half={args.model_half}_start={args.start_index}"
     model = AutoModelForCausalLM.from_pretrained(args.model_name, revision=args.model_revision, cache_dir=args.model_cache_dir)
 
+    # Initialization
+    embedding_layer = model.get_input_embeddings().weight
+    max_length = AutoConfig.from_pretrained(args.model_name).max_position_embeddings
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name)
+
     # Load training data
     if args.train_pt:
         logger.info("You are using a self-specified training dataset...")
@@ -132,11 +137,6 @@ def main():
         print(training_dataset[0])
         print("Sample Val Point:")
         print(validation_dataset[0])
-
-    # Initialization
-    embedding_layer = model.get_input_embeddings().weight
-    max_length = AutoConfig.from_pretrained(args.model_name).max_position_embeddings
-    tokenizer = AutoTokenizer.from_pretrained(args.model_name)
     
     ## Set up projectors (JL objects from TRAK)
     projectors = {}                 
