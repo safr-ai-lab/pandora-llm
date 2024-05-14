@@ -1,12 +1,13 @@
 models/
 results/
+*.DS_Store
+docs/build
+
+*.out
+*.pt
 slurm_scripts/
 experiments/prep/Data
 experiments/prep/logs
-*.DS_Store
-docs/build
-*.out
-*.pt
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
