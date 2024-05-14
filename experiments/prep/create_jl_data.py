@@ -23,6 +23,10 @@ This script serves a few functions:
 2) It creates the JL'ized embedding layer (up to symmetries) that is used in our gray-box model-stealing attack. This info also contains p=1,2,inf norms of those gradients.
 
 [Example] python create_jl_data.py --model_name EleutherAI/pythia-1b-deduped --pack --num_samples 10 --last_layer --project_type normal
+
+3) It creates the enhanced JL features with full projections (need to use --mode for this):
+
+[Example] python create_jl_data.py --model_name EleutherAI/pythia-1.4b-deduped --model_revision step98000 --num_samples 2000 --bs 1 --mode 1 --project_type rademacher --start_index 150000
 """
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -58,7 +62,6 @@ def main():
     # Dataset arguments 
     parser.add_argument('--pack', action="store_true", required=False, help='Pack validation set')
     parser.add_argument('--num_samples', action="store", type=int, required=True, help='Dataset size')
-    # parser.add_argument('--sample_length', action="store", type=int, required=False, help='Truncate number of tokens')
     parser.add_argument('--min_length', action="store", type=int, required=False, default=20, help='Min number of tokens')
     parser.add_argument('--train_pt', action="store", required=False, help='.pt file of train dataset (not dataloader) - if using own data')
     parser.add_argument('--val_pt', action="store", required=False, help='.pt file of val dataset (not dataloader) - if using own data')
@@ -75,28 +78,17 @@ def main():
     parser.add_argument('--project_type', action="store", type=str,required=False,default=False,help='type of projection (rademacher or normal)')
     parser.add_argument('--last_layer', action="store_true", required=False,default=False,help='last layer only (Carlini et al. 2024 extraction experiment)')
     parser.add_argument('--last_layer_proj_dim', action="store", type=int, required=False,default=4096,help='dimension of projection of last layer gradients')
-
-    # Norm Concatenation At End
-    parser.add_argument('--mode', action="store", type=int, required=False,default=-1,help='Feature augmentation.')
-    # parser.add_argument('--gradnorm_loc', action="store", type=str, required=False, default=0, help='Train Grad Norms for concatenation.')
+    parser.add_argument('--mode', action="store", type=int, required=False,default=0,help='Mode = 1 -> Fancy JL features. Otherwise, omit this flag.')
+    parser.add_argument('--jl_enhance_num_split', action="store", type=int, required=False, default=8, help='Num groups of layers to try dividing into before JL projection.')
 
     # Experimental flags
+    parser.add_argument('--quiet', action="store_true", required=False, default=False, help="Hide print of Shapes & Samples.")
     parser.add_argument('--no_rotation', action="store_true", required=False,default=False,help='No random rotation of embedding projection layer (for debugging)')
-    parser.add_argument('--total_dim', action="store", required=False, default=-1, help='Specify total number of features to save. Dimensionality reduction will intelligently work around this.')
     args = parser.parse_args()
 
     accelerator = Accelerator() if args.accelerate else None
     set_seed(args.seed)
-
-    # Title and setup
-    # if args.last_layer:
-    #     title_str = f"Data/lastlayer_model={args.model_name.replace('/','-')}_samp={args.num_samples}_seed={args.seed}_projseed={args.proj_seed}_half={args.model_half}"
-    # else:
-    #     if args.total_dim >= 0:
-    #         title_str = f"Data/gradjl_model={args.model_name.replace('/','-')}_samp={args.num_samples}_wrt={args.wrt}_totalproj={args.total_dim}_seed={args.seed}_projseed={args.proj_seed}_half={args.model_half}"
-    #         print("total_dim is not yet supported; exiting....")
-    #         sys.exit(0)
-    #     else:
+    quiet = args.quiet
            
     title_str = f"model={args.model_name.replace('/','-')}_samp={args.num_samples}_seed={args.seed}_projseed={args.proj_seed}_half={args.model_half}_start={args.start_index}"
     model = AutoModelForCausalLM.from_pretrained(args.model_name, revision=args.model_revision, cache_dir=args.model_cache_dir)
@@ -111,8 +103,16 @@ def main():
         training_dataset = load_train_pile_random(number=args.num_samples,start_index=args.start_index,seed=args.seed,num_splits=1,min_length=args.min_length,deduped="deduped" in args.model_name)[0]
         training_dataloader = DataLoader(training_dataset, batch_size = args.bs, collate_fn=lambda batch: collate_fn(batch, tokenizer=tokenizer, max_length=max_length))
         if accelerator is not None: # for subprocess call
-            args.train_pt = "data/JL/train_dataset.pt"
+            args.train_pt = "Data/JL/train_dataset.pt"
             torch.save(training_dataset,args.train_pt)
+
+    # Save Information
+    directory_path = "Data"
+    if not os.path.exists(directory_path):
+        os.makedirs(directory_path)
+        print(f"Directory '{directory_path}' created successfully.")
+    else:
+        print(f"Directory '{directory_path}' already exists. Using it!")    
 
     # Load validation data
     if args.val_pt:
@@ -124,13 +124,14 @@ def main():
         validation_dataset = load_val_pile(number=args.num_samples,start_index=args.start_index,seed=args.seed,num_splits=1,window=2048 if args.pack else 0)[0]
         validation_dataloader = DataLoader(validation_dataset, batch_size = args.bs, collate_fn=lambda batch: collate_fn(batch, tokenizer=tokenizer, max_length=max_length))
         if accelerator is not None: # for subprocess call
-            args.val_pt = "data/JL/val_dataset.pt"
+            args.val_pt = "Data/JL/val_dataset.pt"
             torch.save(validation_dataset,args.val_pt)
 
-    print("Train")
-    print(training_dataset[0])
-    print("Val")
-    print(validation_dataset[0])
+    if not quiet: # e.g. for verifying that data seed is right
+        print("Sample Train Point:")
+        print(training_dataset[0])
+        print("Sample Val Point:")
+        print(validation_dataset[0])
 
     # Initialization
     embedding_layer = model.get_input_embeddings().weight
@@ -139,9 +140,10 @@ def main():
     
     ## Set up projectors (JL objects from TRAK)
     projectors = {}                 
-    assert args.project_type in ["rademacher","normal"]          
+    assert args.project_type in ["rademacher","normal"]
     
-    if args.mode:
+    if args.mode == 1:
+        print("Mode = 1, so computing Carlini JL Gray Box features + JL of gradients...")
         ## CARLINI INFO
         input_size = next(model.parameters()).shape[1] * next(model.parameters()).shape[0]
         projectors["embed_out"] = CudaProjector(input_size, 512, 
@@ -165,64 +167,84 @@ def main():
         svd_embedding_projection_layer = U @ torch.diag(S)
 
         ## Identify base change to convert regular gradients to gradients we can access
-        print("Trying")
+        print("Computing random basis change")
         base_change = torch.linalg.pinv(last_layer.float()).to('cpu') @ svd_embedding_projection_layer.to('cpu')
         projectors["random_basis_change"] = torch.linalg.inv(base_change).T  
 
-        print("Computing Carlini Train")
+        print("Computing Carlini Gray Box Features")
         train_carlini_info = compute_dataloader_basis_changes(model, training_dataloader, projectors, device=device, nbatches=args.num_samples, half=args.model_half).cpu() 
-        print("Computing Carlini Val")
+        torch.save(train_carlini_info, f"Data/carlini_train_{title_str}.pt")
         val_carlini_info = compute_dataloader_basis_changes(model, validation_dataloader, projectors, device=device, nbatches=args.num_samples, half=args.model_half).cpu() 
+        torch.save(val_carlini_info, f"Data/carlini_val_{title_str}.pt")
 
-        print(f"Train Carlini Info: {train_carlini_info.shape}")
-        print(f"Val Carlini Info: {val_carlini_info.shape}")
+        if not quiet:
+            print(f"Train Carlini Info: {train_carlini_info.shape}")
+            print(f"Val Carlini Info: {val_carlini_info.shape}")
 
-        torch.save(train_carlini_info, f"Data/carlini_pos_{title_str}.pt")
-        torch.save(val_carlini_info, f"Data/carlini_neg_{title_str}.pt")
-
-        ## JL EVERYTHING
+        ## JL Enahnced Features
+        NUM = args.jl_enhance_num_split
         sizes = []
-        NUM = 8
         for i, (name,param) in enumerate(model.named_parameters()):
             sizes.append(prod(param.size()))
         
         groups, sums, indices = balanced_partition(sizes, NUM)
-        print(f"GROUPS: {groups}")
-        print(f"SUMS: {sums}")
-        print(f"INDICES: {indices}")
+        if not quiet:
+            print(f"Split groups: {groups}")
+            print(f"Split sums: {sums}")
+            print(f"Split group indices: {indices}")
 
         for i in range(NUM):
             projectors[i] = CudaProjector(sums[i], 512, args.proj_seed, ProjectionType(args.project_type), 'cuda', 32)
         
         projectors["x"] = BasicProjector(next(model.parameters()).shape[1]**2, 32, args.proj_seed, args.project_type, 'cuda', 1)
 
-        print("Train JL Big")
         train_jl_big = compute_dataloader_jl_enhanced(model, embedding_layer, training_dataloader, projectors, indices, device=device).cpu() 
-        print(f"Train JL Big: {train_jl_big.shape}")
-        torch.save(train_jl_big, f"Data/jlbig_train_{title_str}.pt")
-        print("Val JL Big")
+        torch.save(train_jl_big, f"Data/jllayers_train_{title_str}.pt")
+
         val_jl_big = compute_dataloader_jl_enhanced(model, embedding_layer, validation_dataloader, projectors, indices, device=device).cpu() 
-        print(f"Val JL Big: {val_jl_big.shape}")
-        torch.save(val_jl_big, f"Data/jlbig_val_{title_str}.pt")
+        torch.save(val_jl_big, f"Data/jllayers_val_{title_str}.pt")
 
         # Save
-        print(f"Train JL Big: {train_jl_big.shape}")
-        print(f"Val JL Big: {val_jl_big.shape}")
+        if not quiet:
+            print(f"Train JL Big: {train_jl_big.shape}") # e.g. print(f"Train JL Big: {train_jl_big.shape}")
+            print(f"Val JL Big: {val_jl_big.shape}")
 
-        """
-        Train JL Big: torch.Size([10, 4128])
-        Val JL Big: torch.Size([10, 4128])
-        """
+        train_info = torch.cat((train_carlini_info, train_jl_big), dim=1)
+        val_info = torch.cat((val_carlini_info, val_jl_big), dim=1)
+        finalsavetrain = f"enhanceJL_train_{title_str}.pt"
+        finalsaveval = f"enhanceJL_val_{title_str}.pt"
 
-        train_info_barring_norms = torch.cat((train_carlini_info, train_jl_big), dim=1)
-        print(f"Train Totals Big: {train_info_barring_norms.shape}")
-        torch.save(train_info_barring_norms, f"Data/fulljl_train_{title_str}.pt")
+        if not quiet:
+            print(f"Train JL + Carlini Concatenated Shape: {train_info.shape}")
+            print(f"Val JL + Carlini Concatenated Shape: {val_info.shape}")
+    elif args.mode == 2:
+        print(f"Mode = 2, so not including Carlini JL features...")
+        ## JL Enhanced Features
+        NUM = args.jl_enhance_num_split
+        sizes = []
+        for i, (name,param) in enumerate(model.named_parameters()):
+            sizes.append(prod(param.size()))
+        
+        groups, sums, indices = balanced_partition(sizes, NUM)
+        if not quiet:
+            print(f"Split groups: {groups}")
+            print(f"Split sums: {sums}")
+            print(f"Split group indices: {indices}")
 
-        val_info_barring_norms = torch.cat((val_carlini_info, val_jl_big), dim=1)
-        print(f"Val Totals Big: {val_info_barring_norms.shape}")
-        torch.save(val_info_barring_norms, f"Data/fulljl_val_{title_str}.pt")
+        for i in range(NUM):
+            projectors[i] = CudaProjector(sums[i], 512, args.proj_seed, ProjectionType(args.project_type), 'cuda', 32)
+        
+        projectors["x"] = BasicProjector(next(model.parameters()).shape[1]**2, 32, args.proj_seed, args.project_type, 'cuda', 1)
 
-        sys.exit(0)
+        train_info = compute_dataloader_jl_enhanced(model, embedding_layer, training_dataloader, projectors, indices, device=device).cpu() 
+        val_info = compute_dataloader_jl_enhanced(model, embedding_layer, validation_dataloader, projectors, indices, device=device).cpu() 
+
+        finalsavetrain = f"Data/jllayers_train_{title_str}.pt"
+        finalsaveval = f"Data/jllayers_val_{title_str}.pt"
+
+        if not quiet:
+            print(f"Train JL Shape: {train_info.shape}")
+            print(f"Val JL Shape: {val_info.shape}")
 
     elif args.last_layer: # Gray-box attack on [MLP] -> Logits layer
         input_size = next(model.parameters()).shape[1] * next(model.parameters()).shape[0]
@@ -249,38 +271,34 @@ def main():
             base_change = torch.linalg.pinv(last_layer.float()) @ svd_embedding_projection_layer
             projectors["random_basis_change"] = torch.linalg.inv(base_change).T   
 
+        finalsavetrain = f"Data/carliniGray_train_{title_str}.pt"
+        finalsaveval = f"Data/carliniGray_val_{title_str}.pt"
+
         train_info = compute_dataloader_basis_changes(model, training_dataloader, projectors, device=device, nbatches=args.num_samples, half=args.model_half).cpu() 
         val_info = compute_dataloader_basis_changes(model, validation_dataloader, projectors, device=device, nbatches=args.num_samples, half=args.model_half).cpu() 
+
     else: # JL of all layers
-        if args.total_dim >= 0:
-            print(f"In total, the number of features will be: {args.total_dim}. This feature is not yet implemented.")
-            pass
-        else:
-            print(f"In total, the number of features will be: {sum(1 for _ in model.named_parameters()) * args.proj_each_layer_to}.")
-            ## Project each type of data with a JL dimensionality reduction
-            projectors["x"] = BasicProjector(next(model.parameters()).shape[1]**2, args.proj_each_layer_to, args.proj_seed, args.project_type, 'cuda', 1)
-            
-            for i, (name,param) in enumerate(model.named_parameters()):
-                projectors[(i,name)] = BasicProjector(prod(param.size()), args.proj_each_layer_to, args.proj_seed, args.project_type, 'cuda', 1)
+        print(f"In total, the number of features will be: {sum(1 for _ in model.named_parameters()) * args.proj_each_layer_to}.")
+        ## Project each type of data with a JL dimensionality reduction
+        projectors["x"] = BasicProjector(next(model.parameters()).shape[1]**2, args.proj_each_layer_to, args.proj_seed, args.project_type, 'cuda', 1)
         
-            ## Get data
-            train_info = compute_dataloader_jl(model, embedding_layer, training_dataloader, projectors, device=device, nbatches=args.num_samples, half=args.model_half).cpu() 
-            val_info = compute_dataloader_jl(model, embedding_layer, validation_dataloader, projectors, device=device, nbatches=args.num_samples, half=args.model_half).cpu() 
+        for i, (name,param) in enumerate(model.named_parameters()):
+            projectors[(i,name)] = BasicProjector(prod(param.size()), args.proj_each_layer_to, args.proj_seed, args.project_type, 'cuda', 1)
+    
+        ## Get data
+        train_info = compute_dataloader_jl(model, embedding_layer, training_dataloader, projectors, device=device, nbatches=args.num_samples, half=args.model_half).cpu() 
+        val_info = compute_dataloader_jl(model, embedding_layer, validation_dataloader, projectors, device=device, nbatches=args.num_samples, half=args.model_half).cpu() 
+        
+        finalsavetrain = f"Data/JL_train_to{args.proj_each_layer_to}_{title_str}.pt"
+        finalsaveval = f"Data/JL_val_to{args.proj_each_layer_to}_{title_str}.pt"
 
     # Data
-    # train_dict = {"data": train_info}
-    # val_dict = {"data": val_info}
-
-    # # Save Information
-    # directory_path = "Data"
-    # if not os.path.exists(directory_path):
-    #     os.makedirs(directory_path)
-    #     print(f"Directory '{directory_path}' created successfully.")
-    # else:
-    #     print(f"Directory '{directory_path}' already exists. Using it!")
+    print(f"Saving to... {finalsavetrain} and {finalsaveval}")
+    train_dict = {"data": train_info}
+    val_dict = {"data": val_info}
     
-    # torch.save(train_info, f"{title_str}_train.pt")
-    # torch.save(val_info, f"{title_str}_val.pt")
+    torch.save(train_info, finalsavetrain)
+    torch.save(val_info, finalsaveval)
 
 if __name__ == "__main__":
     start_time = time.perf_counter()
