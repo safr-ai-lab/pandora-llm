@@ -102,7 +102,7 @@ def load_train_pile_random(number=1000, percentage=None, start_index=0, seed=229
 
     return splits
 
-def load_val_pile(number=1000, percentage=None, start_index=0, seed=229, num_splits=1, window=2048):
+def load_val_pile(number=1000, percentage=None, start_index=0, seed=229, num_splits=1, window=2048, compensation_factor=2.):
     """
     Loads the validation pile (NOT deduped), does an exact match deduplication and shuffling, 
     packs samples into 2048-sized chunks, and returns the specified number of splits. 
@@ -114,6 +114,7 @@ def load_val_pile(number=1000, percentage=None, start_index=0, seed=229, num_spl
         seed (int): Random seed
         num_splits (int): Number of splits to separate data into. Usually set to 1 in most methods
         window (int): number of tokens to pack up to. If not packing, set to 0.
+        compensation_factor (float): when packing, sample this times more samples to compensate for packing. Default to 2.
     
     Returns:
         list[list[str]]: List splits, each split is a list of text samples.
@@ -125,11 +126,11 @@ def load_val_pile(number=1000, percentage=None, start_index=0, seed=229, num_spl
         dataset = dataset.select(range(start_index,start_index+clip_len))
         dataset = list(dict.fromkeys(entry["text"] for entry in dataset))[:clip_len]
     else:
-        # Use twice clip_len to ensure enough samples after packing
-        if not (1<=clip_len*2<=len(dataset)):
+        # Use a multiple of clip_len to ensure enough samples after packing
+        if not (1<=clip_len*compensation_factor<=len(dataset)):
             raise IndexError(f"Number or percentage out of bounds. You specified {clip_len} samples but there are only {len(dataset)} samples.")
         tokenizer = AutoTokenizer.from_pretrained("EleutherAI/pythia-70m-deduped")
-        dataset = dataset.select(range(start_index,start_index+clip_len*2))
+        dataset = dataset.select(range(start_index,start_index+clip_len*compensation_factor))
         dataset = dataset.map(lambda x: {"tokens": tokenizer(x["text"])["input_ids"]}, remove_columns=["text","meta"])["tokens"]
 
         # Get tokens for everything, and add EOS_token between examples

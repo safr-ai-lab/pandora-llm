@@ -16,7 +16,7 @@ import sys
 
 """
 This script serves a few functions:
-1) It creates the JL'ized gradients with respect to train/val data. By default it will project each layer ot some fixed num dimensions (proj_each_layer_to; default=3). 
+1) It creates the JL'ized gradients with respect to train/val data. By default it will project each layer to some fixed num dimensions (proj_each_layer_to; default=3). 
 
 [Example] python create_jl_data.py --model_name EleutherAI/pythia-1b-deduped --pack --num_samples 10 --proj_each_layer_to 4 --wrt theta --model_half --project_type normal
 
@@ -61,6 +61,7 @@ def main():
 
     # Dataset arguments 
     parser.add_argument('--pack', action="store_true", required=False, help='Pack validation set')
+    parser.add_argument('--pack_factor', action="store", type=float, required=False, default=2., help='Compensation factor when packing')
     parser.add_argument('--num_samples', action="store", type=int, required=True, help='Dataset size')
     parser.add_argument('--min_length', action="store", type=int, required=False, default=20, help='Min number of tokens')
     parser.add_argument('--train_pt', action="store", required=False, help='.pt file of train dataset (not dataloader) - if using own data')
@@ -127,7 +128,7 @@ def main():
         validation_dataset = torch.load(fixed_input)[:args.num_samples]
         validation_dataloader = DataLoader(validation_dataset, batch_size = args.bs, collate_fn=lambda batch: collate_fn(batch, tokenizer=tokenizer, max_length=max_length))
     else:
-        validation_dataset = load_val_pile(number=args.num_samples,start_index=args.start_index,seed=args.seed,num_splits=1,window=2048 if args.pack else 0)[0]
+        validation_dataset = load_val_pile(number=args.num_samples,start_index=args.start_index,seed=args.seed,num_splits=1,window=2048 if args.pack else 0,compensation_factor=args.pack_factor)[0]
         validation_dataloader = DataLoader(validation_dataset, batch_size = args.bs, collate_fn=lambda batch: collate_fn(batch, tokenizer=tokenizer, max_length=max_length))
         if accelerator is not None: # for subprocess call
             args.val_pt = "Data/JL/val_dataset.pt"
