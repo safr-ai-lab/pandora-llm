@@ -70,7 +70,8 @@ def main():
     # Running Arguments
     parser.add_argument('--seed', action="store", type=int, required=False, default=229, help='Seed')
     parser.add_argument('--proj_seed', action="store", type=int, required=False, default=229, help='Seed for random projection')
-    parser.add_argument('--proj_each_layer_to', action="store", type=int, required=False, default=3, help='When JLing each layer, project to this dimension.')
+    parser.add_argument('--proj_x_to', action="store", type=int, required=False, default=32, help='project grad wrt x to THIS dim. Default = 32.')
+    parser.add_argument('--proj_each_layer_to', action="store", type=int, required=False, default=3, help='When JLing each layer to same dim, project to this dimension.')
     parser.add_argument('--bs', action="store", type=int, required=False, default=1, help='Batch size')
     parser.add_argument('--wrt', action="store", type=str, required=False, default="x", help='Take gradient with respect to {x, theta}')    
     parser.add_argument('--accelerate', action="store_true", required=False, help='Use accelerate. Not supported.')
@@ -154,12 +155,8 @@ def main():
         
         # Computing Logits for svd_dataloader
         print("Computing logits for svd_dataloader")
-        if os.path.exists("logits.pt"):
-            print("Loading....")
-            dataloader_logits = torch.load("logits.pt").to('cpu')
-        else:
-            dataloader_logits = compute_dataloader_logits_embedding(model, svd_dataloader, device, half=args.model_half).T.float().to(device)
-            torch.save(dataloader_logits, "logits.pt")
+        dataloader_logits = compute_dataloader_logits_embedding(model, svd_dataloader, device, half=args.model_half).T.float().to(device)
+        torch.save(dataloader_logits, f"carlini_dllogits_{title_str}.pt")
         last_layer = [m for m in model.parameters()][-1]
         
         ## Generate matrix U @ torch.diag(S) which is equal to embedding projection up to symmetries
@@ -196,7 +193,7 @@ def main():
         for i in range(NUM):
             projectors[i] = CudaProjector(sums[i], 512, args.proj_seed, ProjectionType(args.project_type), 'cuda', 32)
         
-        projectors["x"] = BasicProjector(next(model.parameters()).shape[1]**2, 32, args.proj_seed, args.project_type, 'cuda', 1)
+        projectors["x"] = BasicProjector(next(model.parameters()).shape[1]*2048, args.proj_x_to, args.proj_seed, args.project_type, 'cuda', 1)
 
         train_jl_big = compute_dataloader_jl_enhanced(model, embedding_layer, training_dataloader, projectors, indices, device=device).cpu() 
         torch.save(train_jl_big, f"Data/jllayers_train_{title_str}.pt")
@@ -234,8 +231,8 @@ def main():
         for i in range(NUM):
             projectors[i] = CudaProjector(sums[i], 512, args.proj_seed, ProjectionType(args.project_type), 'cuda', 32)
         
-        projectors["x"] = BasicProjector(next(model.parameters()).shape[1]**2, 32, args.proj_seed, args.project_type, 'cuda', 1)
-
+        projectors["x"] = BasicProjector(next(model.parameters()).shape[1]*2048, args.proj_x_to, args.proj_seed, args.project_type, 'cuda', 1)
+        
         train_info = compute_dataloader_jl_enhanced(model, embedding_layer, training_dataloader, projectors, indices, device=device).cpu() 
         val_info = compute_dataloader_jl_enhanced(model, embedding_layer, validation_dataloader, projectors, indices, device=device).cpu() 
 
@@ -280,7 +277,7 @@ def main():
     else: # JL of all layers
         print(f"In total, the number of features will be: {sum(1 for _ in model.named_parameters()) * args.proj_each_layer_to}.")
         ## Project each type of data with a JL dimensionality reduction
-        projectors["x"] = BasicProjector(next(model.parameters()).shape[1]**2, args.proj_each_layer_to, args.proj_seed, args.project_type, 'cuda', 1)
+        projectors["x"] = BasicProjector(next(model.parameters()).shape[1]*2048, args.proj_x_to, args.proj_seed, args.project_type, 'cuda', 1)
         
         for i, (name,param) in enumerate(model.named_parameters()):
             projectors[(i,name)] = BasicProjector(prod(param.size()), args.proj_each_layer_to, args.proj_seed, args.project_type, 'cuda', 1)
