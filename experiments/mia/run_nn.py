@@ -38,8 +38,8 @@ def main():
     parser.add_argument('--clf_pos_features', action="store", type=str, nargs="+", required=False, help='Location of .pt files with train white-box features to train classifier')
     parser.add_argument('--clf_neg_features', action="store", type=str, nargs="+", required=False, help='Location of .pt files with val white-box features to train classifier')
     parser.add_argument('--clf_test_frac', action="store", type=float, required=False, default=0.1, help='Fraction of input features to use to validate classifier performance')
-    parser.add_argument('--clf_epochs', action="store", type=int, required=False, default=100, help='Epochs to train neural net')
-    parser.add_argument('--clf_bs', action="store", type=int, required=False, default=64, help='Batch size to train neural net')
+    parser.add_argument('--clf_epochs', action="store", type=int, required=False, default=10, help='Epochs to train neural net')
+    parser.add_argument('--clf_bs', action="store", type=int, required=False, default=128, help='Batch size to train neural net')
     parser.add_argument('--clf_size', action="store", type=str, required=False, default="small", help='Size of neural net')
     # MIA Arguments
     parser.add_argument('--mia_num_samples', action="store", type=int, required=False, help='Dataset size')

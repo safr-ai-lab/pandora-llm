@@ -1,9 +1,13 @@
 models/
 results/
-slurm_scripts/
 *.DS_Store
 docs/build
+
 *.out
+*.pt
+slurm_scripts/
+experiments/prep/Data
+experiments/prep/logs
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
