@@ -100,8 +100,8 @@ def main():
     start = time.perf_counter()
 
     # Load data
-    train_features = load_data_from_pt_files(args.mia_train_features)
-    val_features = load_data_from_pt_files(args.mia_val_features)
+    train_features = load_dict_data(args.mia_train_features)
+    val_features = load_dict_data(args.mia_val_features)
     train_features = {feature:value[:args.clf_num_samples] for feature,value in train_features.items()}
     val_features = {feature:value[:args.clf_num_samples] for feature,value in val_features.items()}
     # Preprocess data

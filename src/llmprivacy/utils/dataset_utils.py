@@ -127,7 +127,7 @@ def load_val_pile(number=1000, percentage=None, start_index=0, seed=229, num_spl
         dataset = list(dict.fromkeys(entry["text"] for entry in dataset))[:clip_len]
     else:
         # Use a multiple of clip_len to ensure enough samples after packing
-        if not (1<=clip_len*compensation_factor<=len(dataset)):
+        if not (1<=int(clip_len*compensation_factor)<=len(dataset)):
             raise IndexError(f"Number or percentage out of bounds. You specified {clip_len} samples but there are only {len(dataset)} samples.")
         tokenizer = AutoTokenizer.from_pretrained("EleutherAI/pythia-70m-deduped")
         dataset = dataset.select(range(start_index,start_index+int(clip_len*compensation_factor)))
@@ -148,6 +148,30 @@ def load_val_pile(number=1000, percentage=None, start_index=0, seed=229, num_spl
     splits = [dataset[i * len(dataset)//num_splits : (i+1) * len(dataset) // num_splits] for i in range(num_splits)]
 
     return splits
+
+def load_dict_data(filenames):
+    """
+    Loads data from different .pt files and combines them into one dictionary
+    
+    Args:
+        filenames (list[str]): List of filenames
+        
+    Returns:
+        dict[torch.Tensor]: List of data from all pt_files
+    """
+    combined_data = {}
+    for filename in filenames:
+        data = torch.load(filename)
+        if isinstance(data,dict):
+            for key in data:
+                if key not in combined_data:
+                    combined_data[key] = data[key]
+                else:
+                    combined_data[key] = torch.cat(combined_data[key],data[key])
+        else:
+            combined_data[filename] = data[key]
+    return combined_data
+
 
 def load_data_from_pt_files(list_of_filenames):
     """

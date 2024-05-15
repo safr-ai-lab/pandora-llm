@@ -413,10 +413,9 @@ def compute_dataloader_basis_changes(model, dataloader, projector, device=None, 
     
     return torch.stack(grads)
 
-def compute_input_ids_grad_jl_enhanced(model, embedding_layer, input_ids, projector, group_indices, device=None):
+def compute_input_ids_grad_jl_balanced(model, embedding_layer, input_ids, projector, group_indices, device=None):
     """
-    Compute JL of gradients, augment with the norms. 
-    Idea: concat all norms, add in JL of the biggest layers with some of the smaller ones concatenated. 
+    Compute JL of gradients grouped by indices
     """
 
     mask  = (input_ids > 0).detach()
@@ -428,7 +427,6 @@ def compute_input_ids_grad_jl_enhanced(model, embedding_layer, input_ids, projec
     outputs.loss.backward()
     x_grad = input_embeds.grad.detach().to(device)
     x_grad = F.pad(x_grad, (0,0,0, 2048-x_grad.shape[1],0,next(model.parameters()).shape[1]-x_grad.shape[2]),"constant", 0).flatten().view(-1,1).T
-    # x_grad = F.pad(x_grad, (0,0,0, 2048-x_grad.shape[1],0,2048-x_grad.shape[2]), "constant", 0).flatten().view(-1,1).T
     all_grads = projector["x"].project(x_grad,1).to(device).flatten()
 
     ## Get gradient with respect to theta
@@ -452,7 +450,7 @@ def compute_input_ids_grad_jl_enhanced(model, embedding_layer, input_ids, projec
     torch.cuda.synchronize()
     return all_grads
 
-def compute_dataloader_jl_enhanced(model, embedding_layer, dataloader, projector, indices, device=None, nbatches=None, half=True):
+def compute_dataloader_jl_balanced(model, embedding_layer, dataloader, projector, indices, device=None, nbatches=None, half=True):
     '''
     Computes dataloader gradients with jl dimensionality reduction.
     Args:
@@ -486,11 +484,10 @@ def compute_dataloader_jl_enhanced(model, embedding_layer, dataloader, projector
             data_x = data_x["input_ids"]
         else:
             data_x = data_x[None,:]
-        print(data_x.shape)
         data_x = data_x.detach()                
 
         ## Compute features on input data
-        grad = compute_input_ids_grad_jl_enhanced(model, embedding_layer, data_x, projector, indices, device=device).detach().cpu()
+        grad = compute_input_ids_grad_jl_balanced(model, embedding_layer, data_x, projector, indices, device=device).detach().cpu()
         grads.append(grad)
 
         del data_x
@@ -572,7 +569,6 @@ def compute_dataloader_jl(model, embedding_layer, dataloader, projector, device=
             data_x = data_x["input_ids"]
         else:
             data_x = data_x[None,:]
-        print(data_x.shape)
         data_x = data_x.detach()                
 
         ## Compute features on input data

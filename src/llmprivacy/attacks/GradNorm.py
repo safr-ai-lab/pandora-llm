@@ -52,12 +52,12 @@ class GradNorm(MIA):
                     "--model_name", self.model_name,
                     "--model_revision", self.model_revision,
                     "--model_cache_dir", self.model_cache_dir,
-                    "--save_path", "results/GRAD/embedding.pt",
+                    "--save_path", "results/GradNorm/embedding.pt",
                     "--model_half" if model_half else ""
                     ]
                 )
             accelerator.wait_for_everyone()
-            embedding_layer = torch.load("results/GRAD/embedding.pt")
+            embedding_layer = torch.load("results/GradNorm/embedding.pt")
             self.model.train()
         else:
             embedding_layer = self.model.get_input_embeddings().weight
