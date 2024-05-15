@@ -26,7 +26,7 @@ This script serves a few functions:
 
 3) It creates the enhanced JL features with full projections (need to use --mode for this):
 
-[Example] python create_jl_data.py --model_name EleutherAI/pythia-1.4b-deduped --model_revision step98000 --num_samples 2000 --bs 1 --mode 1 --project_type rademacher --start_index 150000
+[Example] python create_jl_data.py --model_name EleutherAI/pythia-1.4b-deduped --model_revision step98000 --num_samples 2000 --bs 1 --mode 1 --project_type rademacher --start_index 150000 --pack
 """
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
