@@ -130,7 +130,7 @@ def load_val_pile(number=1000, percentage=None, start_index=0, seed=229, num_spl
         if not (1<=clip_len*compensation_factor<=len(dataset)):
             raise IndexError(f"Number or percentage out of bounds. You specified {clip_len} samples but there are only {len(dataset)} samples.")
         tokenizer = AutoTokenizer.from_pretrained("EleutherAI/pythia-70m-deduped")
-        dataset = dataset.select(range(start_index,start_index+clip_len*compensation_factor))
+        dataset = dataset.select(range(start_index,start_index+int(clip_len*compensation_factor)))
         dataset = dataset.map(lambda x: {"tokens": tokenizer(x["text"])["input_ids"]}, remove_columns=["text","meta"])["tokens"]
 
         # Get tokens for everything, and add EOS_token between examples
