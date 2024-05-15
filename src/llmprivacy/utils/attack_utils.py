@@ -427,7 +427,8 @@ def compute_input_ids_grad_jl_enhanced(model, embedding_layer, input_ids, projec
     outputs = model(inputs_embeds=input_embeds.to(device),attention_mask=mask.to(device),labels=input_ids.to(device))    
     outputs.loss.backward()
     x_grad = input_embeds.grad.detach().to(device)
-    x_grad = F.pad(x_grad, (0,0,0, 2048-x_grad.shape[1],0,2048-x_grad.shape[2]), "constant", 0).flatten().view(-1,1).T
+    x_grad = F.pad(x_grad, (0,0,0, 2048-x_grad.shape[1],0,next(model.parameters()).shape[1]-x_grad.shape[2]),"constant", 0).flatten().view(-1,1).T
+    # x_grad = F.pad(x_grad, (0,0,0, 2048-x_grad.shape[1],0,2048-x_grad.shape[2]), "constant", 0).flatten().view(-1,1).T
     all_grads = projector["x"].project(x_grad,1).to(device).flatten()
 
     ## Get gradient with respect to theta
@@ -520,7 +521,7 @@ def compute_input_ids_grad_jl(model, embedding_layer, input_ids,  projector, dev
     outputs = model(inputs_embeds=input_embeds.to(device),attention_mask=mask.to(device),labels=input_ids.to(device))    
     outputs.loss.backward()
     x_grad = input_embeds.grad.detach().to(device)
-    x_grad = F.pad(x_grad, (0,0,0, 2048-x_grad.shape[1],0,2048-x_grad.shape[2]), "constant", 0).flatten().view(-1,1).T
+    x_grad = F.pad(x_grad, (0,0,0, 2048-x_grad.shape[1],0,next(model.parameters()).shape[1]-x_grad.shape[2]),"constant", 0).flatten().view(-1,1).T
     all_grads = projector["x"].project(x_grad,1).to(device).flatten()
 
     ## Get gradient with respect to theta

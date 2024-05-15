@@ -232,7 +232,8 @@ def main():
             projectors[i] = CudaProjector(sums[i], 512, args.proj_seed, ProjectionType(args.project_type), 'cuda', 32)
         
         projectors["x"] = BasicProjector(next(model.parameters()).shape[1]*2048, args.proj_x_to, args.proj_seed, args.project_type, 'cuda', 1)
-        
+        # projectors["x"] = BasicProjector(next(model.parameters()).shape[1]**2, args.proj_x_to, args.proj_seed, args.project_type, 'cuda', 1)
+
         train_info = compute_dataloader_jl_enhanced(model, embedding_layer, training_dataloader, projectors, indices, device=device).cpu() 
         val_info = compute_dataloader_jl_enhanced(model, embedding_layer, validation_dataloader, projectors, indices, device=device).cpu() 
 
@@ -294,8 +295,9 @@ def main():
     train_dict = {"data": train_info}
     val_dict = {"data": val_info}
     
-    torch.save(train_info, finalsavetrain)
-    torch.save(val_info, finalsaveval)
+    # Save the dictionaries
+    torch.save(train_dict, finalsavetrain)
+    torch.save(val_dict, finalsaveval)
 
 if __name__ == "__main__":
     start_time = time.perf_counter()
