@@ -57,7 +57,7 @@ def main():
     accelerator = Accelerator() if args.accelerate else None
     set_seed(args.seed)
     args.model_cache_dir = args.model_cache_dir if args.model_cache_dir is not None else f"models/{args.model_name.replace('/','-')}"
-    args.experiment_name = args.experiment_name if args.experiment_name is not None else GradNorm.get_default_name(args.model_name,args.model_revision,args.num_samples,args.start_index,args.seed,args.data_subset)
+    args.experiment_name = args.experiment_name if args.experiment_name is not None else GradNorm.get_default_name(args.model_name,args.model_revision,args.num_samples,args.start_index,args.seed,args.data_subset,args.max_length)
     logger = get_my_logger(log_file=f"{args.experiment_name}.log")
     ####################################################################################################
     # LOAD DATA
