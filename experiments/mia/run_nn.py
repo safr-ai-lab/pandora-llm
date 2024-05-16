@@ -78,8 +78,8 @@ def main():
     else:
         NNer = NN(args.clf_path, args.feature_set, args.clf_size, args.model_name, model_revision=args.model_revision, model_cache_dir=args.model_cache_dir)
         # Load features
-        pos_features = load_data_from_pt_files(args.clf_pos_features)
-        neg_features = load_data_from_pt_files(args.clf_neg_features)
+        pos_features = load_dict_data(args.clf_pos_features)
+        neg_features = load_dict_data(args.clf_neg_features)
         # Combine features
         features = {}
         for feature_name in args.feature_set:
