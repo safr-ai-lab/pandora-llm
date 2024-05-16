@@ -169,7 +169,7 @@ def load_dict_data(filenames):
                 else:
                     combined_data[key] = torch.cat(combined_data[key],data[key])
         else:
-            combined_data[filename] = data[key]
+            combined_data[filename] = data
     return combined_data
 
 
