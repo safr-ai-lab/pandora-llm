@@ -119,7 +119,7 @@ def main():
     
     # Compute statistics
     GradNormer.load_model()
-    train_gradients = GradNormer.compute_gradients(training_dataloader,norms=args.norms,num_batches=math.ceil(args.num_samples/args.bs),device=device,model_half=args.model_half,accelerator=accelerator,max_length=arga.max_length)
+    train_gradients = GradNormer.compute_gradients(training_dataloader,norms=args.norms,num_batches=math.ceil(args.num_samples/args.bs),device=device,model_half=args.model_half,accelerator=accelerator,max_length=args.max_length)
     torch.save(train_gradients,f"{args.experiment_name}_train.pt")
     val_gradients = GradNormer.compute_gradients(validation_dataloader,norms=args.norms,num_batches=math.ceil(args.num_samples/args.bs),device=device,model_half=args.model_half,accelerator=accelerator,max_length=args.max_length)
     torch.save(val_gradients,f"{args.experiment_name}_val.pt")
