@@ -184,7 +184,7 @@ def compute_dataloader_cross_entropy(model, dataloader, device=None, num_batches
         losses = torch.cat([loss[0] for loss in losses])
         return losses
 
-def compute_input_ids_all_norms(model, embedding_layer, input_ids, norms, device=None, accelerator=None):
+def compute_input_ids_all_norms(model, embedding_layer, input_ids, norms, device=None, accelerator=None, max_length=None):
     """
     Compute norms of gradients with respect x, theta
     Note: takes advantage of the fact that norm([a,b])=norm([norm(a),norm(b)])
@@ -203,11 +203,8 @@ def compute_input_ids_all_norms(model, embedding_layer, input_ids, norms, device
             [x_grad_norm_p1, ..., x_grad_norm_pN, theta_grad_norm_p1, ..., theta_grad_norm_pN, layer1_grad_norm_p1, ..., layerM_grad_norm_p1, ..., layer1_grad_norm_pN, ..., layerM_grad_norm_pN]
     """
     
-    # if extraction_mia:
-    #     print("cutting to 100")
-    #     input_ids = input_ids[:,:100]
-    #     print(input_ids.shape)
-
+    if max_length is not None:
+        input_ids = input_ids[:,:max_length]
 
     # Compute gradient with respect to x
     mask  = (input_ids > 0).detach()
@@ -265,7 +262,7 @@ def compute_input_ids_all_norms(model, embedding_layer, input_ids, norms, device
     # total_and_layer_norms = torch.concat((total_norms, torch.tensor([layer_norms[p][l] for l in range(len(layer_norms[norms[0]])) for p in norms])))
     # return total_and_layer_norms
 
-def compute_dataloader_all_norms(model, embedding_layer, dataloader, norms, device=None, num_batches=None, samplelength=None, accelerator=None, model_half=True):
+def compute_dataloader_all_norms(model, embedding_layer, dataloader, norms, device=None, num_batches=None, samplelength=None, accelerator=None, model_half=True, max_length=None):
     '''
     Computes gradient norms of text in dataloader.
     Warning: using samplelength is discouraged
@@ -315,10 +312,10 @@ def compute_dataloader_all_norms(model, embedding_layer, dataloader, norms, devi
         ## Compute norms on data_x
         if accelerator is None:
             loss = compute_input_ids_all_norms(model, embedding_layer, data_x, norms, 
-                                               device=device,accelerator=accelerator).detach().cpu()
+                                               device=device,accelerator=accelerator,max_length=max_length).detach().cpu()
         else:
             loss = compute_input_ids_all_norms(model, embedding_layer, data_x, norms, 
-                                               device=device,accelerator=accelerator).to(accelerator.device)
+                                               device=device,accelerator=accelerator,max_length=max_length).to(accelerator.device)
 
         losses.append(loss)
 

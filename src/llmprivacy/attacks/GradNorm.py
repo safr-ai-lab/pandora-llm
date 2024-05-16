@@ -63,7 +63,7 @@ class GradNorm(MIA):
             embedding_layer = self.model.get_input_embeddings().weight
         if norms is None:
             norms = [1,2,float("inf")]
-        return compute_dataloader_all_norms(model=self.model,embedding_layer=embedding_layer,norms=norms,dataloader=dataloader,num_batches=num_batches,device=device,model_half=model_half)
+        return compute_dataloader_all_norms(model=self.model,embedding_layer=embedding_layer,norms=norms,dataloader=dataloader,num_batches=num_batches,device=device,model_half=model_half,max_length=max_length)
 
     @classmethod
     def get_default_name(cls, model_name, model_revision, num_samples, start_index, seed, datasubset):
