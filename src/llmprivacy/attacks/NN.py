@@ -33,8 +33,7 @@ class NN(MIA):
         Returns:
             string: informative name of experiment
         """
-        os.makedirs("results/NN", exist_ok=True)
-        return f"results/NN/NN_{clf_name.replace('/','-')}_{model_name.replace('/','-')}_{model_revision.replace('/','-')}_seed={seed}_tag={tag}"
+        return f"NN_{clf_name.replace('/','-')}_{model_name.replace('/','-')}_{model_revision.replace('/','-')}_seed={seed}_tag={tag}"
 
     def preprocess_features(self, features, labels = None, fit_scaler=False):
         """
@@ -63,6 +62,7 @@ class NN(MIA):
         processed_features = torch.cat(processed_features,dim=1)
         
         # Preprocess
+        processed_features = torch.nan_to_num(processed_features)
         mask_out_infinite = processed_features.isfinite().all(axis=1)
         processed_features = processed_features[mask_out_infinite]
         if fit_scaler:

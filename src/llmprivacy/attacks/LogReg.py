@@ -28,8 +28,7 @@ class LogReg(MIA):
         Returns:
             string: informative name of experiment
         """
-        os.makedirs("results/LogReg", exist_ok=True)
-        return f"results/LogReg/LogReg_{clf_name.replace('/','-')}_{model_name.replace('/','-')}_{model_revision.replace('/','-')}_seed={seed}_tag={tag}"
+        return f"LogReg_{clf_name.replace('/','-')}_{model_name.replace('/','-')}_{model_revision.replace('/','-')}_seed={seed}_tag={tag}"
 
     def preprocess_features(self, features, labels = None, fit_scaler=False):
         """

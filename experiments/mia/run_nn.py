@@ -1,4 +1,4 @@
-import time
+import time, os
 import argparse
 import torch
 from torch.utils.data import DataLoader
@@ -53,8 +53,13 @@ def main():
 
     set_seed(args.seed)
     args.model_cache_dir = args.model_cache_dir if args.model_cache_dir is not None else f"models/{args.model_name.replace('/','-')}"
-    args.clf_path = args.clf_path if args.clf_path is not None else f"models/NN/{'_'.join(sorted(args.feature_set))}_size={args.clf_size}_N={args.clf_num_samples}"
-    args.experiment_name = args.experiment_name if args.experiment_name is not None else NN.get_default_name(args.clf_path,args.model_name,args.model_revision,args.seed,args.tag)
+    
+    os.makedirs("results/NN", exist_ok=True)
+    cls = f"{'_'.join(sorted(args.feature_set))}_size={args.clf_size}_N={args.clf_num_samples}"
+    default_name = NN.get_default_name(cls,args.model_name,args.model_revision,args.seed,args.tag)    
+    
+    args.experiment_name = args.experiment_name if args.experiment_name is not None else f"results/NN/{default_name}"
+    args.clf_path = args.clf_path if args.clf_path is not None else f"models/NN/{default_name}.pt"
     logger = get_my_logger(log_file=f"{args.experiment_name}.log")
     ####################################################################################################
     # OBTAIN FEATURES
