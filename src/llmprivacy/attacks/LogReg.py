@@ -2,7 +2,8 @@ import os
 import torch
 from .Attack import MIA
 from ..utils.attack_utils import *
-from sklearn.linear_model import LogisticRegression
+from sklearn.linear_model import LogisticRegression, LogisticRegressionCV
+from sklearn.model_selection import PredefinedSplit
 from sklearn.preprocessing import StandardScaler
 
 class LogReg(MIA):
@@ -72,26 +73,34 @@ class LogReg(MIA):
         else:
             return processed_features
 
-    def train_clf(self, features, labels, max_iter, seed=229):
+    def train_clf(self, train_features, train_labels, test_features, test_labels, max_iter=1000, seed=229):
         """
         Take train and validation data and train logistic regression as MIA.
 
         Args:
-            features (torch.Tensor): Features for training supervised MIA 
-            labels (torch.Tensor): Labels for train data (binary, 1 is train)
+            train_features (torch.Tensor): Features for training supervised MIA 
+            train_labels (torch.Tensor): Labels for train data (binary, 1 is train)
+            test_features (torch.Tensor): Features for validating supervised MIA 
+            test_labels (torch.Tensor): Labels for test data (binary, 1 is train)
             max_iter (int): number of iterations of logistic regression
             seed (int): Seed of logistic regression
                     
         Returns:
-            tuple[torch.Tensor]: train predictions 
+            tuple[torch.Tensor,torch.Tensor]: train predictions, test predictions
         """
+        features = np.concatenate((train_features,test_features),axis=0)
+        labels = np.concatenate((train_labels,test_labels),axis=0)
+        test_fold = np.zeros(features.shape[0])
+        test_fold[:train_features.shape[0]] = -1
+        cv = PredefinedSplit(test_fold)
 
-        self.clf = LogisticRegression(max_iter=max_iter,random_state=seed).fit(features, labels)
+        # self.clf = LogisticRegression(max_iter=6,random_state=seed).fit(features,labels)
+        self.clf = LogisticRegressionCV(cv=cv,max_iter=max_iter,refit=False,random_state=seed).fit(features, labels)
 
         os.makedirs(os.path.dirname(self.clf_name), exist_ok=True)
         torch.save((self.clf,self.feature_set),self.clf_name if self.clf_name.endswith(".pt") else self.clf_name+".pt")
 
-        return -self.clf.predict_proba(features)[:,1]
+        return -self.clf.predict_proba(train_features)[:,1], -self.clf.predict_proba(test_features)[:,1]
 
     def compute_statistic(self, dataset, num_samples=None):
         """

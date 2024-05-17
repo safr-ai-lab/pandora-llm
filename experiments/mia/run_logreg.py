@@ -37,7 +37,7 @@ def main():
     parser.add_argument('--clf_num_samples', action="store", type=int, required=False, help='Dataset size')
     parser.add_argument('--clf_pos_features', action="store", type=str, nargs="+", required=False, help='Location of .pt files with train white-box features to train classifier')
     parser.add_argument('--clf_neg_features', action="store", type=str, nargs="+", required=False, help='Location of .pt files with val white-box features to train classifier')
-    parser.add_argument('--clf_test_frac', action="store", type=float, required=False, default=0.1, help='Fraction of input features to use to validate classifier performance')
+    parser.add_argument('--clf_test_frac', action="store", type=float, required=False, default=0.1, help='Fraction of input train features to use to validate classifier performance')
     parser.add_argument('--clf_iter', action="store", type=int, required=False, default=1000, help='Maximum number of iterations for training logistic regression')
     # MIA Arguments
     parser.add_argument('--mia_num_samples', action="store", type=int, required=False, help='Dataset size')
@@ -79,16 +79,23 @@ def main():
         pos_features = load_dict_data(args.clf_pos_features)
         neg_features = load_dict_data(args.clf_neg_features)
         # Combine features
-        features = {}
+        train_features = {}
+        test_features = {}
+        index = int(args.clf_num_samples*(1-args.clf_test_frac))
         for feature_name in args.feature_set:
-            features[feature_name] = torch.cat((pos_features[feature_name][:args.clf_num_samples],neg_features[feature_name][:args.clf_num_samples]),dim=0)
-        labels = torch.cat((torch.ones(len(pos_features[feature_name][:args.clf_num_samples])),torch.zeros(len(neg_features[feature_name][:args.clf_num_samples]))),dim=0)
+            train_features[feature_name] = torch.cat((pos_features[feature_name][:index],neg_features[feature_name][:index]),dim=0)
+            test_features[feature_name] = torch.cat((pos_features[feature_name][index:args.clf_num_samples],neg_features[feature_name][index:args.clf_num_samples]),dim=0)
+        train_labels = torch.cat((torch.ones(len(pos_features[feature_name][:index])),torch.zeros(len(neg_features[feature_name][:index]))),dim=0)
+        test_labels = torch.cat((torch.ones(len(pos_features[feature_name][index:args.clf_num_samples])),torch.zeros(len(neg_features[feature_name][index:args.clf_num_samples]))),dim=0)
         # Preprocess features
-        features, labels = LogReger.preprocess_features(features,labels,fit_scaler=True)
+        train_features, train_labels = LogReger.preprocess_features(train_features,train_labels,fit_scaler=True)
+        test_features, test_labels = LogReger.preprocess_features(test_features,test_labels,fit_scaler=False)
         # Train on features
-        predictions = LogReger.train_clf(features, labels, args.clf_iter)
-        LogReger.attack_plot_ROC(predictions[labels==1], predictions[labels==0], title=f"{args.experiment_name}_train", log_scale=False, show_plot=False)
-        LogReger.attack_plot_ROC(predictions[labels==1], predictions[labels==0], title=f"{args.experiment_name}_train", log_scale=True, show_plot=False)
+        train_predictions, test_predictions = LogReger.train_clf(train_features, train_labels, test_features, test_labels, args.clf_iter)
+        LogReger.attack_plot_ROC(train_predictions[train_labels==1], train_predictions[train_labels==0], title=f"{args.experiment_name}_train", log_scale=False, show_plot=False)
+        LogReger.attack_plot_ROC(train_predictions[train_labels==1], train_predictions[train_labels==0], title=f"{args.experiment_name}_train", log_scale=True, show_plot=False)
+        LogReger.attack_plot_ROC(test_predictions[test_labels==1], test_predictions[test_labels==0], title=f"{args.experiment_name}_test", log_scale=False, show_plot=False)
+        LogReger.attack_plot_ROC(test_predictions[test_labels==1], test_predictions[test_labels==0], title=f"{args.experiment_name}_test", log_scale=True, show_plot=False)
 
     end = time.perf_counter()
     logger.info(f"- Classifier training took {end-start} seconds.")
