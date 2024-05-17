@@ -77,30 +77,38 @@ class NN(MIA):
         else:
             return processed_features
 
-    def train_clf(self, features, labels, clf_size, epochs, batch_size, device="cuda" if torch.cuda.is_available() else "cpu"):
+    def train_clf(self, train_features, train_labels, test_features, test_labels, clf_size, epochs, batch_size, patience, min_delta=0., device="cuda" if torch.cuda.is_available() else "cpu"):
         """
         Take train and validation data and train neural network as MIA.
 
         Args:
-            features (torch.Tensor): Features for training supervised MIA 
-            labels (torch.Tensor): Labels for train data (binary, 1 is train)
+            train_features (torch.Tensor): Features for training supervised MIA 
+            train_labels (torch.Tensor): Labels for train data (binary, 1 is train)
+            test_features (torch.Tensor): Features for validating supervised MIA 
+            test_labels (torch.Tensor): Labels for test data (binary, 1 is train)
             clf_size (str): which neural net architecture to use
             epochs (int): number of epochs to train
             batch_size (int): batch size to train with
+            patience (int): number of epochs to wait for improvement before stopping
             device (str): device to train on
                     
         Returns:
             tuple[torch.Tensor]: train predictions 
         """
 
-        self.clf = NeuralNetwork(features.shape[1],clf_size).to(device)
+        self.clf = NeuralNetwork(train_features.shape[1], clf_size).to(device)
 
-        dataset = TensorDataset(features, labels)
-        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+        train_dataset = TensorDataset(train_features, train_labels)
+        train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+        test_dataset = TensorDataset(test_features, test_labels)
+        test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+
         optimizer = Adam(self.clf.parameters())
         loss_fn = nn.BCELoss()
 
         # Training
+        epochs_no_improve = 0
+        best_loss = float('inf')
         for epoch in tqdm(range(epochs)):
             self.clf.train()
             total_loss = 0
@@ -109,7 +117,7 @@ class NN(MIA):
             all_probs = []
             all_labels = []
 
-            for step, (data, target) in enumerate(dataloader):
+            for step, (data, target) in enumerate(train_dataloader):
                 optimizer.zero_grad()
                 probs = self.clf(data.to(device).float())[:,0]
                 loss = loss_fn(probs, target.to(device))
@@ -121,13 +129,47 @@ class NN(MIA):
                 all_labels.append(target)
                 loss.backward()
                 optimizer.step()
+            
+            # Validation
+            self.clf.eval()
+            val_loss = 0
+            val_correct = 0
+            val_total = 0
+            all_probs_val = []
+            all_labels_val = []
+            with torch.no_grad():
+                for data, target in test_dataloader:
+                    probs = self.clf(data.to(device).float())[:, 0]
+                    loss = loss_fn(probs, target.to(device))
+                    val_loss += loss.item()
+                    pred = (probs > 0.5).detach().cpu().int()
+                    val_correct += (pred == target).sum().item()
+                    val_total += target.size(0)
+                    all_probs_val.append(probs.detach().cpu())
+                    all_labels_val.append(target)
+            
+            # Early stopping
+            if best_loss - val_loss > min_delta:
+                best_loss = val_loss
+                epochs_no_improve = 0
+                # Save the model
+                best_model = self.clf.state_dict()
+            else:
+                epochs_no_improve += 1
+                if epochs_no_improve >= patience:
+                    print('Early stopping triggered')
+                    break
 
-            print('Epoch:', epoch, 'Loss:', total_loss/total, 'Accuracy:', correct/total, "AUC:", print_AUC(-torch.cat(all_probs)[torch.cat(all_labels)==1],-torch.cat(all_probs)[torch.cat(all_labels)==0]))
+            print('Epoch:', epoch, 
+                  'Train Loss:', total_loss/total, 'Train Accuracy:', correct/total, "Train AUC:", print_AUC(-torch.cat(all_probs)[torch.cat(all_labels)==1],-torch.cat(all_probs)[torch.cat(all_labels)==0]),
+                  'Val Loss', val_loss/val_total, 'Val Accuracy:', val_correct/val_total, "Val AUC:", print_AUC(-torch.cat(all_probs_val)[torch.cat(all_labels_val)==1],-torch.cat(all_probs_val)[torch.cat(all_labels_val)==0]))
+        
+        self.clf.load_state_dict(best_model)
 
         os.makedirs(os.path.dirname(self.clf_name), exist_ok=True)
         torch.save((self.clf,self.feature_set),self.clf_name if self.clf_name.endswith(".pt") else self.clf_name+".pt")
 
-        return -torch.cat(all_probs), torch.cat(all_labels)
+        return -torch.cat(all_probs), torch.cat(all_labels), -torch.cat(all_probs_val), torch.cat(all_labels_val)
 
     def compute_statistic(self, dataset, batch_size, num_samples=None, device="cuda" if torch.cuda.is_available() else "cpu"):
         """
