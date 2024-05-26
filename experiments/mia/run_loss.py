@@ -1,13 +1,13 @@
+import os
 import time
 import math
 import argparse
-import torch
-from torch.utils.data import DataLoader
-from transformers import AutoTokenizer, AutoConfig
-from llmprivacy.utils.attack_utils import *
 from llmprivacy.utils.dataset_utils import *
 from llmprivacy.utils.log_utils import get_my_logger
 from llmprivacy.attacks.LOSS import LOSS
+import torch
+from torch.utils.data import DataLoader
+from transformers import AutoTokenizer, AutoConfig
 from accelerate import Accelerator
 from accelerate.utils import set_seed
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -25,6 +25,7 @@ def main():
     ####################################################################################################
     parser = argparse.ArgumentParser()
     parser.add_argument('--experiment_name', action="store", type=str, required=False, help='Experiment name. Used to determine save location.')
+    parser.add_argument('--tag', action="store", type=str, required=False, help='Use default experiment name but add more information of your choice.')
     # Model Arguments
     parser.add_argument('--model_name', action="store", type=str, required=True, help='Huggingface model name')
     parser.add_argument('--model_revision', action="store", type=str, required=False, help='Model revision. If not specified, uses main.')
@@ -47,8 +48,15 @@ def main():
     
     accelerator = Accelerator() if args.accelerate else None
     set_seed(args.seed)
+
+    os.makedirs("results/LOSS", exist_ok=True)
     args.model_cache_dir = args.model_cache_dir if args.model_cache_dir is not None else f"models/{args.model_name.replace('/','-')}"
-    args.experiment_name = args.experiment_name if args.experiment_name is not None else LOSS.get_default_name(args.model_name,args.model_revision,args.num_samples,args.seed)
+    args.experiment_name = args.experiment_name if args.experiment_name is not None else (
+        f"results/LOSS/LOSS_{args.model_name.replace('/','-')}"
+        f"_{args.model_revision.replace('/','-')}" if args.model_revision is not None else ""
+        f"_N={args.num_samples}_S={args.start_index}_seed={args.seed}"
+        f"_tag={args.tag}" if args.tag is not None else ""
+    )
     logger = get_my_logger(log_file=f"{args.experiment_name}.log")
     ####################################################################################################
     # LOAD DATA
