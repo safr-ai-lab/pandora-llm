@@ -7,16 +7,16 @@ from transformers import AutoTokenizer, AutoConfig
 from llmprivacy.utils.attack_utils import *
 from llmprivacy.utils.dataset_utils import *
 from llmprivacy.utils.log_utils import get_my_logger
-from llmprivacy.attacks.JL import JL
+from llmprivacy.attacks.ModelStealing import ModelStealing
 from accelerate import Accelerator
 from accelerate.utils import set_seed
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 """
 Sample command line prompt (no acceleration)
-python run_jl.py --model_name EleutherAI/pythia-70m-deduped --model_revision step98000 --n_samples 1000 --pack --seed 229
+python run_modelstealing.py --model_name EleutherAI/pythia-70m-deduped --model_revision step98000 --n_samples 1000 --pack --seed 229
 Sample command line prompt (with acceleration)
-accelerate launch run_jl.py --accelerate --model_name EleutherAI/pythia-70m-deduped --model_revision step98000 --n_samples 1000 --pack --seed 229
+accelerate launch run_modelstealing.py --accelerate --model_name EleutherAI/pythia-70m-deduped --model_revision step98000 --n_samples 1000 --pack --seed 229
 """
 
 def main():
@@ -40,16 +40,11 @@ def main():
     parser.add_argument('--train_pt', action="store", required=False, help='.pt file of train dataset (not dataloader)')
     parser.add_argument('--val_pt', action="store", required=False, help='.pt file of val dataset (not dataloader)')
     # Attack Arguments
-    ### Select features
-    parser.add_argument('--compute_jl', action="store_true", required=False, help='Compute layerwise JL of gradients')
-    parser.add_argument('--compute_balanced_jl', action="store_true", required=False, help='Compute groupwise JL of gradients')
+    parser.add_argument('--modelstealing_method', action="store", type=str, required=False, default="one_sided_projection", help="Model stealing method")
     ### Projection arguments
-    parser.add_argument('--proj_type', action="store", type=str,required=False,default="rademacher",help='type of projection (rademacher or normal)')
+    parser.add_argument('--proj_type', action="store", type=str, required=False, default="rademacher", help='type of projection (rademacher or normal)')
     parser.add_argument('--proj_seed', action="store", type=int, required=False, default=229, help='Seed for random projection')
-    parser.add_argument('--proj_dim_x', action="store", type=int, required=False, default=32, help='Project grad wrt x to this dim. Default = 32.')
-    parser.add_argument('--proj_dim_layer', action="store", type=int, required=False, default=3, help='When JLing a layer, project to this dimension. Default = 3.')
-    parser.add_argument('--proj_dim_group', action="store", type=int, required=False, default=512, help='When JLing a group, project to this dimension. Default = 512.')
-    parser.add_argument('--balance_num_splits', action="store", type=int, required=False, default=8, help='Num groups of layers to try dividing into before JL projection. Default = 8.')
+    parser.add_argument('--proj_dim_last', action="store", type=int, required=False,default=4096, help='Dimension of projection of last layer gradients for model stealing. Default = 4096.')
     # Device Arguments
     parser.add_argument('--seed', action="store", type=int, required=False, default=229, help='Seed')
     parser.add_argument('--accelerate', action="store_true", required=False, help='Use accelerate. Not supported.')
@@ -59,7 +54,7 @@ def main():
     accelerator = Accelerator() if args.accelerate else None
     set_seed(args.seed)
     args.model_cache_dir = args.model_cache_dir if args.model_cache_dir is not None else f"models/{args.model_name.replace('/','-')}"
-    args.experiment_name = args.experiment_name if args.experiment_name is not None else JL.get_default_name(args.model_name,args.model_revision,args.num_samples,args.start_index,args.seed)
+    args.experiment_name = args.experiment_name if args.experiment_name is not None else ModelStealing.get_default_name(args.model_name,args.model_revision,args.num_samples,args.start_index,args.seed)
     logger = get_my_logger(log_file=f"{args.experiment_name}.log")
     ####################################################################################################
     # LOAD DATA
@@ -103,38 +98,30 @@ def main():
     logger.info("Running Attack")
 
     # Initialize attack
-    JLer = JL(args.model_name, model_revision=args.model_revision, model_cache_dir=args.model_cache_dir)
+    ModelStealer = ModelStealer(args.model_name, model_revision=args.model_revision, model_cache_dir=args.model_cache_dir)
+    ModelStealer.load_model()
+
+    # Load some random internet text
+    svd_dataset = load_val_pile(number=next(ModelStealer.model.parameters()).shape[1], seed=314159, num_splits=1, window=2048 if args.pack else 0)[0]
+    svd_dataloader = DataLoader(svd_dataset, batch_size = 1, collate_fn=lambda batch: collate_fn(batch, tokenizer=tokenizer, max_length=max_length))
     
     # Compute statistics
-    JLer.load_model()
-    train_jl = {}
-    val_jl = {}
-    if args.compute_jl:
-        train_jl["jl"] = JLer.compute_jl(
-            dataloader=training_dataloader,
-            proj_x_to=args.proj_dim_x,proj_each_layer_to=args.proj_dim_layer,proj_type=args.proj_type,proj_seed=args.proj_seed,
-            num_batches=math.ceil(args.num_samples/args.bs),device=device,model_half=args.model_half,accelerator=accelerator
-        )
-        val_jl["jl"] = JLer.compute_jl(
-            dataloader=validation_dataloader,
-            proj_x_to=args.proj_dim_x,proj_each_layer_to=args.proj_dim_layer,proj_type=args.proj_type,proj_seed=args.proj_seed,
-            num_batches=math.ceil(args.num_samples/args.bs),device=device,model_half=args.model_half,accelerator=accelerator
-        )
-    if args.compute_balanced_jl:
-        train_jl["balanced_jl"] = JLer.compute_jl_balanced(
-            dataloader=training_dataloader,
-            proj_x_to=args.proj_dim_x,proj_group_to=args.proj_dim_group,proj_type=args.proj_type,proj_seed=args.proj_seed,num_splits=args.balance_num_splits,
-            num_batches=math.ceil(args.num_samples/args.bs),device=device,model_half=args.model_half,accelerator=accelerator
-        )
-        val_jl["balanced_jl"] = JLer.compute_jl_balanced(
-            dataloader=validation_dataloader,
-            proj_x_to=args.proj_dim_x,proj_group_to=args.proj_dim_group,proj_type=args.proj_type,proj_seed=args.proj_seed,num_splits=args.balance_num_splits,
-            num_batches=math.ceil(args.num_samples/args.bs),device=device,model_half=args.model_half,accelerator=accelerator
-        )
-    JLer.unload_model()
+    train_features = {}
+    val_features = {}
+    train_features["model_stealing"] = ModelStealer.compute_model_stealing(
+        dataloader=training_dataloader,svd_dataloader=svd_dataloader,
+        method=args.modelstealing_method,proj_dim=args.proj_dim_last,proj_type=args.proj_type,proj_seed=args.proj_seed,
+        num_batches=math.ceil(args.num_samples/args.bs),device=device,model_half=args.model_half,accelerator=accelerator
+    )
+    val_features["model_stealing"] = ModelStealer.compute_model_stealing(
+        dataloader=validation_dataloader,svd_dataloader=svd_dataloader,
+        method=args.modelstealing_method,proj_dim=args.proj_dim_last,proj_type=args.proj_type,proj_seed=args.proj_seed,
+        num_batches=math.ceil(args.num_samples/args.bs),device=device,model_half=args.model_half,accelerator=accelerator
+    )
+    ModelStealer.unload_model()
 
-    torch.save(train_jl,f"{args.experiment_name}_train.pt")
-    torch.save(val_jl,f"{args.experiment_name}_val.pt")
+    torch.save(train_features,f"{args.experiment_name}_train.pt")
+    torch.save(val_features,f"{args.experiment_name}_val.pt")
 
     end = time.perf_counter()
 
