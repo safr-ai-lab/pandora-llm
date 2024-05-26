@@ -349,15 +349,25 @@ def plot_ROC_multiple(train_statistics_list, val_statistics_list, plot_title, la
     plt.grid(which="major",alpha=0.2)
     plt.grid(which="minor",alpha=0.1)
     texts = plt.legend().get_texts()
-    for index in bold_labels:
-        texts[index].set_fontweight('bold')
     if save_name is not None:
-        if save_name[-4:] != ".png" and save_name[-4:] != ".pdf":
-            save_name = save_name + ".png"
-        plt.savefig(save_name, bbox_inches="tight")
+        fig.write_image(save_name + "_roc_plotly.png",scale=5)
+        fig.write_image(save_name + "_roc_plotly.pdf",scale=5)
+        fig.write_html(save_name + "_roc_plotly.html")
+        df = pd.DataFrame([roc_auc_map,auc_se_map,tpr_at_fprs_map,tpr_se_map]).T
+        df = df.rename(columns={0:"AUC",1:"AUC_SE"})
+        df[[f'TPR@{fpr_val}' for fpr_val in fprs]] = pd.DataFrame(df[2].tolist(), index=df.index)
+        df[[f'TPR@{fpr_val}' for fpr_val in fprs]] = pd.DataFrame(df[3].tolist(), index=df.index)
+        df = df.drop(columns=[2,3])
+        output = io.StringIO()
+        df.to_csv(output,sep="\t")
+        print(output.getvalue())
+        df.to_csv(save_name+"_data.csv")
     if show_plot:
         plt.show()
-    return roc_auc_map, tpr_at_fprs_map, auc_se_map, tpr_se_map
+    if ci:
+        return roc_auc_map, tpr_at_fprs_map, auc_se_map, tpr_se_map
+    else:
+        return roc_auc_map, tpr_at_fprs_map
 
 def plot_ROC_multiple_plotly(train_statistics_list, val_statistics_list, plot_title, labels, keep_first=None, ci=True, num_bootstraps=1000, fprs=None, log_scale=False, show_plot=True, save_name=None, lims=None, colors=None, bold_labels=[]):
     '''
