@@ -102,3 +102,4 @@ class MinK(MIA):
             train_statistics.append(train_stats)
             val_statistics.append(val_stats)
         plot_ROC_multiple(train_statistics, val_statistics, title, k_range, log_scale=log_scale, show_plot=show_plot, save_name=save_name)
+        plot_ROC_multiple_plotly(train_statistics, val_statistics, title, k_range, log_scale=log_scale, show_plot=show_plot, save_name=save_name)

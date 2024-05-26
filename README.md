@@ -19,6 +19,7 @@ pip install accelerate==0.30.1
 pip install scikit-learn==1.5.0
 pip install matplotlib==3.9.0
 pip install plotly==5.22.0
+pip install kaleido==0.2.1
 pip install sentencepiece==0.2.0
 pip install setuptools==70.0.0
 pip install sphinx==7.3.7

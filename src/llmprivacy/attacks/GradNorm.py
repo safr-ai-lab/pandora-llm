@@ -120,3 +120,4 @@ class GradNorm(MIA):
             val_statistics.append(val_stats)
             labels.append(grad_type)
         plot_ROC_multiple(train_statistics, val_statistics, title, labels, log_scale=log_scale, show_plot=show_plot, save_name=save_name)
+        plot_ROC_multiple_plotly(train_statistics, val_statistics, title, labels, log_scale=log_scale, show_plot=show_plot, save_name=save_name)

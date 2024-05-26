@@ -137,6 +137,133 @@ def plot_ROC(train_statistics, val_statistics, plot_title, keep_first=None, ci=T
     else:
         return roc_auc, tpr_at_fprs
 
+def plot_ROC_plotly(train_statistics, val_statistics, plot_title, keep_first=None, ci=True, num_bootstraps=1000, fprs=None, log_scale=False, show_plot=True, save_name=None, lims=None, color='darkorange'):
+    '''
+    Plots ROC curve with train and validation test statistics. Also saves TPRs at FPRs. Uses plotly.
+    
+    **Note that we assume train statistic < test statistic. Negate before using if otherwise.**
+
+    Args:
+        train_statistics (list[float]): list of train statistics
+        val_statistics (list[float]): list of val statistics
+        plot_title (str): title of the plot
+        ci (bool): compute confidence intervals. Default: True
+        num_bootstraps (int): number of bootstraps for confidence interval
+        keep_first (int): compute only for the first keep_first number of samples
+        show_plot (bool): whether to show the plot
+        save_name (str): save path for plot and scores (without extension); does not save unless save_name is specified
+        log_scale (bool): whether to plot on log-log scale
+        lims (list): argument to xlim and ylim
+        fprs (list[float]): return TPRs at given FPRs. If unspecified, calculates at every 0.1 increment
+        color (str): color
+    
+    Returns:
+        auc (float): the ROC-AUC score
+        tpr_at_fprs (list[float]): the tprs at the given fprs
+    '''
+    color = mcolors.to_hex(color)
+    # Preprocess
+    train_statistics = torch.as_tensor(train_statistics).flatten()[:keep_first]
+    train_statistics = train_statistics[~train_statistics.isnan()]
+    val_statistics = torch.as_tensor(val_statistics).flatten()[:keep_first]
+    val_statistics = val_statistics[~val_statistics.isnan()]
+
+    ground_truth = torch.cat((torch.ones_like(train_statistics),torch.zeros_like(val_statistics))).flatten()
+    predictions = torch.cat((-train_statistics,-val_statistics)).flatten()
+    n_points = len(ground_truth)
+
+    fpr, tpr, thresholds = roc_curve(ground_truth,predictions)
+    roc_auc = auc(fpr, tpr)
+
+    # Process FPRs
+    if fprs is None:
+        fprs = [0.01,0.05,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9]
+    tpr_at_fprs = [tpr[np.max(np.argwhere(fpr<=fpr_val))] for fpr_val in fprs]
+    
+    # Compute CI
+    if ci:
+        fpr_range = np.linspace(0, 1, n_points)
+        def auc_statistic(data,axis):
+            ground_truth = data[0,0,:].T
+            predictions = data[1,0,:].T
+            fpr, tpr, thresholds = roc_curve(ground_truth, predictions)
+            roc_auc = auc(fpr, tpr)
+            tpr_range = np.interp(fpr_range,fpr,tpr)
+            return np.array([[roc_auc]+tpr_range.tolist()]).T
+        
+        data = torch.cat((ground_truth[:,None],predictions[:,None]),dim=1)
+        bootstrap_result = bootstrap((data,), auc_statistic, confidence_level=0.95, n_resamples=num_bootstraps, batch=1, method='percentile',axis=0)
+        auc_se = bootstrap_result.standard_error[0]
+        tpr_se = [bootstrap_result.standard_error[np.max(np.argwhere(fpr_range<=fpr_val))] for fpr_val in fprs]
+
+    # Plot
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=[0, 1], y=[0, 1], mode='lines', line=dict(dash='dash', color='black'), showlegend=False))
+    fig.add_trace(go.Scatter(x=fpr, y=tpr, mode='lines', name=f'AUC = {roc_auc:0.4f}', line=dict(color=color),legendgroup=0))
+    if ci:
+        fig.add_trace(go.Scatter(
+            x=fpr_range,
+            y=bootstrap_result.confidence_interval.low[1:],
+            fill=None,
+            mode='lines',
+            line=dict(color=color, width=0),
+            legendgroup=0,
+            showlegend=False
+        ))
+        fig.add_trace(go.Scatter(
+            x=fpr_range,
+            y=bootstrap_result.confidence_interval.high[1:],
+            fill='tonexty',
+            mode='lines',
+            line=dict(color=color, width=0),
+            showlegend=False,
+            legendgroup=0,
+            fillcolor=f'rgba({int(color[1:3], 16)}, {int(color[3:5], 16)}, {int(color[5:], 16)}, 0.1)'
+        ))
+    fig.update_layout(
+        title=plot_title,
+        xaxis_title='False Positive Rate',
+        yaxis_title='True Positive Rate',
+        xaxis=dict(
+            range=([-int(np.log10(n_points)), 0] if log_scale else [0,1]) if lims is None else lims,
+            type='log' if log_scale else 'linear',
+            constrain='domain',
+            tickmode = 'linear',
+            tick0 = -int(np.log10(n_points)) if log_scale else 0,
+            dtick = 1 if log_scale else 0.2,
+            minor=dict(ticks="inside", ticklen=0, showgrid=True)
+        ),
+        yaxis=dict(
+            range=([-int(np.log10(n_points)), 0] if log_scale else [0,1]) if lims is None else lims,
+            type='log' if log_scale else 'linear',
+            scaleanchor='x',
+            tickmode = 'linear',
+            tick0 = -int(np.log10(n_points)) if log_scale else 0,
+            dtick = 1 if log_scale else 0.2,
+            minor=dict(ticks="inside", ticklen=0, showgrid=True)
+        ),
+        showlegend=True,
+    )
+
+    if save_name is not None:
+        fig.write_image(save_name + "_roc_plotly.png")
+        fig.write_image(save_name + "_roc_plotly.pdf")
+        fig.write_html(save_name + "_roc_plotly.html")
+        df = pd.DataFrame([roc_auc,auc_se,tpr_at_fprs,tpr_se]).T
+        df = df.rename(columns={0:"AUC",1:"AUC_SE"})
+        df[[f'TPR@{fpr_val}' for fpr_val in fprs]] = pd.DataFrame(df[2].tolist(), index=df.index)
+        df[[f'TPR@{fpr_val}' for fpr_val in fprs]] = pd.DataFrame(df[3].tolist(), index=df.index)
+        df = df.drop(columns=[2,3])
+        output = io.StringIO()
+        df.to_csv(output,sep="\t")
+        print(output.getvalue())
+        df.to_csv(save_name+"_data.csv")
+    if show_plot:
+        plt.show()
+    if ci:
+        return roc_auc, tpr_at_fprs, auc_se, tpr_se
+    else:
+        return roc_auc, tpr_at_fprs
 
 def plot_ROC_multiple(train_statistics_list, val_statistics_list, plot_title, labels, keep_first=None, ci=True, num_bootstraps=1000, fprs=None, log_scale=False, show_plot=True, save_name=None, lims=None, colors=None, bold_labels=None):
     '''
@@ -232,6 +359,131 @@ def plot_ROC_multiple(train_statistics_list, val_statistics_list, plot_title, la
         plt.show()
     return roc_auc_map, tpr_at_fprs_map, auc_se_map, tpr_se_map
 
+def plot_ROC_multiple_plotly(train_statistics_list, val_statistics_list, plot_title, labels, keep_first=None, ci=True, num_bootstraps=1000, fprs=None, log_scale=False, show_plot=True, save_name=None, lims=None, colors=None, bold_labels=[]):
+    '''
+    Plots multiple ROC curves in a single plot. Uses plotly
+
+    Args:
+        train_statistics_list (list[list[float]]): list of curves, each a list of train statistics
+        val_statistics_list (list[list[float]]): list of curves, each a list of val statistics
+        plot_title (str): title of the plot
+        labels (list[str]): labels of each curve
+        fprs (list[float]): return TPRs at given FPRs. If unspecified, calculates at every 0.1 increment
+        keep_first (int): compute only for the first keep_first number of samples
+        show_plot (bool): whether to show the plot
+        save_name (str): save path for plot; does not save unless save_name is specified
+        log_scale (bool): whether to plot on log-log scale
+        lims (list): argument to xlim and ylim
+        colors (list): list of colors to use
+        bold_labels (list): list of indices to bold in legend
+    
+    Returns:
+        roc_auc_map (dict[str,float]): map of labels to auc
+        tpr_at_fprs_map (dict[str,list[float]]): map of labels to the tprs at the given fprs
+    '''
+    if fprs is None:
+        fprs = [0.01,0.05,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9]
+    if colors is None:
+        colors = [mpl.colormaps["tab10"](i) for i in range(len(train_statistics_list))]
+    colors = [mcolors.to_hex(color) for color in colors]
+
+    roc_auc_map = {}
+    tpr_at_fprs_map = {}
+    auc_se_map = {}
+    tpr_se_map = {}
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=[0, 1], y=[0, 1], mode='lines', line=dict(dash='dash', color='black'), showlegend=False))
+    for i, (train_statistics, val_statistics, label) in enumerate(zip(train_statistics_list, val_statistics_list,labels)):
+        train_statistics = torch.as_tensor(train_statistics).flatten()[:keep_first]
+        train_statistics = train_statistics[~train_statistics.isnan()]
+        val_statistics = torch.as_tensor(val_statistics).flatten()[:keep_first]
+        val_statistics = val_statistics[~val_statistics.isnan()]
+
+        ground_truth = torch.cat((torch.ones_like(train_statistics),torch.zeros_like(val_statistics))).flatten()
+        predictions = torch.cat((-train_statistics,-val_statistics)).flatten()
+        n_points = len(ground_truth)
+
+        fpr, tpr, thresholds = roc_curve(ground_truth,predictions)
+        roc_auc = auc(fpr, tpr)
+        
+        fig.add_trace(go.Scatter(x=fpr, y=tpr, mode='lines', name=f'{label} (AUC = {roc_auc:0.4f})' if i not in bold_labels else f'<b>{label} (AUC = {roc_auc:0.4f})</b>', line=dict(color=colors[i]), legendgroup=i))
+
+        # Compute CI
+        if ci:
+            fpr_range = np.linspace(0, 1, 2000)
+            def auc_statistic(data,axis):
+                ground_truth = data[0,0,:].T
+                predictions = data[1,0,:].T
+                fpr, tpr, thresholds = roc_curve(ground_truth, predictions)
+                roc_auc = auc(fpr, tpr)
+                tpr_range = np.interp(fpr_range,fpr,tpr)
+                return np.array([[roc_auc]+tpr_range.tolist()]).T
+            
+            data = torch.cat((ground_truth[:,None],predictions[:,None]),dim=1)
+            bootstrap_result = bootstrap((data,), auc_statistic, confidence_level=0.95, n_resamples=num_bootstraps, batch=1, method='percentile',axis=0)
+            fig.add_trace(go.Scatter(
+                x=fpr_range,
+                y=bootstrap_result.confidence_interval.low[1:],
+                fill=None,
+                mode='lines',
+                line=dict(color=colors[i], width=0),
+                showlegend=False,
+                legendgroup=i,
+            ))
+            fig.add_trace(go.Scatter(
+                x=fpr_range,
+                y=bootstrap_result.confidence_interval.high[1:],
+                fill='tonexty',
+                mode='lines',
+                line=dict(color=colors[i], width=0),
+                showlegend=False,
+                legendgroup=i,
+                fillcolor=f'rgba({int(colors[i][1:3], 16)}, {int(colors[i][3:5], 16)}, {int(colors[i][5:], 16)}, 0.1)'
+            ))
+            auc_se_map[label] = bootstrap_result.standard_error[0]
+            tpr_se_map[label] = [bootstrap_result.standard_error[np.max(np.argwhere(fpr_range<=fpr_val))] for fpr_val in fprs]        
+        roc_auc_map[label] = roc_auc
+        tpr_at_fprs_map[label] = [tpr[np.max(np.argwhere(fpr<=fpr_val))] for fpr_val in fprs]
+    fig.update_layout(
+        title=plot_title,
+        xaxis_title='False Positive Rate',
+        yaxis_title='True Positive Rate',
+        xaxis=dict(
+            range=([-int(np.log10(n_points)), 0] if log_scale else [0,1]) if lims is None else lims,
+            type='log' if log_scale else 'linear',
+            constrain='domain',
+            tickmode = 'linear',
+            tick0 = -int(np.log10(n_points)) if log_scale else 0,
+            dtick = 1 if log_scale else 0.2,
+            minor=dict(ticks="inside", ticklen=0, showgrid=True)
+        ),
+        yaxis=dict(
+            range=([-int(np.log10(n_points)), 0] if log_scale else [0,1]) if lims is None else lims,
+            type='log' if log_scale else 'linear',
+            scaleanchor='x',
+            tickmode = 'linear',
+            tick0 = -int(np.log10(n_points)) if log_scale else 0,
+            dtick = 1 if log_scale else 0.2,
+            minor=dict(ticks="inside", ticklen=0, showgrid=True)
+        ),
+        showlegend=True,
+    )
+    if save_name is not None:
+        fig.write_image(save_name + "_roc_plotly.png",scale=5)
+        fig.write_image(save_name + "_roc_plotly.pdf",scale=5)
+        fig.write_html(save_name + "_roc_plotly.html")
+        df = pd.DataFrame([roc_auc_map,auc_se_map,tpr_at_fprs_map,tpr_se_map]).T
+        df = df.rename(columns={0:"AUC",1:"AUC_SE"})
+        df[[f'TPR@{fpr_val}' for fpr_val in fprs]] = pd.DataFrame(df[2].tolist(), index=df.index)
+        df[[f'TPR@{fpr_val}' for fpr_val in fprs]] = pd.DataFrame(df[3].tolist(), index=df.index)
+        df = df.drop(columns=[2,3])
+        output = io.StringIO()
+        df.to_csv(output,sep="\t")
+        print(output.getvalue())
+        df.to_csv(save_name+"_data.csv")
+    if show_plot:
+        plt.show()
+    return roc_auc_map, tpr_at_fprs_map, auc_se_map, tpr_se_map
 
 def plot_ROC_files(files, plot_title, labels=None, keep_first=None, show_plot=True, save_name=None, log_scale=False, fprs=None):
     """
@@ -260,7 +512,6 @@ def plot_ROC_files(files, plot_title, labels=None, keep_first=None, show_plot=Tr
     if labels is None:
         labels = files
     plot_ROC_multiple(train_statistics_list, val_statistics_list, plot_title, labels, keep_first=keep_first, show_plot=show_plot, save_name=save_name, log_scale=log_scale, fprs=fprs)
-
 
 def print_AUC(train_statistic, val_statistic):
     """
