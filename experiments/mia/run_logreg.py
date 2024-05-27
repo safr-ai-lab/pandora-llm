@@ -30,7 +30,7 @@ def main():
     parser.add_argument('--clf_path', action="store", type=str, required=False, help='Location of saved classifier')
     parser.add_argument('--use_existing', action="store_true", required=False, help='Whether to use existing trained classifier at args.clf_path')
     ### Train Classifier Arguments
-    parser.add_argument('--feature_set', action="store", nargs='+', type=str, required=False, help='Features to use (keys of feature dict to use)')
+    parser.add_argument('--feature_set', action="store", nargs='+', type=str, required=True, help='Features to use (keys of feature dict to use)')
     parser.add_argument('--clf_num_samples', action="store", type=int, required=False, help='Dataset size')
     parser.add_argument('--clf_pos_features', action="store", type=str, nargs="+", required=False, help='Location of .pt files with train white-box features to train classifier')
     parser.add_argument('--clf_neg_features', action="store", type=str, nargs="+", required=False, help='Location of .pt files with val white-box features to train classifier')
@@ -48,14 +48,15 @@ def main():
 
     set_seed(args.seed)
 
+    args.feature_set = sorted(args.feature_set)
     args.model_cache_dir = args.model_cache_dir if args.model_cache_dir is not None else f"models/{args.model_name.replace('/','-')}"
-    args.clf_path = args.clf_path if args.clf_path is not None else f"models/LogReg/{'_'.join(sorted(args.feature_set))}_N={args.clf_num_samples}_M={args.model_name.replace('/','-')}"
+    args.clf_path = args.clf_path if args.clf_path is not None else f"models/LogReg/{'_'.join(args.feature_set)}_N={args.clf_num_samples}_M={args.model_name.replace('/','-')}"
     if args.experiment_name is None:
         args.experiment_name = (
             (f"LogReg_{args.model_name.replace('/','-')}") +
             (f"_{args.model_revision.replace('/','-')}" if args.model_revision is not None else "") +
-            (f"_N={args.num_samples}_S={args.start_index}_seed={args.seed}") +
-            (f"_{'_'.join(sorted(args.feature_set))}") +
+            (f"_N={args.clf_num_samples}_M={args.mia_num_samples}_seed={args.seed}") +
+            (f"_{'_'.join(args.feature_set)}") +
             (f"_tag={args.tag}" if args.tag is not None else "")
         )
         args.experiment_name = f"results/LogReg/{args.experiment_name}/{args.experiment_name}"
@@ -74,12 +75,11 @@ def main():
 
     if args.use_existing:
         clf, feature_set = torch.load(args.clf_path)
-        if args.feature_set is not None and feature_set!=args.feature_set:
+        if feature_set!=args.feature_set:
             raise ValueError("Specified feature set does not match saved feature set!")
         LogReger = LogReg(args.clf_path, args.feature_set, args.model_name, model_revision=args.model_revision, model_cache_dir=args.model_cache_dir)
         # Load exisitng classifier
         LogReger.clf = clf
-        LogReger.feature_set = feature_set
     else:
         LogReger = LogReg(args.clf_path, args.feature_set, args.model_name, model_revision=args.model_revision, model_cache_dir=args.model_cache_dir)
         # Load features
