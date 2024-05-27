@@ -15,22 +15,6 @@ class LogReg(MIA):
         self.model_name = model_name
         self.model_revision = model_revision
         self.model_cache_dir = model_cache_dir
-    
-    @classmethod
-    def get_default_name(cls, feature_set, model_name, model_revision, seed,tag):
-        """
-        Generates a default experiment name. Also ensures its validity with makedirs.
-
-        Args:
-            model_name (str): Huggingface model name
-            model_revision (str): model revision name
-            num_samples (int): number of training samples
-            seed (int): random seed
-        Returns:
-            string: informative name of experiment
-        """
-        os.makedirs("results/LogReg", exist_ok=True)
-        return f"results/LogReg/LogReg_{'_'.join(sorted(feature_set))}_{model_name.replace('/','-')}_{model_revision.replace('/','-')}_seed={seed}_tag={tag}"
 
     def preprocess_features(self, features, labels = None, fit_scaler=False):
         """

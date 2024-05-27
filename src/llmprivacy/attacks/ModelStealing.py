@@ -19,22 +19,6 @@ class ModelStealing(MIA):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.model = None
-
-    @classmethod
-    def get_default_name(cls, model_name, model_revision, num_samples, start_index, seed):
-        """
-        Generates a default experiment name. Also ensures its validity with makedirs.
-
-        Args:
-            model_name (str): Huggingface model name
-            model_revision (str): model revision name
-            num_samples (int): number of training samples
-            seed (int): random seed
-        Returns:
-            string: informative name of experiment
-        """
-        os.makedirs("results/ModelStealing", exist_ok=True)
-        return f"results/ModelStealing/ModelStealing_{model_name.replace('/','-')}_{model_revision.replace('/','-')}_N={num_samples}_S={start_index}_seed={seed}"
         
     def load_model(self):
         """

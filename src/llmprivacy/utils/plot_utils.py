@@ -2,6 +2,7 @@ import io
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
 import matplotlib as mpl
 import plotly.graph_objects as go
 from scipy.stats import bootstrap
@@ -350,9 +351,8 @@ def plot_ROC_multiple(train_statistics_list, val_statistics_list, plot_title, la
     plt.grid(which="minor",alpha=0.1)
     texts = plt.legend().get_texts()
     if save_name is not None:
-        fig.write_image(save_name + "_roc_plotly.png",scale=5)
-        fig.write_image(save_name + "_roc_plotly.pdf",scale=5)
-        fig.write_html(save_name + "_roc_plotly.html")
+        plt.savefig(save_name+"_roc.png", bbox_inches="tight")
+        plt.savefig(save_name+"_roc.pdf", bbox_inches="tight")
         df = pd.DataFrame([roc_auc_map,auc_se_map,tpr_at_fprs_map,tpr_se_map]).T
         df = df.rename(columns={0:"AUC",1:"AUC_SE"})
         df[[f'TPR@{fpr_val}' for fpr_val in fprs]] = pd.DataFrame(df[2].tolist(), index=df.index)

@@ -1,3 +1,4 @@
+import os
 import time
 import math
 import argparse
@@ -25,6 +26,7 @@ def main():
     ####################################################################################################
     parser = argparse.ArgumentParser()
     parser.add_argument('--experiment_name', action="store", type=str, required=False, help='Experiment name. Used to determine save location.')
+    parser.add_argument('--tag', action="store", type=str, required=False, help='Use default experiment name but add more information of your choice.')
     # Dataset Arguments
     parser.add_argument('--dataset_name', action="store", type=str, required=True, help='Dataset name')
     parser.add_argument('--num_samples', action="store", type=int, required=True, help='Dataset size')
@@ -40,7 +42,12 @@ def main():
     args = parser.parse_args()
     
     set_seed(args.seed)
-    args.experiment_name = args.experiment_name if args.experiment_name is not None else ZLIB.get_default_name(args.dataset_name,args.num_samples,args.seed)
+    os.makedirs("results/ZLIB", exist_ok=True)
+    args.experiment_name = args.experiment_name if args.experiment_name is not None else (
+        (f"results/ZLIB/ZLIB_{args.dataset_name.replace('/','-')}") +
+        (f"_N={args.num_samples}_S={args.start_index}_seed={args.seed}") +
+        (f"_tag={args.tag}" if args.tag is not None else "")
+    )
     logger = get_my_logger(log_file=f"{args.experiment_name}.log")
     ####################################################################################################
     # LOAD DATA

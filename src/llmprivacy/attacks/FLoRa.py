@@ -39,22 +39,6 @@ class FLoRa(MIA):
         Unloads model from memory
         """
         self.model = None
-    
-    @classmethod
-    def get_default_name(cls, model_name, model_revision, num_samples, seed):
-        """
-        Generates a default experiment name. Also ensures its validity with makedirs.
-
-        Args:
-            model_name (str): Huggingface model name
-            model_revision (str): model revision name
-            num_samples (int): number of training samples
-            seed (int): random seed
-        Returns:
-            string: informative name of experiment
-        """
-        os.makedirs("results/FLoRa", exist_ok=True)
-        return f"results/FLoRa/FLoRa_{model_name.replace('/','-')}_{model_revision.replace('/','-')}_N={num_samples}_seed={seed}"
 
     def compute_statistic(self, dataloader, num_batches=None, device=None, model_half=None, accelerator=None):
         """

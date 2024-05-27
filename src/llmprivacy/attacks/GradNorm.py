@@ -65,26 +65,6 @@ class GradNorm(MIA):
             norms = [1,2,float("inf")]
         return compute_dataloader_all_norms(model=self.model,embedding_layer=embedding_layer,norms=norms,dataloader=dataloader,num_batches=num_batches,device=device,model_half=model_half,max_length=max_length)
 
-    @classmethod
-    def get_default_name(cls, model_name, model_revision, num_samples, start_index, seed, datasubset, max_length):
-        """
-        Generates a default experiment name. Also ensures its validity with makedirs.
-
-        Args:
-            model_name (str): Huggingface model name
-            model_revision (str): model revision name
-            num_samples (int): number of training samples
-            seed (int): random seed
-        Returns:
-            string: informative name of experiment
-        """
-        os.makedirs("results/GradNorm", exist_ok=True)
-        if datasubset is None:
-            return f"results/GradNorm/GradNorm_{model_name.replace('/','-')}_{model_revision.replace('/','-')}_N={num_samples}_S={start_index}_seed={seed}"+(f"_trunc={max_length}" if max_length is not None else "")
-        else:
-            return f"results/GradNorm/GradNorm_{model_name.replace('/','-')}_{model_revision.replace('/','-')}_N={num_samples}_S={start_index}_seed={seed}_datasubset={datasubset}"+(f"_trunc={max_length}" if max_length is not None else "")
-
-
     def attack_plot_ROC(self, train_gradients, val_gradients, title, log_scale=False, show_plot=False, save_name=None):
         """
         Generates and displays or saves a plot of the ROC curve for the membership inference attack.
@@ -108,7 +88,7 @@ class GradNorm(MIA):
                 appropriate file extension. Defaults to None.
         """
         if save_name is None:
-            save_name = title + (" log.png" if log_scale else ".png")
+            save_name = title + ("_log" if log_scale else "")
         
         train_statistics = []
         val_statistics = []

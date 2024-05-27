@@ -1,4 +1,5 @@
-import time, os
+import os
+import time
 import argparse
 import torch
 from torch.utils.data import DataLoader
@@ -25,6 +26,7 @@ def main():
     ####################################################################################################
     parser = argparse.ArgumentParser()
     parser.add_argument('--experiment_name', action="store", type=str, required=False, help='Experiment name. Used to determine save location.')
+    parser.add_argument('--tag', action="store", type=str, required=False, help='Use default experiment name but add more information of your choice.')
     # Model Arguments
     parser.add_argument('--model_name', action="store", type=str, required=True, help='Huggingface model name')
     parser.add_argument('--model_revision', action="store", type=str, required=False, help='Model revision. If not specified, uses main.')
@@ -50,8 +52,17 @@ def main():
     args = parser.parse_args()
 
     set_seed(args.seed)
+
+    os.makedirs("results/LogReg", exist_ok=True)
     args.model_cache_dir = args.model_cache_dir if args.model_cache_dir is not None else f"models/{args.model_name.replace('/','-')}"
     args.clf_path = args.clf_path if args.clf_path is not None else f"models/LogReg/{'_'.join(sorted(args.feature_set))}_N={args.clf_num_samples}_M={args.model_name.replace('/','-')}"
+    args.experiment_name = args.experiment_name if args.experiment_name is not None else (
+        (f"results/LogReg/LogReg_{args.model_name.replace('/','-')}") +
+        (f"_{args.model_revision.replace('/','-')}" if args.model_revision is not None else "") +
+        (f"_N={args.num_samples}_S={args.start_index}_seed={args.seed}") +
+        (f"_{'_'.join(sorted(args.feature_set))}") +
+        (f"_tag={args.tag}" if args.tag is not None else "")
+    )
     args.experiment_name = args.experiment_name if args.experiment_name is not None else LogReg.get_default_name(args.feature_set,args.model_name,args.model_revision,args.seed,args.tag)
     logger = get_my_logger(log_file=f"{args.experiment_name}.log")
     ####################################################################################################

@@ -48,24 +48,6 @@ class MinK(MIA):
             self.model, dataloader, = accelerator.prepare(self.model, dataloader)
         return compute_dataloader_cross_entropy_tokens(model=self.model,dataloader=dataloader,num_batches=num_batches,device=device,model_half=model_half)
 
-
-    @classmethod
-    def get_default_name(cls, model_name, model_revision, num_samples, seed):
-        """
-        Generates a default experiment name. Also ensures its validity with makedirs.
-
-        Args:
-            model_name (str): Huggingface model name
-            model_revision (str): model revision name
-            num_samples (int): number of training samples
-            seed (int): random seed
-        Returns:
-            string: informative name of experiment
-        """
-        os.makedirs("results/MinK", exist_ok=True)
-        return f"results/MinK/MinK_{model_name.replace('/','-')}_{model_revision.replace('/','-')}_N={num_samples}_seed={seed}"
-
-
     def attack_plot_ROC(self, train_statistics_tokens, val_statistics_tokens, title, k_range=None, log_scale=False, show_plot=False, save_name=None):
         """
         Generates and displays or saves a plot of the ROC curve for the membership inference attack.
@@ -91,7 +73,7 @@ class MinK(MIA):
                 appropriate file extension. Defaults to None.
         """
         if save_name is None:
-            save_name = title + (" log.png" if log_scale else ".png")
+            save_name = title + ("_log" if log_scale else "")
         
         train_statistics = []
         val_statistics = []

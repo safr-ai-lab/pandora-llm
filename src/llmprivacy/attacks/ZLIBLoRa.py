@@ -17,23 +17,7 @@ class ZLIBLoRa(MIA):
         self.ft_model_revision = ft_model_revision
         self.ft_model_cache_dir = ft_model_cache_dir
         self.model = None
-
-    @classmethod
-    def get_default_name(cls, model_name, model_revision, num_samples, seed):
-        """
-        Generates a default experiment name. Also ensures its validity with makedirs.
-
-        Args:
-            model_name (str): Huggingface model name
-            model_revision (str): model revision name
-            num_samples (int): number of training samples
-            seed (int): random seed
-        Returns:
-            string: informative name of experiment
-        """
-        os.makedirs("results/ZLIBLoRa", exist_ok=True)
-        return f"results/ZLIBLoRa/ZLIBLoRa_{model_name.replace('/','-')}_{model_revision.replace('/','-')}_N={num_samples}_seed={seed}"
-
+        
     def load_model(self):
         """
         Loads model into memory

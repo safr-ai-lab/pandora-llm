@@ -67,6 +67,6 @@ class MIA:
                 appropriate file extension. Defaults to None.
         """
         if save_name is None:
-            save_name = title + (" log.png" if log_scale else ".png")
+            save_name = title + ("_log" if log_scale else "")
         plot_ROC(train_statistics, val_statistics, title, log_scale=log_scale, show_plot=show_plot, save_name=save_name)
         plot_ROC_plotly(train_statistics, val_statistics, title, log_scale=log_scale, show_plot=show_plot, save_name=save_name)
