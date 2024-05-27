@@ -55,15 +55,17 @@ def main():
     accelerator = Accelerator() if args.accelerate else None
     set_seed(args.seed)
 
-    os.makedirs("results/ModelStealing", exist_ok=True)
     args.model_cache_dir = args.model_cache_dir if args.model_cache_dir is not None else f"models/{args.model_name.replace('/','-')}"
-    args.experiment_name = args.experiment_name if args.experiment_name is not None else (
-        (f"results/ModelStealing/ModelStealing_{args.model_name.replace('/','-')}") +
-        (f"_{args.model_revision.replace('/','-')}" if args.model_revision is not None else "") +
-        (f"_N={args.num_samples}_S={args.start_index}_seed={args.seed}") +
-        (f"_method={args.modelstealing_method}") +
-        (f"_tag={args.tag}" if args.tag is not None else "")
-    )
+    if args.experiment_name is None:
+        args.experiment_name = (
+            (f"ModelStealing_{args.model_name.replace('/','-')}") +
+            (f"_{args.model_revision.replace('/','-')}" if args.model_revision is not None else "") +
+            (f"_N={args.num_samples}_S={args.start_index}_seed={args.seed}") +
+            (f"_method={args.modelstealing_method}") +
+            (f"_tag={args.tag}" if args.tag is not None else "")
+        )
+        args.experiment_name = f"results/ModelStealing/{args.experiment_name}/{args.experiment_name}"
+    os.makedirs(os.path.dirname(args.experiment_name), exist_ok=True)
     logger = get_my_logger(log_file=f"{args.experiment_name}.log")
     ####################################################################################################
     # LOAD DATA

@@ -54,15 +54,17 @@ def main():
     accelerator = Accelerator() if args.accelerate else None
     set_seed(args.seed)
 
-    os.makedirs("results/MoPe", exist_ok=True)
     args.model_cache_dir = args.model_cache_dir if args.model_cache_dir is not None else f"models/{args.model_name.replace('/','-')}"
-    args.experiment_name = args.experiment_name if args.experiment_name is not None else (
-        (f"results/MoPe/MoPe_{args.model_name.replace('/','-')}") +
-        (f"_{args.model_revision.replace('/','-')}" if args.model_revision is not None else "") +
-        (f"_N={args.num_samples}_S={args.start_index}_seed={args.seed}") +
-        (f"_Nmodels={args.num_models}_sigma={args.noise_stdev}_noise={args.noise_type}")
-        (f"_tag={args.tag}" if args.tag is not None else "")
-    )
+    if args.experiment_name is None:
+        args.experiment_name = (
+            (f"MoPe_{args.model_name.replace('/','-')}") +
+            (f"_{args.model_revision.replace('/','-')}" if args.model_revision is not None else "") +
+            (f"_N={args.num_samples}_S={args.start_index}_seed={args.seed}") +
+            (f"_Nmodels={args.num_models}_sigma={args.noise_stdev}_noise={args.noise_type}")
+            (f"_tag={args.tag}" if args.tag is not None else "")
+        )
+        args.experiment_name = f"results/MoPe/{args.experiment_name}/{args.experiment_name}"
+    os.makedirs(os.path.dirname(args.experiment_name), exist_ok=True)
     logger = get_my_logger(log_file=f"{args.experiment_name}.log")
     ####################################################################################################
     # LOAD DATA
@@ -138,15 +140,8 @@ def main():
     # Plot ROCs
     MoPer.attack_plot_ROC(train_statistics, val_statistics, title=args.experiment_name, log_scale=False, show_plot=False)
     MoPer.attack_plot_ROC(train_statistics, val_statistics, title=args.experiment_name, log_scale=False, show_plot=False)
-    # MoPer.plot_loss_ROC(log_scale = False)
-    # MoPer.plot_loss_ROC(log_scale = True)
-    # MoPer.plot_mope_loss_linear_ROC(log_scale=False)
-    # MoPer.plot_mope_loss_linear_ROC(log_scale=True)
-    # MoPer.plot_mope_loss_LR_ROC(log_scale = False)
-    # MoPer.plot_mope_loss_LR_ROC(log_scale = True)
-    # MoPer.plot_mope_loss(log_scale=False)
-    # MoPer.plot_mope_loss(log_scale=True)
-    # MoPer.plot_stat_hists(args.n_models)
+    MoPer.attack_plot_histogram(train_statistics, val_statistics, title=args.experiment_name, normalize=False, show_plot=False)
+    MoPer.attack_plot_histogram(train_statistics, val_statistics, title=args.experiment_name, normalize=True, show_plot=False)
 
     end = time.perf_counter()
 

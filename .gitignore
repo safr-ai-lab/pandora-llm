@@ -2,12 +2,6 @@ models/
 results/
 *.DS_Store
 docs/build
-err_out/
-*.out
-*.pt
-slurm_scripts/
-experiments/prep/Data
-experiments/prep/logs
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

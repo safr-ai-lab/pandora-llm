@@ -37,12 +37,14 @@ def main():
     args = parser.parse_args()
     
     set_seed(args.seed)
-    os.makedirs("results/ZLIB", exist_ok=True)
-    args.experiment_name = args.experiment_name if args.experiment_name is not None else (
-        (f"results/ZLIB/ZLIB_{args.dataset_name.replace('/','-')}") +
-        (f"_N={args.num_samples}_S={args.start_index}_seed={args.seed}") +
-        (f"_tag={args.tag}" if args.tag is not None else "")
-    )
+    if args.experiment_name is None:
+        args.experiment_name = (
+            (f"ZLIB_{args.dataset_name.replace('/','-')}") +
+            (f"_N={args.num_samples}_S={args.start_index}_seed={args.seed}") +
+            (f"_tag={args.tag}" if args.tag is not None else "")
+        )
+        args.experiment_name = f"results/ZLIB/{args.experiment_name}/{args.experiment_name}"
+    os.makedirs(os.path.dirname(args.experiment_name), exist_ok=True)
     logger = get_my_logger(log_file=f"{args.experiment_name}.log")
     ####################################################################################################
     # LOAD DATA
@@ -98,6 +100,8 @@ def main():
     # Plot ROCs
     ZLIBer.attack_plot_ROC(train_statistics, val_statistics, title=args.experiment_name, log_scale=False, show_plot=False)
     ZLIBer.attack_plot_ROC(train_statistics, val_statistics, title=args.experiment_name, log_scale=True, show_plot=False)
+    ZLIBer.attack_plot_histogram(train_statistics, val_statistics, title=args.experiment_name, normalize=False, show_plot=False)
+    ZLIBer.attack_plot_histogram(train_statistics, val_statistics, title=args.experiment_name, normalize=True, show_plot=False)
 
     end = time.perf_counter()
 

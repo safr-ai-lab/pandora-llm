@@ -1,15 +1,17 @@
 import io
+import math
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import matplotlib as mpl
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 from scipy.stats import bootstrap
 from sklearn.metrics import roc_curve, auc
 import torch
 
-def plot_hist(train_statistics, val_statistics, plot_title, keep_first=None, show_plot=True, save_name=None, bins=20):
+def plot_histogram(train_statistics, val_statistics, plot_title, keep_first=None, bins=None, normalize=False, show_plot=True, save_name=None):
     """
     Plot histogram of membership inference statistics on train and validation datasets
 
@@ -27,18 +29,183 @@ def plot_hist(train_statistics, val_statistics, plot_title, keep_first=None, sho
     val_statistics = torch.as_tensor(val_statistics).flatten()[:keep_first]
     val_statistics = val_statistics[~val_statistics.isnan()]
 
+    if normalize:
+        sigma, mu = torch.std_mean(torch.cat((train_statistics,val_statistics)))
+        train_statistics = (train_statistics-mu)/sigma
+        val_statistics = (val_statistics-mu)/sigma
+
+    # Compute bins    
+    if bins is None: # use max number of bins by fd and sturges rule
+        train_len = len(train_statistics)
+        train_iqr = np.subtract(*np.percentile(train_statistics, [75, 25]))
+        train_binwidth = min(2.0 * train_iqr * train_len ** (-1.0 / 3.0), np.ptp(train_statistics)/(np.log2(train_len) + 1.0))
+        train_bins = int(math.ceil(np.ptp(train_statistics)/train_binwidth))
+        val_len = len(val_statistics)
+        val_iqr = np.subtract(*np.percentile(val_statistics, [75, 25]))
+        val_binwidth = min(2.0 * val_iqr * val_len ** (-1.0 / 3.0), np.ptp(val_statistics)/(np.log2(val_len) + 1.0))
+        val_bins = int(math.ceil(np.ptp(val_statistics)/val_binwidth))
+        bins = int(1.*max(train_bins,val_bins))
+
+    train_min, train_max = train_statistics.min().item(), train_statistics.max().item()
+    val_min, val_max = val_statistics.min().item(), val_statistics.max().item()
+    train_bin_width = (train_max - train_min) / bins
+    val_bin_width = (val_max - val_min) / bins
+    bin_width = min(train_bin_width, val_bin_width)
+    combined_min = min(train_min, val_min)
+    combined_max = max(train_max, val_max)
+    combined_bin_edges = np.arange(combined_min, combined_max + bin_width, bin_width)
+
     # Plot
     plt.figure()
-    plt.hist(train_statistics, bins=bins, alpha=0.5, label='training')
-    plt.hist(val_statistics, bins=bins, alpha=0.5, label='validation')
+    plt.hist(train_statistics, bins=combined_bin_edges, alpha=0.5, edgecolor='black', label='Train')
+    plt.hist(val_statistics, bins=combined_bin_edges, alpha=0.5, edgecolor='black', label='Validation')
     plt.legend(loc='upper right')
-    plt.xlabel('Value')
+    plt.xlabel('Normalized Attack Statistic' if normalize else 'Attack Statistic')
     plt.ylabel('Frequency')
     plt.title(plot_title)
+    plt.minorticks_on()
+    plt.grid(which="major",alpha=0.2)
+    plt.grid(which="minor",alpha=0.1)
     if save_name is not None:
         plt.savefig(save_name+"_hist.png", bbox_inches="tight")
+        plt.savefig(save_name+"_hist.pdf", bbox_inches="tight")
     if show_plot:
         plt.show()
+    plt.close()
+
+def plot_histogram_plotly(train_statistics, val_statistics, plot_title, keep_first=None, bins=None, normalize=False, show_plot=True, save_name=None):
+    """
+    Plot histogram of membership inference statistics on train and validation datasets
+
+    Args:
+        train_statistics (list[float]): list of train statistics
+        val_statistics (list[float]): list of val statistics
+        plot_title (str): title of the plot
+        keep_first (int): compute only for the first keep_first number of samples
+        show_plot (bool): whether to show the plot
+        save_name (str): save path for plot (without extension); does not save unless save_name is specified
+    """
+    # Preprocess
+    train_statistics = torch.as_tensor(train_statistics).flatten()[:keep_first]
+    train_statistics = train_statistics[~train_statistics.isnan()]
+    val_statistics = torch.as_tensor(val_statistics).flatten()[:keep_first]
+    val_statistics = val_statistics[~val_statistics.isnan()]
+
+    if normalize:
+        sigma, mu = torch.std_mean(torch.cat((train_statistics,val_statistics)))
+        train_statistics = (train_statistics-mu)/sigma
+        val_statistics = (val_statistics-mu)/sigma
+
+    # Compute bins    
+    if bins is None: # use max number of bins by fd and sturges rule
+        train_len = len(train_statistics)
+        train_iqr = np.subtract(*np.percentile(train_statistics, [75, 25]))
+        train_binwidth = min(2.0 * train_iqr * train_len ** (-1.0 / 3.0), np.ptp(train_statistics)/(np.log2(train_len) + 1.0))
+        train_bins = int(math.ceil(np.ptp(train_statistics)/train_binwidth))
+        val_len = len(val_statistics)
+        val_iqr = np.subtract(*np.percentile(val_statistics, [75, 25]))
+        val_binwidth = min(2.0 * val_iqr * val_len ** (-1.0 / 3.0), np.ptp(val_statistics)/(np.log2(val_len) + 1.0))
+        val_bins = int(math.ceil(np.ptp(val_statistics)/val_binwidth))
+        bins = int(1.*max(train_bins,val_bins))
+
+    train_min, train_max = train_statistics.min().item(), train_statistics.max().item()
+    val_min, val_max = val_statistics.min().item(), val_statistics.max().item()
+    train_bin_width = (train_max - train_min) / bins
+    val_bin_width = (val_max - val_min) / bins
+    bin_width = min(train_bin_width, val_bin_width)
+    combined_min = min(train_min, val_min)
+    combined_max = max(train_max, val_max)
+    combined_bin_edges = np.arange(combined_min, combined_max + bin_width, bin_width)
+
+    # Plot
+    fig = make_subplots(rows=3, cols=1, row_heights=[0.1, 0.4, 0.55], shared_xaxes=True, vertical_spacing=0.02)
+
+    # Rug plots
+    fig.add_trace(go.Box(
+        x=val_statistics.numpy(), 
+        marker_symbol='line-ns-open', 
+        marker_color='#ff7f0e',
+        boxpoints='all',
+        jitter=0,
+        fillcolor='rgba(255,255,255,0)',
+        line_color='rgba(255,255,255,0)',
+        hoveron='points',
+        showlegend=False,
+        name='Validation'
+    ), row=1, col=1)
+    fig.add_trace(go.Box(
+        x=train_statistics.numpy(), 
+        marker_symbol='line-ns-open', 
+        marker_color='#1f77b4',
+        boxpoints='all',
+        jitter=0,
+        fillcolor='rgba(255,255,255,0)',
+        line_color='rgba(255,255,255,0)',
+        hoveron='points',
+        showlegend=False,
+        name='Train'
+    ), row=1, col=1)
+
+    # Violin plots
+    fig.add_trace(go.Violin(
+        x=val_statistics.numpy(), 
+        line_color='#ff7f0e',
+        box_visible=True,
+        meanline_visible=True,
+        showlegend=False,
+        name='Validation',
+    ), row=2, col=1)
+    fig.add_trace(go.Violin(
+        x=train_statistics.numpy(), 
+        line_color='#1f77b4',
+        box_visible=True,
+        meanline_visible=True,
+        showlegend=False,
+        name='Train',
+    ), row=2, col=1)
+
+    # Histograms
+    fig.add_trace(go.Histogram(
+        x=train_statistics.numpy(), 
+        nbinsx=len(combined_bin_edges)-1, 
+        name='Train', 
+        opacity=0.5, 
+        marker_color='#1f77b4', 
+        marker_line_color='black',
+        marker_line_width=1.5,
+        xbins=dict(start=combined_min, end=combined_max, size=bin_width)
+    ), row=3, col=1)
+    fig.add_trace(go.Histogram(
+        x=val_statistics.numpy(), 
+        nbinsx=len(combined_bin_edges)-1, 
+        name='Validation', 
+        opacity=0.5, 
+        marker_color='#ff7f0e', 
+        marker_line_color='black',
+        marker_line_width=1.5,
+        xbins=dict(start=combined_min, end=combined_max, size=bin_width)
+    ), row=3, col=1)
+
+    fig.update_layout(
+        title=plot_title,
+        width=800,
+        height=800,
+        xaxis3_title='Normalized Attack Statistic' if normalize else 'Attack Statistic',
+        yaxis3_title='Frequency',
+        yaxis=dict(range=[-1, 1.4], tickvals=[0.65,-0.35], ticktext=['Train','Validation'], tickmode='array'),
+        xaxis1=dict(showticklabels=False, minor=dict(showgrid=True, ticklen=0)),
+        xaxis2=dict(showticklabels=False, minor=dict(ticklen=0, showgrid=True)),
+        xaxis3=dict(showticklabels=True, showgrid=True, minor=dict(ticklen=0, showgrid=True)),
+        yaxis3=dict(showticklabels=True, minor=dict(ticklen=0, showgrid=True)),
+        barmode='overlay'
+    )
+
+    if save_name is not None:
+        fig.write_image(save_name + "_hist_plotly.png", scale=5)
+        fig.write_image(save_name + "_hist_plotly.pdf", scale=5)
+        fig.write_html(save_name + "_hist_plotly.html")
+    if show_plot:
+        fig.show()
 
 def plot_ROC(train_statistics, val_statistics, plot_title, keep_first=None, ci=True, num_bootstraps=1000, fprs=None, log_scale=False, show_plot=True, save_name=None, lims=None, color='darkorange'):
     '''
@@ -133,6 +300,7 @@ def plot_ROC(train_statistics, val_statistics, plot_title, keep_first=None, ci=T
         df.to_csv(save_name+"_data.csv")
     if show_plot:
         plt.show()
+    plt.close()
     if ci:
         return roc_auc, tpr_at_fprs, auc_se, tpr_se
     else:
