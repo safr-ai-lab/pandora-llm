@@ -1,16 +1,15 @@
 import os
 import time
-import math
 import argparse
+import subprocess
 import torch
 from torch.utils.data import DataLoader
 from transformers import AutoModelForCausalLM, AutoTokenizer, AutoConfig, TrainingArguments, Trainer
-from llmprivacy.utils.attack_utils import *
-from llmprivacy.utils.dataset_utils import *
-from llmprivacy.utils.log_utils import get_my_logger
-from llmprivacy.attacks.ZLIBLoRa import ZLIBLoRa
 from accelerate import Accelerator
 from accelerate.utils import set_seed
+from llmprivacy.utils.dataset_utils import collate_fn, load_val_pile
+from llmprivacy.utils.log_utils import get_my_logger
+from llmprivacy.attacks.ZLIBLoRa import ZLIBLoRa
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 """

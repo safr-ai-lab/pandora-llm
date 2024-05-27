@@ -1,9 +1,10 @@
 import argparse
+import numpy as np
 import torch
 from torch.utils.data import DataLoader
 from transformers import AutoModelForCausalLM
 from accelerate import Accelerator
-from ..utils.generation_utils import *
+from ..utils.generation_utils import generate_suffixes
 
 
 def main():

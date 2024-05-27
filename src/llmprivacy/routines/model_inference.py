@@ -2,10 +2,10 @@ import argparse
 import torch
 from torch.utils.data import DataLoader
 from transformers import AutoModelForCausalLM, AutoTokenizer
-from ..utils.attack_utils import *
-from ..utils.dataset_utils import *
 from accelerate import Accelerator
 from accelerate.utils import set_seed
+from ..attacks.LOSS import compute_dataloader_cross_entropy
+from ..utils.dataset_utils import collate_fn
 
 def main():
     ####################################################################################################

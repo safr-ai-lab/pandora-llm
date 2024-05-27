@@ -1,12 +1,8 @@
-import torch
-import os 
-from pathlib import Path
-from tqdm import tqdm
-# from run_supervised_mia_scripts import *
-import matplotlib.pyplot as plt
-import numpy as np
-from llmprivacy.utils.dataset_utils import *
+import os
 import argparse
+import torch
+import matplotlib.pyplot as plt
+from llmprivacy.utils.dataset_utils import split_unsplit_pt
 
 def main(lr_colmax_pt_file: str, lr_model_pt_file: str, nn_colmax_pt_file: str, nn_model_pt_file: str, 
          extraction_pt_generations: str, label: str) -> None:

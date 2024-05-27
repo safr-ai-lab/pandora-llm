@@ -1,16 +1,11 @@
 import os
 import time
-import math
 import argparse
 import torch
-from torch.utils.data import DataLoader
-from transformers import AutoTokenizer, AutoConfig
-from llmprivacy.utils.attack_utils import *
-from llmprivacy.utils.dataset_utils import *
+from accelerate.utils import set_seed
+from llmprivacy.utils.dataset_utils import load_train_pile_random, load_val_pile
 from llmprivacy.utils.log_utils import get_my_logger
 from llmprivacy.attacks.ZLIB import ZLIB
-from accelerate import Accelerator
-from accelerate.utils import set_seed
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 """

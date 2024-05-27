@@ -201,7 +201,7 @@ def load_data_from_pt_files(list_of_filenames):
         data[key] = torch.tensor(data[key])[randperm]
     return data
 
-
+# TODO processing should not occur here
 def split_pt_into_dict(pt_file, only_x=False, only_theta=False, divideby = 10000000):
     '''
     Convert .pt of norms into dictionary. Divide L1 norms by divideby 

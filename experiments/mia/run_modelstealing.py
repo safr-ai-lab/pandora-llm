@@ -5,12 +5,11 @@ import argparse
 import torch
 from torch.utils.data import DataLoader
 from transformers import AutoTokenizer, AutoConfig
-from llmprivacy.utils.attack_utils import *
-from llmprivacy.utils.dataset_utils import *
-from llmprivacy.utils.log_utils import get_my_logger
-from llmprivacy.attacks.ModelStealing import ModelStealing
 from accelerate import Accelerator
 from accelerate.utils import set_seed
+from llmprivacy.utils.dataset_utils import collate_fn, load_train_pile_random, load_val_pile
+from llmprivacy.utils.log_utils import get_my_logger
+from llmprivacy.attacks.ModelStealing import ModelStealing
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 """
@@ -108,7 +107,7 @@ def main():
     logger.info("Running Attack")
 
     # Initialize attack
-    ModelStealer = ModelStealer(args.model_name, model_revision=args.model_revision, model_cache_dir=args.model_cache_dir)
+    ModelStealer = ModelStealing(args.model_name, model_revision=args.model_revision, model_cache_dir=args.model_cache_dir)
     ModelStealer.load_model()
 
     # Load some random internet text
