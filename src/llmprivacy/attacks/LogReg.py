@@ -1,11 +1,14 @@
 import os
+import numpy as np
 import torch
 from .Attack import MIA
-from ..utils.attack_utils import *
-from sklearn.linear_model import LogisticRegression, LogisticRegressionCV
+from sklearn.linear_model import LogisticRegressionCV
 from sklearn.model_selection import PredefinedSplit
 from sklearn.preprocessing import StandardScaler
 
+####################################################################################################
+# MAIN CLASS
+####################################################################################################
 class LogReg(MIA):
     def __init__(self, clf_name, feature_set, model_name, model_revision=None, model_cache_dir=None):
         self.clf_name = clf_name
@@ -78,7 +81,6 @@ class LogReg(MIA):
         test_fold[:train_features.shape[0]] = -1
         cv = PredefinedSplit(test_fold)
 
-        # self.clf = LogisticRegression(max_iter=6,random_state=seed).fit(features,labels)
         self.clf = LogisticRegressionCV(cv=cv,max_iter=max_iter,refit=False,random_state=seed).fit(features, labels)
 
         os.makedirs(os.path.dirname(self.clf_name), exist_ok=True)

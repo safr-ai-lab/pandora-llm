@@ -1,10 +1,13 @@
-import os
+from tqdm import tqdm
 import torch
 from transformers import AutoModelForCausalLM
 from .Attack import MIA
-from ..utils.attack_utils import *
-from ..utils.plot_utils import *
+from .LOSS import compute_input_ids_cross_entropy
+from ..utils.plot_utils import plot_ROC_multiple, plot_ROC_multiple_plotly
 
+####################################################################################################
+# MAIN CLASS
+####################################################################################################
 class MinK(MIA):
     """
     Min-K thresholding attack
@@ -85,3 +88,67 @@ class MinK(MIA):
             val_statistics.append(val_stats)
         plot_ROC_multiple(train_statistics, val_statistics, title, k_range, log_scale=log_scale, show_plot=show_plot, save_name=save_name)
         plot_ROC_multiple_plotly(train_statistics, val_statistics, title, k_range, log_scale=log_scale, show_plot=show_plot, save_name=save_name)
+
+####################################################################################################
+# HELPER FUNCTIONS
+####################################################################################################
+
+def compute_dataloader_cross_entropy_tokens(model, dataloader, device=None, num_batches=None, samplelength=None, accelerator=None, model_half=True):    
+    '''
+    Computes dataloader cross entropy with additional support for specifying the full data loader and full sample length.
+    Warning: using samplelength is discouraged
+
+    Args:
+        model (transformers.AutoModelForCausalLM): HuggingFace model.
+        dataloader (torch.utils.data.dataloader.DataLoader): DataLoader with tokens.
+        device (str): CPU or GPU 
+        nbatches (int): Number of batches to consider
+        samplelength (int or NoneType): cut all samples to a given length
+        accelerator (accelerate.Accelerator or NoneType): enable distributed training
+        half (bool): use half precision floats for model
+
+    Returns:
+        torch.Tensor or list: loss of input IDs
+    '''
+
+    if samplelength is not None:
+        print("Warning: using sample length is discouraged. Please avoid using this parameter.")
+    if accelerator is None:
+        if model_half:
+            print("Using model.half() ....")
+            model.half()
+        else:
+            print("Not using model.half() ....")
+        model.eval()
+        model.to(device)
+
+    losses = []
+    for batchno, data_x in tqdm(enumerate(dataloader),total=len(dataloader)):
+        if num_batches is not None and batchno >= num_batches:
+            break
+        with torch.no_grad():    
+            ## Get predictions on training data 
+            data_x = data_x["input_ids"]
+            if samplelength is None:
+                data_x = data_x.detach()                
+            else:
+                data_x = data_x[:,:samplelength].detach()
+   
+            ## Compute average log likelihood
+            if accelerator is None:
+                loss = compute_input_ids_cross_entropy(model, data_x.to(device), return_pt=False, tokens=True).detach().cpu()
+            else:
+                loss = compute_input_ids_cross_entropy(model, data_x, return_pt=False, tokens=True)
+
+            losses.append(loss)
+
+            del data_x
+            torch.cuda.empty_cache()
+            torch.cuda.synchronize()
+    
+    if accelerator is None:
+        return losses
+    else:
+        losses = accelerator.gather_for_metrics(losses)
+        losses = torch.cat([loss[0] for loss in losses])
+        return losses

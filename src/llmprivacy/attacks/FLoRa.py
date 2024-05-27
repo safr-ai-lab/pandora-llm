@@ -1,12 +1,10 @@
-from .Attack import MIA
-from ..utils.attack_utils import *
 from transformers import AutoModelForCausalLM
-from torch.utils.data import DataLoader
-import torch
-import subprocess
-import os
-from typing import Optional
+from .Attack import MIA
+from .LOSS import compute_dataloader_cross_entropy
 
+####################################################################################################
+# MAIN CLASS
+####################################################################################################
 class FLoRa(MIA):
     def __init__(self, model_name, ft_model_name, model_revision=None, model_cache_dir=None, ft_model_revision=None, ft_model_cache_dir=None):
         self.model_name         = model_name

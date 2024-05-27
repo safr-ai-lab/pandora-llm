@@ -1,8 +1,11 @@
-import os
+from tqdm import tqdm
+import torch
 from transformers import AutoModelForCausalLM
 from .Attack import MIA
-from ..utils.attack_utils import *
 
+####################################################################################################
+# MAIN CLASS
+####################################################################################################
 class ALoRa(MIA):
     """
     Approximate loss ratio thresholding attack (vs. pre-training)

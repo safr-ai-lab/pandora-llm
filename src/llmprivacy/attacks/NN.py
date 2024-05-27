@@ -1,19 +1,22 @@
+from tqdm import tqdm
 import os
 import math
 import torch
 import torch.nn as nn
 from torch.optim import Adam
 from torch.utils.data import DataLoader, TensorDataset
-from .Attack import MIA
-from ..utils.attack_utils import *
-from ..utils.plot_utils import *
 from sklearn.preprocessing import StandardScaler
+from .Attack import MIA
+from ..utils.plot_utils import print_AUC
 
+####################################################################################################
+# MAIN CLASS
+####################################################################################################
 class NN(MIA):
     def __init__(self, clf_name, feature_set, clf_size, model_name, model_revision=None, model_cache_dir=None):
         self.clf_name = clf_name
         self.clf = None
-        self.clf_size = None
+        self.clf_size = clf_size
         self.scaler = None
         self.feature_set = feature_set
         self.model_name = model_name

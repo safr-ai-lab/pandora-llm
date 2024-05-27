@@ -1,15 +1,12 @@
-import os
 import subprocess
-import time
-import re
 import torch
 from transformers import AutoModelForCausalLM
 from .Attack import MIA
-from ..utils.attack_utils import *
-import matplotlib.pyplot as plt
-import plotly.graph_objects as go
-from sklearn.linear_model import LogisticRegression
+from .LOSS import compute_dataloader_cross_entropy
 
+####################################################################################################
+# MAIN CLASS
+####################################################################################################
 class MoPe(MIA):
     """
     Model Perturbation attack thresholding attack (vs. pre-training)

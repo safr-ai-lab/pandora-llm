@@ -1,13 +1,12 @@
-from .Attack import MIA
-from ..utils.attack_utils import *
-from transformers import AutoModelForCausalLM
-from torch.utils.data import DataLoader
-import torch
 import math
-import subprocess
-import os
-from typing import Optional
+from transformers import AutoModelForCausalLM
+from .Attack import MIA
+from .LOSS import compute_dataloader_cross_entropy
+from .ZLIB import compute_dataloader_cross_entropy_zlib
 
+####################################################################################################
+# MAIN CLASS
+####################################################################################################
 class ZLIBLoRa(MIA):
     def __init__(self, ft_model_name, ft_model_revision=None, ft_model_cache_dir=None):
         """

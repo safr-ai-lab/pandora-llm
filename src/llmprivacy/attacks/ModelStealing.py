@@ -1,13 +1,10 @@
-import os
 from tqdm import tqdm
 import torch
 import torch.nn.functional as F
 from einops import einsum
 from transformers import AutoModelForCausalLM
-from .Attack import MIA
-# from ..utils.attack_utils import *
-# from ..utils.plot_utils import *
 from trak.projectors import CudaProjector, ProjectionType
+from .Attack import MIA
 
 ####################################################################################################
 # MAIN CLASS

@@ -1,9 +1,9 @@
-from typing import Optional
 from transformers import AutoModelForCausalLM
-from ..utils.attack_utils import *
-from ..utils.dataset_utils import *
-from ..utils.plot_utils import *
+from ..utils.plot_utils import plot_ROC, plot_ROC_plotly
 
+####################################################################################################
+# MAIN CLASS
+####################################################################################################
 class MIA:
     def __init__(self, model_name, model_revision=None, model_cache_dir=None):
         """

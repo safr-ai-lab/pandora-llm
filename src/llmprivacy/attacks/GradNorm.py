@@ -1,9 +1,15 @@
-import os
+from tqdm import tqdm
+import subprocess
+import torch
+from torch.autograd import Variable
 from transformers import AutoModelForCausalLM
+from deepspeed.utils import safe_get_full_grad
 from .Attack import MIA
-from ..utils.attack_utils import *
-from ..utils.plot_utils import *
+from ..utils.plot_utils import plot_ROC_multiple, plot_ROC_multiple_plotly
 
+####################################################################################################
+# MAIN CLASS
+####################################################################################################
 class GradNorm(MIA):
     """
     GradNorm thresholding attack
@@ -101,3 +107,154 @@ class GradNorm(MIA):
             labels.append(grad_type)
         plot_ROC_multiple(train_statistics, val_statistics, title, labels, log_scale=log_scale, show_plot=show_plot, save_name=save_name)
         plot_ROC_multiple_plotly(train_statistics, val_statistics, title, labels, log_scale=log_scale, show_plot=show_plot, save_name=save_name)
+
+####################################################################################################
+# HELPER FUNCTIONS
+####################################################################################################
+def compute_input_ids_all_norms(model, embedding_layer, input_ids, norms, device=None, accelerator=None, max_length=None):
+    """
+    Compute norms of gradients with respect x, theta
+    Note: takes advantage of the fact that norm([a,b])=norm([norm(a),norm(b)])
+    
+    Args:
+        model (transformers.AutoModelForCausalLM): HuggingFace model.
+        embedding_layer (torch.nn.parameter.Parameter): computes embeddings from tokens, useful for taking grad wrt x
+        input_ids (torch.Tensor): tensor of input IDs.
+        norms (list): gradient norm types
+        # extraction_mia (bool): flag to cut samples for extraction mia data collection
+        device (str): CPU or GPU 
+        accelerator (accelerate.Accelerator or NoneType): enable distributed training
+        
+    Returns:
+        torch.Tensor or list: gradient norms of input ID
+            [x_grad_norm_p1, ..., x_grad_norm_pN, theta_grad_norm_p1, ..., theta_grad_norm_pN, layer1_grad_norm_p1, ..., layerM_grad_norm_p1, ..., layer1_grad_norm_pN, ..., layerM_grad_norm_pN]
+    """
+    
+    if max_length is not None:
+        input_ids = input_ids[:,:max_length]
+
+    # Compute gradient with respect to x
+    mask  = (input_ids > 0).detach()
+    input_embeds=Variable(embedding_layer[input_ids.cpu()],requires_grad=True)
+    if accelerator is not None:
+        model.zero_grad()
+        outputs = model(inputs_embeds=input_embeds.to(accelerator.device), attention_mask = mask.to(accelerator.device), labels=input_ids.to(accelerator.device))
+    else:
+        model.zero_grad()
+        outputs = model(inputs_embeds=input_embeds.to(device),attention_mask=mask.to(device),labels=input_ids.to(device))
+    if accelerator is not None:
+        accelerator.backward(outputs.loss)
+    else:
+        outputs.loss.backward()
+    x_grad = input_embeds.grad.detach()
+
+    # Compute gradients with respect to different layers
+    mask  = (input_ids > 0).detach()
+    if accelerator is not None:
+        model.zero_grad()
+        outputs = model(input_ids=input_ids.to(accelerator.device), attention_mask = mask.to(accelerator.device), labels=input_ids.to(accelerator.device))
+    else:
+        model.zero_grad()
+        outputs = model(input_ids=input_ids.to(device),attention_mask=mask.to(device),labels=input_ids.to(device))
+    if accelerator is not None:
+        accelerator.backward(outputs.loss)
+    else:
+        outputs.loss.backward()
+    
+    layer_norms = {p:[] for p in norms} # p: [layer_1_norm, layer_2_norm, ...]
+    for i, (name,param) in enumerate(model.named_parameters()):
+        if accelerator is None:
+            grad = param.grad.flatten()
+        else:
+            grad = safe_get_full_grad(param).flatten()
+        
+        # Append all norms of layers to dictionary
+        for p in norms:
+            layer_norms[p].append(torch.norm(grad,p=p))
+    
+    del outputs, input_embeds, input_ids, mask
+    torch.cuda.empty_cache()
+    torch.cuda.synchronize()
+
+    for p in norms: # p: [x_grad_norm, theta_grad_norm, layer_1_grad_norm, ... layer_N_grad_norm]
+        layer_norms[p] = [torch.norm(x_grad,p=p,dim=(1,2))] + [torch.norm(torch.tensor(layer_norms[p]),p=p)] + layer_norms[p]
+    
+    # layer_norms = torch.tensor([l for p in norms for l in layer_norms[p]]) # [p1 first grad, ..., p1 last grad, ..., pM first grad, ... pM last grad]
+    layer_norms = torch.tensor([layer_norms[p][l] for l in range(len(layer_norms[norms[0]])) for p in norms]) # [x_grad_norm_p1, ..., x_grad_norm_pM, theta_grad_norm_p1, ..., theta_grad_norm_pM, layer1_grad_norm_p1, ..., layer1_grad_norm_pM, ..., layerN_grad_norm_p1, ..., layerN_grad_norm_pM]
+    return layer_norms
+    # # Compute norms of entire gradients and append norms of each layer
+    # ## Total norms is [x_grad_norm_p1, ..., x_grad_norm_pN, theta_grad_norm_p1, ..., theta_grad_norm_pN]
+    # total_norms = torch.tensor([torch.norm(x_grad,p=p,dim=(1,2)) for p in norms] + [torch.norm(torch.tensor(layer_norms[p]),p=p) for p in norms])
+    # ## Total and layer norms is [x_grad_norm_p1, ..., x_grad_norm_pN, theta_grad_norm_p1, ..., theta_grad_norm_pN, layer1_grad_norm_p1, ..., layer1_grad_norm_pN, ..., layerM_grad_norm_p1, ..., layerM_grad_norm_pN]
+    # total_and_layer_norms = torch.concat((total_norms, torch.tensor([layer_norms[p][l] for l in range(len(layer_norms[norms[0]])) for p in norms])))
+    # return total_and_layer_norms
+
+def compute_dataloader_all_norms(model, embedding_layer, dataloader, norms, device=None, num_batches=None, samplelength=None, accelerator=None, model_half=True, max_length=None):
+    '''
+    Computes gradient norms of text in dataloader.
+    Warning: using samplelength is discouraged
+    
+    Args:
+        model (transformers.AutoModelForCausalLM): HuggingFace model.
+        embedding_layer (torch.nn.parameter.Parameter): computes embeddings from tokens, useful for taking grad wrt x
+        dataloader (torch.utils.data.dataloader.DataLoader): DataLoader of samples.
+        norms (list): gradient norm types
+        # extraction_mia (bool): flag to cut samples for extraction mia data collection
+        device (str): CPU or GPU 
+        nbatches (int): Number of batches to consider
+        samplelength (int or NoneType): cut all samples to a given length
+        accelerator (accelerate.Accelerator or NoneType): enable distributed training
+        half (bool): use half precision floats for model
+
+    Returns:
+        dict[str,torch.Tensor]: gradients for each norm type. The gradient is a dictionary of x_grad_p, theta_grad_p, and layerwise_grads_p for each norm order p
+    '''
+    
+    if samplelength is not None:
+        print("Warning: using sample length is discouraged. Please avoid using this parameter.")
+    if accelerator is None:
+        if model_half:
+            print("Using model.half() ....")
+            model.half()
+        else:
+            print("Not using model.half() ....")
+        model.eval()
+        model.to(device)
+
+    losses = []
+    for batchno, data_x in tqdm(enumerate(dataloader),total=len(dataloader)):
+        if num_batches is not None and batchno >= num_batches:
+            break
+    
+        ## Get predictions on data 
+        if type(data_x) is dict:
+            data_x = data_x["input_ids"]
+        else:
+            data_x = data_x[None,:]
+        if samplelength is None:
+            data_x = data_x.detach()                
+        else:
+            data_x = data_x[:,:samplelength].detach()
+        
+        ## Compute norms on data_x
+        if accelerator is None:
+            loss = compute_input_ids_all_norms(model, embedding_layer, data_x, norms, 
+                                               device=device,accelerator=accelerator,max_length=max_length).detach().cpu()
+        else:
+            loss = compute_input_ids_all_norms(model, embedding_layer, data_x, norms, 
+                                               device=device,accelerator=accelerator,max_length=max_length).to(accelerator.device)
+
+        losses.append(loss)
+
+        del data_x
+        torch.cuda.empty_cache()
+        torch.cuda.synchronize()
+    
+    if accelerator is not None:
+        losses = accelerator.gather_for_metrics(losses)
+        losses = torch.cat(losses)
+    
+    total_grads = torch.nan_to_num(torch.stack(losses)).cpu()
+    grad_norms = [{f"x_grad_{p}": total_grads[:,i], f"theta_grad_{p}": total_grads[:,len(norms)+i], f"layerwise_grad_{p}": total_grads[:,2*len(norms)+i::len(norms)]} for i,p in enumerate(norms)]
+    grad_norms = {feature:value for grad_norms_p in grad_norms for feature,value in grad_norms_p.items()}
+    return grad_norms

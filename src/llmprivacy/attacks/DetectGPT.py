@@ -1,8 +1,18 @@
-import os
-from transformers import AutoModelForCausalLM
+import re
+import math
+import subprocess
+from tqdm import tqdm
+import numpy as np
+import torch
+from torch.nn import CrossEntropyLoss
+import torch.nn.functional as F
+from transformers import AutoModelForCausalLM, AutoTokenizer, T5ForConditionalGeneration, T5Tokenizer
 from .Attack import MIA
-from ..utils.attack_utils import *
+from .LOSS import compute_input_ids_cross_entropy
 
+####################################################################################################
+# MAIN CLASS
+####################################################################################################
 class DetectGPT(MIA):
     """
     DetectGPT thresholding attack
@@ -47,7 +57,9 @@ class DetectGPT(MIA):
             self.model, dataloader, = accelerator.prepare(self.model, dataloader)
         return compute_dataloader_cross_entropy_batch(model=self.model,dataloader=dataloader,num_batches=num_batches,device=device,model_half=model_half,detect_args=detect_args).cpu()
 
-from transformers import T5Tokenizer, T5ForConditionalGeneration
+####################################################################################################
+# MAIN CLASS
+####################################################################################################
 
 def compute_input_ids_cross_entropy_batch(model, input_ids, return_pt=True):
     """
@@ -200,12 +212,6 @@ def compute_dataloader_cross_entropy_batch(model, dataloader, device=None, num_b
         losses = accelerator.gather_for_metrics(losses)
         losses = torch.cat([loss[0] for loss in losses])
         return losses
-
-
-import numpy as np
-import re
-import torch.nn.functional as F
-import math
 
 PATTERN = re.compile(r"<extra_id_\d+>")
 SPLIT_LEN = 64

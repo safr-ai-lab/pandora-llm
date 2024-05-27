@@ -1,11 +1,16 @@
-import os
+import subprocess
 import math
+from tqdm import tqdm
+import torch
+from torch.nn.functional import F
+from torch.autograd import Variable
 from transformers import AutoModelForCausalLM
+from trak.projectors import CudaProjector, ProjectionType, BasicProjector
 from .Attack import MIA
-from ..utils.attack_utils import *
-from ..utils.plot_utils import *
-from trak.projectors import CudaProjector, ProjectionType, ChunkedCudaProjector, BasicProjector
 
+####################################################################################################
+# MAIN CLASS
+####################################################################################################
 class JL(MIA):
     """
     JL features attack
@@ -201,3 +206,175 @@ class JL(MIA):
             block_size=1,
         )
         return compute_dataloader_jl_balanced(model=self.model, embedding_layer=embedding_layer, dataloader=dataloader, projector=projectors, indices=indices, device=device, nbatches=num_batches, half=model_half).cpu() 
+
+####################################################################################################
+# HELPER FUNCTIONS
+####################################################################################################
+
+def compute_input_ids_grad_jl_balanced(model, embedding_layer, input_ids, projector, group_indices, device=None):
+    """
+    Compute JL of gradients grouped by indices
+    """
+
+    mask  = (input_ids > 0).detach()
+    input_embeds=Variable(embedding_layer[input_ids.cpu()],requires_grad=True)
+
+    ## Get gradient with respect to x    
+    model.zero_grad()
+    outputs = model(inputs_embeds=input_embeds.to(device),attention_mask=mask.to(device),labels=input_ids.to(device))    
+    outputs.loss.backward()
+    x_grad = input_embeds.grad.detach().to(device)
+    x_grad = F.pad(x_grad, (0,0,0, 2048-x_grad.shape[1],0,next(model.parameters()).shape[1]-x_grad.shape[2]),"constant", 0).flatten().view(-1,1).T
+    all_grads = projector["x"].project(x_grad,1).to(device).flatten()
+
+    ## Get gradient with respect to theta
+    model.zero_grad()
+    outputs = model(input_ids=input_ids.to(device),attention_mask=mask.to(device),labels=input_ids.to(device))
+    outputs.loss.backward()
+
+    for j, indexarr in enumerate(group_indices):
+        catelems = []
+        for i, (name,param) in enumerate(model.named_parameters()):
+            if i in indexarr:
+                grad = param.grad.flatten()
+                # print(f"Grad shape: {grad.shape}")
+                catelems.append(grad)
+        result_tensor = torch.cat(catelems, dim=0).view(-1,1).T # pre transform: torch.Size([128188416])
+        # print(f"Res Tens Shape: {result_tensor.shape}")
+        all_grads = torch.concat((all_grads, projector[j].project(result_tensor,1).flatten()),dim=0)
+    
+    del outputs, input_embeds, input_ids, mask
+    torch.cuda.empty_cache()
+    torch.cuda.synchronize()
+    return all_grads
+
+def compute_dataloader_jl_balanced(model, embedding_layer, dataloader, projector, indices, device=None, nbatches=None, half=True):
+    '''
+    Computes dataloader gradients with jl dimensionality reduction.
+    Args:
+        model (transformers.AutoModelForCausalLM): HuggingFace model.
+        embedding_layer (torch.nn.parameter.Parameter): computes embeddings from tokens, useful for taking grad wrt x
+        dataloader (torch.utils.data.dataloader.DataLoader): DataLoader of samples.
+        projector (dict): dictionary of dimensionality reduction functions        
+        device (str): CPU or GPU 
+        nbatches (int): Number of batches to consider
+        half (bool): use half precision floats for model
+
+    Returns:
+        torch.Tensor or list: data for input IDs
+    '''
+    if half:
+        print("Using model.half() ....")
+        model.half()
+    else:
+        print("Not using model.half() ....")
+    model.eval()
+    model.to(device)
+    # if "random_basis_change" in projector:
+    #     projector["random_basis_change"] = projector["random_basis_change"].to(device).half()
+
+    grads = []
+    for batchno, data_x in tqdm(enumerate(dataloader),total=len(dataloader)):
+        if nbatches is not None and batchno >= nbatches:
+            break
+        ## Get predictions on data 
+        if type(data_x) is dict:
+            data_x = data_x["input_ids"]
+        else:
+            data_x = data_x[None,:]
+        data_x = data_x.detach()                
+
+        ## Compute features on input data
+        grad = compute_input_ids_grad_jl_balanced(model, embedding_layer, data_x, projector, indices, device=device).detach().cpu()
+        grads.append(grad)
+
+        del data_x
+        torch.cuda.empty_cache()
+        torch.cuda.synchronize()
+    
+    return torch.stack(grads)
+
+def compute_input_ids_grad_jl(model, embedding_layer, input_ids,  projector, device=None):
+    """
+    Compute JL of gradients with respect x and/or theta
+    Args:
+        model (transformers.AutoModelForCausalLM): HuggingFace model.
+        embedding_layer (torch.nn.parameter.Parameter): computes embeddings from tokens, useful for taking grad wrt x
+        input_ids (torch.Tensor): tensor of input IDs.
+        projector (dict): dictionary of dimensionality reduction functions
+        device (str): CPU or GPU 
+                
+    Returns:
+        torch.Tensor or list: data from input IDs
+    """
+
+    mask  = (input_ids > 0).detach()
+    input_embeds=Variable(embedding_layer[input_ids.cpu()],requires_grad=True)
+
+    ## Get gradient with respect to x    
+    model.zero_grad()
+    outputs = model(inputs_embeds=input_embeds.to(device),attention_mask=mask.to(device),labels=input_ids.to(device))    
+    outputs.loss.backward()
+    x_grad = input_embeds.grad.detach().to(device)
+    x_grad = F.pad(x_grad, (0,0,0, 2048-x_grad.shape[1],0,next(model.parameters()).shape[1]-x_grad.shape[2]),"constant", 0).flatten().view(-1,1).T
+    all_grads = projector["x"].project(x_grad,1).to(device).flatten()
+
+    ## Get gradient with respect to theta
+    model.zero_grad()
+    outputs = model(input_ids=input_ids.to(device),attention_mask=mask.to(device),labels=input_ids.to(device))
+    outputs.loss.backward()
+
+    for i, (name,param) in enumerate(model.named_parameters()):
+        grad = param.grad.flatten().view(-1,1).T
+        all_grads = torch.concat((all_grads, projector[(i,name)].project(grad,1).flatten()),dim=0)
+    
+    del outputs, input_embeds, input_ids, mask
+    torch.cuda.empty_cache()
+    torch.cuda.synchronize()
+    return all_grads
+
+def compute_dataloader_jl(model, embedding_layer, dataloader, projector, device=None, nbatches=None, half=True):
+    '''
+    Computes dataloader gradients with jl dimensionality reduction.
+    Args:
+        model (transformers.AutoModelForCausalLM): HuggingFace model.
+        embedding_layer (torch.nn.parameter.Parameter): computes embeddings from tokens, useful for taking grad wrt x
+        dataloader (torch.utils.data.dataloader.DataLoader): DataLoader of samples.
+        projector (dict): dictionary of dimensionality reduction functions        
+        device (str): CPU or GPU 
+        nbatches (int): Number of batches to consider
+        half (bool): use half precision floats for model
+
+    Returns:
+        torch.Tensor or list: data for input IDs
+    '''
+    if half:
+        print("Using model.half() ....")
+        model.half()
+    else:
+        print("Not using model.half() ....")
+    model.eval()
+    model.to(device)
+    # if "random_basis_change" in projector:
+    #     projector["random_basis_change"] = projector["random_basis_change"].to(device).half()
+
+    grads = []
+    for batchno, data_x in tqdm(enumerate(dataloader),total=len(dataloader)):
+        if nbatches is not None and batchno >= nbatches:
+            break
+        ## Get predictions on data 
+        if type(data_x) is dict:
+            data_x = data_x["input_ids"]
+        else:
+            data_x = data_x[None,:]
+        data_x = data_x.detach()                
+
+        ## Compute features on input data
+        grad = compute_input_ids_grad_jl(model, embedding_layer, data_x, projector, device=device).detach().cpu()
+        grads.append(grad)
+
+        del data_x
+        torch.cuda.empty_cache()
+        torch.cuda.synchronize()
+    
+    return torch.stack(grads)
