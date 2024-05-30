@@ -105,49 +105,111 @@ def compute_extraction_metrics(ground_truth,generations,ground_truth_statistics,
     flattened_df.to_csv(f"{title}_flattened.csv",index=False)
 
     # Error-recall
-    did_solve = np.zeros(num_samples)
-    recall = []
-    errors = []
-    bad_guesses = 0
-    answer = None
-    for exid, is_correct in zip(flattened_df["original_index"],flattened_df["exact_match"]):
-        if is_correct:
-            did_solve[int(exid)] = 1
+    def plot_error_recall(prefix_index,correct,plot_title,recall_at=100,log_scale=False,show_plot=True,save_name=None):
+        did_solve = np.zeros(len(np.unique(prefix_index)))
+        recall = []
+        errors = []
+        bad_guesses = 0
+        answer = None
+        for exid, is_correct in zip(prefix_index,correct):
+            if is_correct:
+                did_solve[int(exid)] = 1
+            else:
+                bad_guesses += 1
             recall.append(np.mean(did_solve))
             errors.append(bad_guesses)
             if bad_guesses < 100:
                 answer = np.mean(did_solve)
-        else:
-            bad_guesses += 1
-    print("Recall at 100 errors", answer)
-            
-    plt.plot(errors, recall)
-
-    plt.semilogx()
-    plt.xlabel("Number of bad guesses")
-    plt.ylabel("Recall")
+        print("Recall at 100 errors", answer)
+        plt.figure(dpi=300)        
+        plt.plot(errors, recall, label=f"Error-Recall (Recall@{recall_at}={answer:.4f})")
+        plt.axvline(recall_at,alpha=0.5,c="red")
+        if log_scale:
+            plt.semilogx()
+        plt.title(plot_title)
+        plt.xlabel("Number of Errors")
+        plt.ylabel("Recall")
+        plt.legend(loc='lower right')
+        plt.minorticks_on()
+        plt.grid(which="major",alpha=0.2)
+        plt.grid(which="minor",alpha=0.1)
+        if save_name is not None:
+            plt.savefig(save_name+"_error_recall.png", bbox_inches="tight")
+            plt.savefig(save_name+"_error_recall.pdf", bbox_inches="tight")
+        if show_plot:
+            plt.show()
+        plt.close()
+        return answer
+    metrics["recall@100"] = plot_error_recall(flattened_df["original_index"],flattened_df["exact_match"],"test")
+    plot_error_recall(flattened_df["original_index"],flattened_df["exact_match"],"test",log_scale=True)
 
     # Precision-recall curve using scikit-learn
-    precision, recall, _ = precision_recall_curve(flattened_df["exact_match"], flattened_df[f"generation_{statistic_name}"])
-    plt.figure(figsize=(10, 6))
-    plt.plot(recall, precision, marker='o', linestyle='-', color='b')
-    plt.xlabel('Recall')
-    plt.ylabel('Precision')
-    plt.title('Precision-Recall Curve')
-    plt.grid(True)
-    plt.show()
+    def plot_precision_recall(ground_truth,predictions,plot_title,show_plot=True,save_name=None):
+        precision, recall, _ = precision_recall_curve(ground_truth, predictions)
+        plt.figure(dpi=300)        
+        plt.plot(recall, precision, label=f"Precision-Recall")
+        plt.title(plot_title)
+        plt.xlabel("Recall")
+        plt.ylabel("Precision")
+        plt.legend()
+        plt.minorticks_on()
+        plt.grid(which="major",alpha=0.2)
+        plt.grid(which="minor",alpha=0.1)
+        if save_name is not None:
+            plt.savefig(save_name+"_precision_recall.png", bbox_inches="tight")
+            plt.savefig(save_name+"_precision_recall.pdf", bbox_inches="tight")
+        if show_plot:
+            plt.show()
+        plt.close()
+    plot_precision_recall(flattened_df["exact_match"],flattened_df[f"generation_{statistic_name}"],"test")
 
-    # ROC-AUC curve
-    fpr, tpr, thresholds = roc_curve(flattened_df["exact_match"], flattened_df[f"generation_{statistic_name}"])
-    roc_auc = auc(fpr, tpr)
-    plt.figure()
-    plt.plot(fpr, tpr, color='darkorange', label='ROC curve (area = %0.4f)' % roc_auc)
-    plt.plot([0, 1], [0, 1], color='navy', linestyle='--')
-    plt.grid(which="both",alpha=0.2)
-    plt.title("Generation Attack ROC")
-    plt.legend(loc="lower right")
-    plt.xlabel('False Positive Rate')
-    plt.ylabel('True Positive Rate')
+    # # ROC-AUC curve
+    def plot_ROC_single(ground_truth, predictions, plot_title, keep_first=None, ci=True, num_bootstraps=1000, fprs=None, log_scale=False, show_plot=True, save_name=None, lims=None, color='darkorange'):
+        n_points = len(ground_truth)
+        fpr, tpr, thresholds = roc_curve(ground_truth,predictions)
+        roc_auc = auc(fpr, tpr)
+
+        if fprs is None:
+            fprs = [0.01,0.05,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9]
+        tpr_at_fprs = [tpr[np.max(np.argwhere(fpr<=fpr_val))] for fpr_val in fprs]
+
+        # Plot
+        plt.figure(figsize=(7,7),dpi=300)
+        plt.plot([0, 1], [0, 1], linestyle="--", c="k")
+        if not log_scale:
+            plt.plot(fpr, tpr, label=f'AUC = {roc_auc:0.4f}',c=color)
+            plt.xlim([0,1] if lims is None else lims)
+            plt.ylim([0,1] if lims is None else lims)
+        else:
+            plt.loglog(fpr, tpr, label=f'AUC = {roc_auc:0.4f}',c=color)
+            plt.xlim([10**(-int(np.log10(n_points))),1] if lims is None else lims)
+            plt.ylim([10**(-int(np.log10(n_points))),1] if lims is None else lims)
+        plt.title(plot_title)
+        plt.legend(loc="lower right")
+        plt.xlabel('False Positive Rate')
+        plt.ylabel('True Positive Rate')
+        plt.gca().set_aspect('equal', adjustable='box')
+        plt.minorticks_on()
+        plt.grid(which="major",alpha=0.2)
+        plt.grid(which="minor",alpha=0.1)
+        if save_name is not None:
+            plt.savefig(save_name+"_roc.png", bbox_inches="tight")
+            plt.savefig(save_name+"_roc.pdf", bbox_inches="tight")
+            df = pd.DataFrame([roc_auc,auc_se,tpr_at_fprs,tpr_se]).T
+            df = df.rename(columns={0:"AUC",1:"AUC_SE"})
+            df[[f'TPR@{fpr_val}' for fpr_val in fprs]] = pd.DataFrame(df[2].tolist(), index=df.index)
+            df[[f'TPR@{fpr_val}' for fpr_val in fprs]] = pd.DataFrame(df[3].tolist(), index=df.index)
+            df = df.drop(columns=[2,3])
+            output = io.StringIO()
+            df.to_csv(output,sep="\t")
+            print(output.getvalue())
+            df.to_csv(save_name+"_data.csv")
+        if show_plot:
+            plt.show()
+        plt.close()
+        return roc_auc, tpr_at_fprs
+    metrics["auc"], tpr_at_fprs = plot_ROC_single(flattened_df["exact_match"], flattened_df[f"generation_{statistic_name}"],"test",log_scale=False)
+    plot_ROC_single(flattened_df["exact_match"], flattened_df[f"generation_{statistic_name}"],"test",log_scale=True)
 
     flattened_df_w_true = pd.DataFrame(rows_with_ground_truth).sort_values(by=f"generation_{statistic_name}")
     flattened_df_w_true.to_csv(f"{title}_flattened_w_true.csv",index=False)
@@ -156,4 +218,4 @@ def compute_extraction_metrics(ground_truth,generations,ground_truth_statistics,
     with open(f"{title}_metrics.json","w") as f:
         json.dump(metrics,f,indent=4)
 
-    return df, flattened_df
+    return flattened_df

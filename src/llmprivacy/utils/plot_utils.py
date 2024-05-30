@@ -56,7 +56,7 @@ def plot_histogram(train_statistics, val_statistics, plot_title, keep_first=None
     combined_bin_edges = np.arange(combined_min, combined_max + bin_width, bin_width)
 
     # Plot
-    plt.figure()
+    plt.figure(dpi=300)
     plt.hist(train_statistics, bins=combined_bin_edges, alpha=0.5, edgecolor='black', label='Train')
     plt.hist(val_statistics, bins=combined_bin_edges, alpha=0.5, edgecolor='black', label='Validation')
     plt.legend(loc='upper right')
