@@ -206,6 +206,7 @@ def plot_histogram_plotly(train_statistics, val_statistics, plot_title, keep_fir
         fig.write_html(save_name + "_hist_plotly.html")
     if show_plot:
         fig.show()
+    del fig
 
 def plot_ROC(train_statistics, val_statistics, plot_title, keep_first=None, ci=True, num_bootstraps=1000, fprs=None, log_scale=False, show_plot=True, save_name=None, lims=None, color='darkorange'):
     '''
@@ -428,7 +429,8 @@ def plot_ROC_plotly(train_statistics, val_statistics, plot_title, keep_first=Non
         print(output.getvalue())
         df.to_csv(save_name+"_data.csv")
     if show_plot:
-        plt.show()
+        fig.show()
+    del fig
     if ci:
         return roc_auc, tpr_at_fprs, auc_se, tpr_se
     else:
@@ -660,7 +662,8 @@ def plot_ROC_multiple_plotly(train_statistics_list, val_statistics_list, plot_ti
         print(output.getvalue())
         df.to_csv(save_name+"_data.csv")
     if show_plot:
-        plt.show()
+        fig.show()
+    del fig
     return roc_auc_map, tpr_at_fprs_map, auc_se_map, tpr_se_map
 
 def plot_ROC_files(files, plot_title, labels=None, keep_first=None, show_plot=True, save_name=None, log_scale=False, fprs=None):
@@ -718,3 +721,120 @@ def print_AUC(train_statistic, val_statistic):
                                     torch.cat((-train_statistic,-val_statistic)).flatten())
     roc_auc = auc(fpr, tpr)
     return roc_auc
+
+def plot_probabilities(probabilities, plot_title, keep_first=None, log_scale=False, bins=None, show_plot=True, save_name=None):
+    """
+    Plot histogram of true suffix generation probabilities
+
+    Args:
+        probabilities (list[float]): list of probabilities
+        plot_title (str): title of the plot
+        keep_first (int): compute only for the first keep_first number of samples
+        log_scale (bool): whether to make y-axis use a log scale
+        show_plot (bool): whether to show the plot
+        save_name (str): save path for plot (without extension); does not save unless save_name is specified
+    """
+    # Preprocess
+    probabilities = torch.as_tensor(probabilities).flatten()[:keep_first]
+    probabilities = probabilities[~probabilities.isnan()]
+
+    # Compute bins
+    bin_edges = np.histogram_bin_edges(probabilities,bins="auto" if bins is None else bins)
+
+    # Plot
+    plt.figure()
+    plt.hist(probabilities, bins=bin_edges, alpha=0.5, edgecolor='black', label='True Suffix Probabilities')
+    plt.legend(loc='upper right')
+    plt.xlabel('True Suffix Probability')
+    plt.ylabel('Frequency')
+    if log_scale:
+        plt.yscale("log")
+    plt.title(plot_title)
+    plt.minorticks_on()
+    plt.grid(which="major",alpha=0.2)
+    plt.grid(which="minor",alpha=0.1)
+    if save_name is not None:
+        plt.savefig(save_name+"_hist.png", bbox_inches="tight")
+        plt.savefig(save_name+"_hist.pdf", bbox_inches="tight")
+    if show_plot:
+        plt.show()
+    plt.close()
+
+def plot_probabilities_plotly(probabilities, plot_title, keep_first=None, log_scale=False, bins=None, show_plot=True, save_name=None):
+    """
+    Plot histogram of true suffix generation probabilities using plotly
+
+    Args:
+        probabilities (list[float]): list of probabilities
+        plot_title (str): title of the plot
+        keep_first (int): compute only for the first keep_first number of samples
+        log_scale (bool): whether to make y-axis use a log scale
+        show_plot (bool): whether to show the plot
+        save_name (str): save path for plot (without extension); does not save unless save_name is specified
+    """
+    # Preprocess
+    probabilities = torch.as_tensor(probabilities).flatten()[:keep_first]
+    probabilities = probabilities[~probabilities.isnan()]
+
+    # Compute bins    
+    bin_edges = np.histogram_bin_edges(probabilities,bins="auto" if bins is None else bins)
+
+    print(bin_edges)
+    # Plot
+    fig = make_subplots(rows=3, cols=1, row_heights=[0.1, 0.4, 0.55], shared_xaxes=True, vertical_spacing=0.02)
+
+    # Rug plots
+    fig.add_trace(go.Box(
+        x=probabilities.numpy(), 
+        marker_symbol='line-ns-open', 
+        marker_color='#1f77b4',
+        boxpoints='all',
+        jitter=0,
+        fillcolor='rgba(255,255,255,0)',
+        line_color='rgba(255,255,255,0)',
+        hoveron='points',
+        showlegend=False,
+    ), row=1, col=1)
+
+    # Violin plots
+    fig.add_trace(go.Violin(
+        x=probabilities.numpy(), 
+        line_color='#1f77b4',
+        box_visible=True,
+        meanline_visible=True,
+        showlegend=False,
+    ), row=2, col=1)
+
+    # Histograms
+    fig.add_trace(go.Histogram(
+        x=probabilities.numpy(), 
+        nbinsx=len(bin_edges)-1, 
+        name='True Suffix Probabilities', 
+        opacity=0.5, 
+        marker_color='#1f77b4', 
+        marker_line_color='black',
+        marker_line_width=1.5,
+    ), row=3, col=1)
+
+    fig.update_layout(
+        title=plot_title,
+        width=800,
+        height=800,
+        xaxis3_title='True Suffix Probability',
+        yaxis3_title='Frequency',
+        yaxis=dict(showticklabels=False),
+        yaxis2=dict(showticklabels=False),
+        xaxis1=dict(showticklabels=False, minor=dict(showgrid=True, ticklen=0)),
+        xaxis2=dict(showticklabels=False, minor=dict(ticklen=0, showgrid=True)),
+        xaxis3=dict(showticklabels=True, showgrid=True, minor=dict(ticklen=0, showgrid=True)),
+        yaxis3=dict(showticklabels=True, minor=dict(ticklen=0, showgrid=True), type='log' if log_scale else 'linear'),
+        barmode='overlay'
+    )
+
+    if save_name is not None:
+        fig.write_image(save_name + "_hist_plotly.png", scale=5)
+        fig.write_image(save_name + "_hist_plotly.pdf", scale=5)
+        fig.write_html(save_name + "_hist_plotly.html")
+    if show_plot:
+        fig.show()
+    del fig

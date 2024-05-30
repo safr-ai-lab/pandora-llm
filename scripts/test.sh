@@ -19,5 +19,5 @@ source activate llm-privacy
 module load cuda
 conda list
 
-python experiments/mia/run_gradnorm.py --model_name EleutherAI/pythia-70m-deduped --model_revision step98000 --num_samples 10000 --start_index 150000 --pack --seed 229
-python experiments/mia/run_gradnorm.py --model_name EleutherAI/pythia-70m-deduped --model_revision step98000 --num_samples 2000 --start_index 0 --pack --seed 229
+# python experiments/mia/run_gradnorm.py --model_name EleutherAI/pythia-70m-deduped --model_revision step98000 --num_samples 10000 --start_index 150000 --pack --seed 229
+python experiments/mia/run_gradnorm.py --model_name EleutherAI/pythia-70m-deduped --model_revision step98000 --num_samples 200 --start_index 0 --pack --seed 229

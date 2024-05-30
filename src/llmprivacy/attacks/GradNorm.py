@@ -100,6 +100,7 @@ class GradNorm(MIA):
         val_statistics = []
         labels = []
         for grad_type in train_gradients.keys():
+            print(grad_type)
             train_stats = train_gradients[grad_type]
             val_stats = val_gradients[grad_type]
             train_statistics.append(train_stats)
