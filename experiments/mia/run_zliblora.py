@@ -1,5 +1,6 @@
 import os
 import time
+import json
 import argparse
 import subprocess
 import torch
@@ -59,6 +60,8 @@ def main():
         args.experiment_name = f"results/ZLIBLoRa/{args.experiment_name}/{args.experiment_name}"
     os.makedirs(os.path.dirname(args.experiment_name), exist_ok=True)
     logger = get_my_logger(log_file=f"{args.experiment_name}.log")
+    with open(f"{args.experiment_name}_args.json", "w") as f:
+        json.dump(vars(args), f, indent=4)
     ####################################################################################################
     # LOAD DATA
     ####################################################################################################

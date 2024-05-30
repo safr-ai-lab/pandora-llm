@@ -1,5 +1,6 @@
 import os
 import time
+import json
 import argparse
 import torch
 from accelerate.utils import set_seed
@@ -66,6 +67,8 @@ def main():
         args.experiment_name = f"results/NN/{args.experiment_name}/{args.experiment_name}"
     os.makedirs(os.path.dirname(args.experiment_name), exist_ok=True)
     logger = get_my_logger(log_file=f"{args.experiment_name}.log")
+    with open(f"{args.experiment_name}_args.json", "w") as f:
+        json.dump(vars(args), f, indent=4)
     ####################################################################################################
     # OBTAIN FEATURES
     ####################################################################################################

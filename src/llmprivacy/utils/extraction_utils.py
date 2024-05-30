@@ -2,6 +2,12 @@ import csv
 import numpy as np
 import pandas as pd
 
+def compute_extraction_metrics(ground_truth,generations,ground_truth_statistics,generations_statistics,prefix_length,suffix_length,tokenizer,title):
+    """
+    Computes all extraction metrics
+    """
+    
+
 def results(generations,losses,base_losses,prefixes,suffixes,n_samples,n_iterations,suffix_length,tokenizer,name1,name2,title="",probabilities=None):  
     """
     Method to generate extraction results. 

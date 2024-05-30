@@ -1,6 +1,8 @@
 import os
 import time
+import json
 import argparse
+import numpy as np
 import torch
 from torch.utils.data import DataLoader
 from transformers import AutoModelForCausalLM, AutoTokenizer, AutoConfig
@@ -61,7 +63,7 @@ def main():
         args.experiment_name = (
             (f"Generations_{args.model_name.replace('/','-')}") +
             (f"_{args.model_revision.replace('/','-')}" if args.model_revision is not None else "") +
-            (f"_{args.data.replace('/','-')}") + 
+            # (f"_{args.data.replace('/','-')}") + 
             (f"_k={args.prefix_length}_m={args.suffix_length}") +
             (f"_N={args.num_samples}_S={args.start_index}_seed={args.seed}") +
             (f"_tag={args.tag}" if args.tag is not None else "") +
@@ -70,6 +72,8 @@ def main():
         args.experiment_name = f"results/Generations/{args.experiment_name}/{args.experiment_name}"
     os.makedirs(os.path.dirname(args.experiment_name), exist_ok=True)
     logger = get_my_logger(log_file=f"{args.experiment_name}.log")
+    with open(f"{args.experiment_name}_args.json", "w") as f:
+        json.dump(vars(args), f, indent=4)
     ####################################################################################################
     # LOAD DATA
     ####################################################################################################
@@ -135,8 +139,8 @@ def main():
             num_generations=args.num_generations,
             accelerate=False
         )
-        torch.save(generations,f"{args.experiment_name}_generations.pt")
-        torch.save(dataset,f"{args.experiment_name}_true.pt")
+        torch.save(torch.from_numpy(generations).long(),f"{args.experiment_name}_generations.pt")
+        torch.save(torch.from_numpy(np.array([sample for batch in dataloader for sample in batch["input_ids"]])).long(),f"{args.experiment_name}_true.pt")
 
     end = time.perf_counter()
     logger.info(f"- Experiment {args.experiment_name} took {end-start} seconds.")

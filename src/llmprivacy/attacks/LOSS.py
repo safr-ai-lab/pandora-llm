@@ -140,7 +140,8 @@ def compute_dataloader_cross_entropy(model, dataloader, device=None, num_batches
             break
         with torch.no_grad():    
             ## Get predictions on training data 
-            data_x = data_x["input_ids"]
+            if isinstance(data_x,dict):
+                data_x = data_x["input_ids"]
             if samplelength is None:
                 data_x = data_x.detach()                
             else:
