@@ -35,6 +35,7 @@ def main():
     # Dataset Arguments
     parser.add_argument('--ground_truth', action="store", type=str, required=False, help='.pt file of ground truth input_ids')
     parser.add_argument('--generations', action="store", type=str, required=False, help='.pt file of generated input_ids')
+    parser.add_argument('--ground_truth_probabilities', action="store", type=str, required=False, help='.pt file of generated input_ids')
     parser.add_argument('--prefix_length', action="store", type=int, required=False, help='Prefix length')
     parser.add_argument('--suffix_length', action="store", type=int, required=False, help='Suffix length')
     parser.add_argument('--num_samples', action="store", type=int, required=True, help='Dataset size')
@@ -76,6 +77,8 @@ def main():
     ground_truth_dataloader = DataLoader(ground_truth, batch_size = args.bs)
     generations_dataloader = DataLoader(generations.flatten(end_dim=1), batch_size = args.bs)
 
+    ground_truth_probabilities = torch.load(args.ground_truth_probabilities) if (args.ground_truth_probabilities is not None) else None
+
     end = time.perf_counter()
     logger.info(f"- Dataset loading took {end-start} seconds.")
     ####################################################################################################
@@ -103,14 +106,28 @@ def main():
         generations=generations,
         ground_truth_statistics=ground_truth_statistics,
         generations_statistics=generations_statistics,
+        ground_truth_probabilities=ground_truth_probabilities,
         prefix_length=args.prefix_length,
         suffix_length=args.suffix_length,
         tokenizer=tokenizer,
         title=args.experiment_name,
+        statistic_name="LOSS",
     )
+    # true_and_generations = torch.cat((ground_truth[:,None,:],generations),dim=1)
+    # true_and_generations_statistics = torch.cat((ground_truth_statistics[:,None],generations_statistics),dim=1)
+    # compute_extraction_metrics(
+    #     ground_truth=ground_truth,
+    #     generations=true_and_generations,
+    #     ground_truth_statistics=ground_truth_statistics,
+    #     generations_statistics=true_and_generations_statistics,
+    #     prefix_length=args.prefix_length,
+    #     suffix_length=args.suffix_length,
+    #     tokenizer=tokenizer,
+    #     title=args.experiment_name+"_artificial",
+    #     statistic_name="LOSS",
+    # )
 
     end = time.perf_counter()
-
     logger.info(f"- Experiment {args.experiment_name} took {end-start} seconds.")
 
 if __name__ == "__main__":

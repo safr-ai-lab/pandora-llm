@@ -2,11 +2,49 @@ import csv
 import numpy as np
 import pandas as pd
 
-def compute_extraction_metrics(ground_truth,generations,ground_truth_statistics,generations_statistics,prefix_length,suffix_length,tokenizer,title):
+def compute_extraction_metrics(ground_truth,generations,ground_truth_statistics,generations_statistics,prefix_length,suffix_length,tokenizer,title=None,statistic_name=None,ground_truth_probabilities=None):
     """
     Computes all extraction metrics
     """
-    
+    # Metrics obtained by choosing the best suffix per prefix
+    num_samples = ground_truth.shape[0]
+    num_generations = generations.shape[1]
+    axis0 = np.arange(num_samples)
+    axis1 = generations_statistics.argmin(1).reshape(-1)
+
+    datadict = {}
+    datadict |= {f"ground_truth_{statistic_name}": ground_truth_statistics}
+    datadict |= {f"best_generation_{statistic_name}": generations_statistics[axis0,axis1].tolist()}
+    datadict |= {f"generations_{i}_{statistic_name}": generations_statistics[:,i] for i in range(num_generations)}
+
+    datadict |= {"prefix": [tokenizer.decode(ground_truth[row,:prefix_length]) for row in range(num_samples)]}
+    datadict |= {"ground_truth_suffix_text": [tokenizer.decode(ground_truth[row,-suffix_length:]) for row in range(num_samples)]}
+    datadict |= {"best_generation_suffix_text": [tokenizer.decode(row) for row in generations[axis0,axis1,-suffix_length:]]}
+    datadict |= {f"generations_{i}_suffix_text": [tokenizer.decode(generations[row,i,-suffix_length:]) for row in range(num_samples)] for i in range(num_generations)}
+
+    datadict |= {"ground_truth_suffix_tokens": ground_truth[:,-suffix_length:].tolist()}
+    datadict |= {"best_generation_suffix_tokens": generations[axis0,axis1,-suffix_length:].tolist()}
+    datadict |= {f"generations_{i}_suffix_tokens": generations[:,i,-suffix_length:].tolist() for i in range(num_generations)}
+
+    if ground_truth_probabilities is not None:
+        datadict |= {"ground_truth_suffix_probability": ground_truth_probabilities}
+
+    df = pd.DataFrame(datadict)
+
+    df["exact_match"] = df["ground_truth_suffix_tokens"]==df["best_generation_suffix_tokens"]
+    df["token_match"] = [(np.array(df["ground_truth_suffix_tokens"][row])==np.array(df["best_generation_suffix_tokens"][row])).mean() for row in range(num_samples)]
+    df["any_exact_match"] = df.apply(lambda row: any(row[f"generations_{i}_suffix_tokens"] == row["ground_truth_suffix_tokens"] for i in range(num_generations)), axis=1)
+    df["highest_token_match"] = df.apply(lambda row: max((np.array(row["ground_truth_suffix_tokens"]) == np.array(row[f"generations_{i}_suffix_tokens"])).mean() for i in range(num_generations)), axis=1)
+    df["ground_truth_better_than"] = df.apply(lambda row: sum(row[f"ground_truth_{statistic_name}"] <= row[f"generations_{i}_{statistic_name}"] for i in range(num_generations)) / num_generations, axis=1)
+    df["ground_truth_best"] = df['ground_truth_better_than']==1
+    print(f"Exact Match Accuracy (Precision): {df['exact_match'].mean():.4g}")
+    print(f"Token Level Accuracy (Hamming): {df['token_match'].mean():.4g}")
+    print(f"Any Exact Match Accuracy (Multiprecision): {df['any_exact_match'].mean():.4g}")
+    print(f"Highest Token Level Accuracy (Multihamming): {df['highest_token_match'].mean():.4g}")
+    print(f"Average Proportion of Generations True Suffix is Better Than (Distinguishability Given Generated): {df['ground_truth_better_than'].mean():.4g}")
+    print(f"True Suffix is Best (Accuracy Given Generated): {df['ground_truth_best'].mean():.4g}")
+
+    return df
 
 def results(generations,losses,base_losses,prefixes,suffixes,n_samples,n_iterations,suffix_length,tokenizer,name1,name2,title="",probabilities=None):  
     """
