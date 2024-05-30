@@ -290,15 +290,21 @@ def plot_ROC(train_statistics, val_statistics, plot_title, keep_first=None, ci=T
     if save_name is not None:
         plt.savefig(save_name+"_roc.png", bbox_inches="tight")
         plt.savefig(save_name+"_roc.pdf", bbox_inches="tight")
-        df = pd.DataFrame([roc_auc,auc_se,tpr_at_fprs,tpr_se]).T
-        df = df.rename(columns={0:"AUC",1:"AUC_SE"})
-        df[[f'TPR@{fpr_val}' for fpr_val in fprs]] = pd.DataFrame(df[2].tolist(), index=df.index)
-        df[[f'TPR@{fpr_val}' for fpr_val in fprs]] = pd.DataFrame(df[3].tolist(), index=df.index)
-        df = df.drop(columns=[2,3])
+        if ci:
+            df = pd.DataFrame([roc_auc,auc_se,tpr_at_fprs,tpr_se]).T
+            df = df.rename(columns={0:"AUC",1:"AUC_SE"})
+            df[[f'TPR@{fpr_val}' for fpr_val in fprs]] = pd.DataFrame(df[2].tolist(), index=df.index)
+            df[[f'TPR@{fpr_val}_SE' for fpr_val in fprs]] = pd.DataFrame(df[3].tolist(), index=df.index)
+            df = df.drop(columns=[2,3])
+        else:
+            df = pd.DataFrame([roc_auc,tpr_at_fprs]).T
+            df = df.rename(columns={0:"AUC"})
+            df[[f'TPR@{fpr_val}' for fpr_val in fprs]] = pd.DataFrame(df[2].tolist(), index=df.index)
+            df = df.drop(columns=[1])
         output = io.StringIO()
         df.to_csv(output,sep="\t")
         print(output.getvalue())
-        df.to_csv(save_name+"_data.csv")
+        df.to_csv(save_name+"_roc.csv")
     if show_plot:
         plt.show()
     plt.close()
@@ -419,15 +425,21 @@ def plot_ROC_plotly(train_statistics, val_statistics, plot_title, keep_first=Non
         fig.write_image(save_name + "_roc_plotly.png")
         fig.write_image(save_name + "_roc_plotly.pdf")
         fig.write_html(save_name + "_roc_plotly.html")
-        df = pd.DataFrame([roc_auc,auc_se,tpr_at_fprs,tpr_se]).T
-        df = df.rename(columns={0:"AUC",1:"AUC_SE"})
-        df[[f'TPR@{fpr_val}' for fpr_val in fprs]] = pd.DataFrame(df[2].tolist(), index=df.index)
-        df[[f'TPR@{fpr_val}' for fpr_val in fprs]] = pd.DataFrame(df[3].tolist(), index=df.index)
-        df = df.drop(columns=[2,3])
+        if ci:
+            df = pd.DataFrame([roc_auc,auc_se,tpr_at_fprs,tpr_se]).T
+            df = df.rename(columns={0:"AUC",1:"AUC_SE"})
+            df[[f'TPR@{fpr_val}' for fpr_val in fprs]] = pd.DataFrame(df[2].tolist(), index=df.index)
+            df[[f'TPR@{fpr_val}_SE' for fpr_val in fprs]] = pd.DataFrame(df[3].tolist(), index=df.index)
+            df = df.drop(columns=[2,3])
+        else:
+            df = pd.DataFrame([roc_auc,tpr_at_fprs]).T
+            df = df.rename(columns={0:"AUC"})
+            df[[f'TPR@{fpr_val}' for fpr_val in fprs]] = pd.DataFrame(df[2].tolist(), index=df.index)
+            df = df.drop(columns=[1])
         output = io.StringIO()
         df.to_csv(output,sep="\t")
         print(output.getvalue())
-        df.to_csv(save_name+"_data.csv")
+        df.to_csv(save_name+"_roc_plotly.csv")
     if show_plot:
         fig.show()
     del fig
@@ -523,15 +535,21 @@ def plot_ROC_multiple(train_statistics_list, val_statistics_list, plot_title, la
     if save_name is not None:
         plt.savefig(save_name+"_roc.png", bbox_inches="tight")
         plt.savefig(save_name+"_roc.pdf", bbox_inches="tight")
-        df = pd.DataFrame([roc_auc_map,auc_se_map,tpr_at_fprs_map,tpr_se_map]).T
-        df = df.rename(columns={0:"AUC",1:"AUC_SE"})
-        df[[f'TPR@{fpr_val}' for fpr_val in fprs]] = pd.DataFrame(df[2].tolist(), index=df.index)
-        df[[f'TPR@{fpr_val}' for fpr_val in fprs]] = pd.DataFrame(df[3].tolist(), index=df.index)
-        df = df.drop(columns=[2,3])
+        if ci:
+            df = pd.DataFrame([roc_auc_map,auc_se_map,tpr_at_fprs_map,tpr_se_map]).T
+            df = df.rename(columns={0:"AUC",1:"AUC_SE"})
+            df[[f'TPR@{fpr_val}' for fpr_val in fprs]] = pd.DataFrame(df[2].tolist(), index=df.index)
+            df[[f'TPR@{fpr_val}_SE' for fpr_val in fprs]] = pd.DataFrame(df[3].tolist(), index=df.index)
+            df = df.drop(columns=[2,3])
+        else:
+            df = pd.DataFrame([roc_auc_map,tpr_at_fprs_map]).T
+            df = df.rename(columns={0:"AUC"})
+            df[[f'TPR@{fpr_val}' for fpr_val in fprs]] = pd.DataFrame(df[2].tolist(), index=df.index)
+            df = df.drop(columns=[1])
         output = io.StringIO()
         df.to_csv(output,sep="\t")
         print(output.getvalue())
-        df.to_csv(save_name+"_data.csv")
+        df.to_csv(save_name+"_roc.csv")
     if show_plot:
         plt.show()
     if ci:
@@ -652,15 +670,21 @@ def plot_ROC_multiple_plotly(train_statistics_list, val_statistics_list, plot_ti
         fig.write_image(save_name + "_roc_plotly.png",scale=5)
         fig.write_image(save_name + "_roc_plotly.pdf",scale=5)
         fig.write_html(save_name + "_roc_plotly.html")
-        df = pd.DataFrame([roc_auc_map,auc_se_map,tpr_at_fprs_map,tpr_se_map]).T
-        df = df.rename(columns={0:"AUC",1:"AUC_SE"})
-        df[[f'TPR@{fpr_val}' for fpr_val in fprs]] = pd.DataFrame(df[2].tolist(), index=df.index)
-        df[[f'TPR@{fpr_val}' for fpr_val in fprs]] = pd.DataFrame(df[3].tolist(), index=df.index)
-        df = df.drop(columns=[2,3])
+        if ci:
+            df = pd.DataFrame([roc_auc_map,auc_se_map,tpr_at_fprs_map,tpr_se_map]).T
+            df = df.rename(columns={0:"AUC",1:"AUC_SE"})
+            df[[f'TPR@{fpr_val}' for fpr_val in fprs]] = pd.DataFrame(df[2].tolist(), index=df.index)
+            df[[f'TPR@{fpr_val}_SE' for fpr_val in fprs]] = pd.DataFrame(df[3].tolist(), index=df.index)
+            df = df.drop(columns=[2,3])
+        else:
+            df = pd.DataFrame([roc_auc_map,tpr_at_fprs_map]).T
+            df = df.rename(columns={0:"AUC"})
+            df[[f'TPR@{fpr_val}' for fpr_val in fprs]] = pd.DataFrame(df[2].tolist(), index=df.index)
+            df = df.drop(columns=[1])
         output = io.StringIO()
         df.to_csv(output,sep="\t")
         print(output.getvalue())
-        df.to_csv(save_name+"_data.csv")
+        df.to_csv(save_name+"_roc_plotly.csv")
     if show_plot:
         fig.show()
     del fig
