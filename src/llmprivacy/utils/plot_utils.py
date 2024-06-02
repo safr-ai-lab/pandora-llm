@@ -873,7 +873,7 @@ def plot_probabilities_plotly(probabilities, plot_title, keep_first=None, log_sc
     del fig
 
 ####################################################################################################
-# EXTRACTION
+# ERROR-RECALL
 ####################################################################################################
 def unique(x, dim=0, sort_index=False):
     # torch analog of np.unique from https://github.com/pytorch/pytorch/issues/16330
@@ -910,7 +910,8 @@ def compute_error_recalls(prefix_index,correct):
 # Error-recall
 def plot_error_recall(prefix_index, correct, plot_title, recall_at=100, ci=True, num_bootstraps=1000, log_scale=False, show_plot=True, save_name=None):
     errors, recalls = compute_error_recalls(prefix_index,correct)
-    answer = recalls[errors < recall_at][-1].item()
+    recall_at_indices = torch.cat(((torch.searchsorted(errors, torch.arange(len(errors)), right=True)-1)[1:],torch.tensor([len(errors)-1])))
+    recalls_per_error = recalls[recall_at_indices].numpy()
 
     if ci:
         data = torch.cat((prefix_index[:,None],correct[:,None]),dim=1)
@@ -918,11 +919,12 @@ def plot_error_recall(prefix_index, correct, plot_title, recall_at=100, ci=True,
             prefix_index = torch.from_numpy(data[0,0,:].T)
             correct = torch.from_numpy(data[1,0,:].T)
             errors, recalls = compute_error_recalls(prefix_index,correct)
-            return [recalls[errors < recall_at][-1].item()]
+            recall_at_indices = torch.cat(((torch.searchsorted(errors, torch.arange(len(errors)), right=True)-1)[1:],torch.tensor([len(errors)-1])))
+            return np.array([recalls[recall_at_indices].numpy()]).T
         bootstrap_result = bootstrap((data,), error_recall_statistic, confidence_level=0.95, n_resamples=num_bootstraps, batch=1, method='percentile', axis=0)
 
     plt.figure(dpi=300)
-    plt.plot(errors, recalls, label=f"Error-Recall (Recall@{recall_at}={answer:.4f})")
+    plt.plot(errors, recalls, label=f"Error-Recall (Recall@{recall_at}={recalls_per_error[recall_at]:.4f})")
     if ci:
         plt.fill_between(errors, bootstrap_result.confidence_interval.low, bootstrap_result.confidence_interval.high, alpha=0.1, color='darkorange')
     plt.axvline(recall_at, alpha=0.5, c="red")
@@ -938,15 +940,113 @@ def plot_error_recall(prefix_index, correct, plot_title, recall_at=100, ci=True,
     if save_name is not None:
         plt.savefig(save_name+"_error_recall.png", bbox_inches="tight")
         plt.savefig(save_name+"_error_recall.pdf", bbox_inches="tight")
+        if ci:
+            df = pd.DataFrame([recalls_per_error,bootstrap_result.standard_error]).T
+            df[[f'Recall@{error}_Errors' for error in range(len(errors))]] = pd.DataFrame(df[0].tolist(), index=df.index)
+            df[[f'Recall@{error}_Errors_SE' for error in range(len(errors))]] = pd.DataFrame(df[1].tolist(), index=df.index)
+            df = df.drop(columns=[0,1])
+        else:
+            df = pd.DataFrame([recalls_per_error]).T
+            df[[f'Recall@{error}_Errors' for error in range(len(errors))]] = pd.DataFrame(df[0].tolist(), index=df.index)
+            df = df.drop(columns=[0])
+        output = io.StringIO()
+        df.to_csv(output,sep="\t")
+        print(output.getvalue())
+        df.to_csv(save_name+"__error_recall.csv")
     if show_plot:
         plt.show()
     plt.close()
     if ci:
-        return answer, bootstrap_result.standard_error
+        return recalls_per_error, bootstrap_result.standard_error
     else:
-        return answer
+        return recalls_per_error
 
-# Precision-recall curve
+def plot_error_recall_plotly(prefix_index, correct, plot_title, recall_at=100, ci=True, num_bootstraps=1000, log_scale=False, show_plot=True, save_name=None):
+    errors, recalls = compute_error_recalls(prefix_index,correct)
+    recall_at_indices = torch.cat(((torch.searchsorted(errors, torch.arange(len(errors)), right=True)-1)[1:],torch.tensor([len(errors)-1])))
+    recalls_per_error = recalls[recall_at_indices].numpy()
+
+    if ci:
+        data = torch.cat((prefix_index[:,None],correct[:,None]),dim=1)
+        def error_recall_statistic(data, axis):
+            prefix_index = torch.from_numpy(data[0,0,:].T)
+            correct = torch.from_numpy(data[1,0,:].T)
+            errors, recalls = compute_error_recalls(prefix_index,correct)
+            recall_at_indices = torch.cat(((torch.searchsorted(errors, torch.arange(len(errors)), right=True)-1)[1:],torch.tensor([len(errors)-1])))
+            return np.array([recalls[recall_at_indices].numpy()]).T
+        bootstrap_result = bootstrap((data,), error_recall_statistic, confidence_level=0.95, n_resamples=num_bootstraps, batch=1, method='percentile', axis=0)
+
+    fig = go.Figure(data=[go.Scatter(
+        x=errors,
+        y=recalls,
+        mode='lines',
+        name=f"Error-Recall (Recall@{recall_at}={recalls_per_error[recall_at]:.4f})"
+    )])
+
+    fig.update_layout(dict(
+        title=plot_title,
+        xaxis=dict(title='Number of Errors', type='log' if log_scale else 'linear'),
+        yaxis=dict(title='Recall'),
+        shapes=[
+            dict(
+                type='line',
+                x0=recall_at,
+                y0=0,
+                x1=recall_at,
+                y1=1,
+                line=dict(color='red', dash='dash')
+            )
+        ]
+    ))
+
+    if ci:
+        fig.add_trace(go.Scatter(
+            x=errors,
+            y=bootstrap_result.confidence_interval.low,
+            fill=None,
+            mode='lines',
+            line=dict(width=0),
+            showlegend=False
+        ))
+        fig.add_trace(go.Scatter(
+            x=errors,
+            y=bootstrap_result.confidence_interval.high,
+            fill='tonexty',
+            mode='lines',
+            line=dict(width=0),
+            fillcolor='rgba(255, 165, 0, 0.1)',
+            showlegend=False
+        ))
+
+    if save_name is not None:
+        fig.write_image(save_name + "_error_recall_plotly.png", scale=5)
+        fig.write_image(save_name + "_error_recall_plotly.pdf", scale=5)
+        fig.write_html(save_name + "_error_recall_plotly.html")
+        if ci:
+            df = pd.DataFrame([recalls_per_error,bootstrap_result.standard_error]).T
+            df[[f'Recall@{error}_Errors' for error in range(len(errors))]] = pd.DataFrame(df[0].tolist(), index=df.index)
+            df[[f'Recall@{error}_Errors_SE' for error in range(len(errors))]] = pd.DataFrame(df[1].tolist(), index=df.index)
+            df = df.drop(columns=[0,1])
+        else:
+            df = pd.DataFrame([recalls_per_error]).T
+            df[[f'Recall@{error}_Errors' for error in range(len(errors))]] = pd.DataFrame(df[0].tolist(), index=df.index)
+            df = df.drop(columns=[0])
+        output = io.StringIO()
+        df.to_csv(output,sep="\t")
+        print(output.getvalue())
+        df.to_csv(save_name+"__error_recall_plotly.csv")
+    if show_plot:
+        fig.show()
+    del fig
+    if ci:
+        return recalls_per_error, bootstrap_result.standard_error
+    else:
+        return recalls_per_error
+
+####################################################################################################
+# PRECISION-RECALL
+####################################################################################################
+
 def plot_precision_recall(ground_truth,predictions,plot_title,ci=True,num_bootstraps=1000,recalls=None,log_scale=False, show_plot=True, save_name=None, lims=None, color='darkorange'):
     n_points = len(ground_truth)
 
@@ -1015,7 +1115,95 @@ def plot_precision_recall(ground_truth,predictions,plot_title,ci=True,num_bootst
     else:
         return average_precision, precision_at_recalls
 
-# ROC-AUC curve
+def plot_precision_recall_plotly(ground_truth,predictions,plot_title,ci=True,num_bootstraps=1000,recalls=None,log_scale=False, show_plot=True, save_name=None, lims=None, color='darkorange'):
+    n_points = len(ground_truth)
+
+    precision, recall, thresholds = precision_recall_curve(ground_truth, predictions)
+    average_precision = average_precision_score(ground_truth, predictions)
+    if recalls is None:
+        recalls = [0.01,0.05,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9]
+    precision_at_recalls = [precision[np.max(np.argwhere(recall<=recall_val))] for recall_val in recalls]
+
+    if ci:
+        recall_range = np.linspace(0, 1, n_points)
+        def precision_recall_statistic(data,axis):
+            ground_truth = data[0,0,:].T
+            predictions = data[1,0,:].T
+            precision, recall, _ = precision_recall_curve(ground_truth, predictions)
+            average_precision = average_precision_score(ground_truth, predictions)
+            precision_range = np.interp(recall_range,recall,precision)
+            return np.array([[average_precision]+precision_range.tolist()]).T
+        
+        data = torch.cat((ground_truth[:,None],predictions[:,None]),dim=1)
+        bootstrap_result = bootstrap((data,), precision_recall_statistic, confidence_level=0.95, n_resamples=num_bootstraps, batch=1, method='percentile',axis=0)
+        average_precision_se = bootstrap_result.standard_error[0]
+        precision_se = [bootstrap_result.standard_error[np.max(np.argwhere(recall<=recall_val))] for recall_val in recalls]
+    
+
+    fig = go.Figure(data=go.Scatter(
+        x=recall,
+        y=precision,
+        mode='lines',
+        name=f'AP = {average_precision:0.4f}',
+        line=dict(color=color)
+    ))
+
+    fig.update_layout(dict(
+        title=plot_title,
+        xaxis=dict(title='Recall', type='log' if log_scale else 'linear', range=[0, 1] if lims is None else lims),
+        yaxis=dict(title='Precision', range=[0, 1] if lims is None else lims),
+    ))
+    
+    if ci:
+        fig.add_trace(go.Scatter(
+            x=recall_range,
+            y=bootstrap_result.confidence_interval.low[1:],
+            fill=None,
+            mode='lines',
+            line=dict(width=0),
+            showlegend=False
+        ))
+        fig.add_trace(go.Scatter(
+            x=recall_range,
+            y=bootstrap_result.confidence_interval.high[1:],
+            fill='tonexty',
+            mode='lines',
+            line=dict(width=0),
+            fillcolor='rgba(255, 165, 0, 0.1)',
+            showlegend=False
+        ))
+
+    if save_name is not None:
+        fig.write_image(save_name + "_pr_plotly.png", scale=5)
+        fig.write_image(save_name + "_pr_plotly.pdf", scale=5)
+        fig.write_html(save_name + "_pr_plotly.html")
+        if ci:
+            df = pd.DataFrame([average_precision,average_precision_se,precision_at_recalls,precision_se]).T
+            df = df.rename(columns={0:"AP",1:"AP_SE"})
+            df[[f'Precision@{recall_val}' for recall_val in recalls]] = pd.DataFrame(df[2].tolist(), index=df.index)
+            df[[f'Precision@{recall_val}_SE' for recall_val in recalls]] = pd.DataFrame(df[3].tolist(), index=df.index)
+            df = df.drop(columns=[2,3])
+        else:
+            df = pd.DataFrame([average_precision,precision_at_recalls]).T
+            df = df.rename(columns={0:"AP"})
+            df[[f'Precision@{recall_val}' for recall_val in recalls]] = pd.DataFrame(df[2].tolist(), index=df.index)
+            df = df.drop(columns=[1])
+        output = io.StringIO()
+        df.to_csv(output,sep="\t")
+        print(output.getvalue())
+        df.to_csv(save_name+"_pr_plotly.csv")
+    if show_plot:
+        fig.show()
+    del fig
+    if ci:
+        return average_precision, precision_at_recalls, average_precision_se, precision_se
+    else:
+        return average_precision, precision_at_recalls
+
+####################################################################################################
+# ROC SINGLE
+####################################################################################################
+
 def plot_ROC_single(ground_truth, predictions, plot_title, keep_first=None, ci=True, num_bootstraps=1000, fprs=None, log_scale=False, show_plot=True, save_name=None, lims=None, color='darkorange'):
     n_points = len(ground_truth)
     fpr, tpr, thresholds = roc_curve(ground_truth,predictions)
@@ -1083,6 +1271,120 @@ def plot_ROC_single(ground_truth, predictions, plot_title, keep_first=None, ci=T
     if show_plot:
         plt.show()
     plt.close()
+    if ci:
+        return roc_auc, tpr_at_fprs, auc_se, tpr_se
+    else:
+        return roc_auc, tpr_at_fprs
+
+def plot_ROC_single_plotly(ground_truth, predictions, plot_title, keep_first=None, ci=True, num_bootstraps=1000, fprs=None, log_scale=False, show_plot=True, save_name=None, lims=None, color='darkorange'):
+    n_points = len(ground_truth)
+    fpr, tpr, thresholds = roc_curve(ground_truth,predictions)
+    roc_auc = auc(fpr, tpr)
+
+    if fprs is None:
+        fprs = [0.01,0.05,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9]
+    tpr_at_fprs = [tpr[np.max(np.argwhere(fpr<=fpr_val))] for fpr_val in fprs]
+
+    # Compute CI
+    if ci:
+        fpr_range = np.linspace(0, 1, n_points)
+        def auc_statistic(data,axis):
+            ground_truth = data[0,0,:].T
+            predictions = data[1,0,:].T
+            fpr, tpr, thresholds = roc_curve(ground_truth, predictions)
+            roc_auc = auc(fpr, tpr)
+            tpr_range = np.interp(fpr_range,fpr,tpr)
+            return np.array([[roc_auc]+tpr_range.tolist()]).T
+        
+        data = torch.cat((ground_truth[:,None],predictions[:,None]),dim=1)
+        bootstrap_result = bootstrap((data,), auc_statistic, confidence_level=0.95, n_resamples=num_bootstraps, batch=1, method='percentile',axis=0)
+        auc_se = bootstrap_result.standard_error[0]
+        tpr_se = [bootstrap_result.standard_error[np.max(np.argwhere(fpr_range<=fpr_val))] for fpr_val in fprs]
+
+        # Plot
+        fig = go.Figure(data=go.Scatter(
+            x=fpr,
+            y=tpr,
+            mode='lines',
+            name=f'AUC = {roc_auc:0.4f}',
+            line=dict(color=color)
+        ))
+
+        fig.update_layout(dict(
+            title=plot_title,
+            xaxis=dict(
+                title='False Positive Rate',
+                range=([-int(np.log10(n_points)), 0] if log_scale else [0,1]) if lims is None else lims,
+                type='log' if log_scale else 'linear',
+                constrain='domain',
+                tickmode = 'linear',
+                tick0 = -int(np.log10(n_points)) if log_scale else 0,
+                dtick = 1 if log_scale else 0.2,
+                minor=dict(ticks="inside", ticklen=0, showgrid=True)
+            ),
+            yaxis=dict(
+                title='True Positive Rate',
+                range=([-int(np.log10(n_points)), 0] if log_scale else [0,1]) if lims is None else lims,
+                type='log' if log_scale else 'linear',
+                scaleanchor='x',
+                tickmode = 'linear',
+                tick0 = -int(np.log10(n_points)) if log_scale else 0,
+                dtick = 1 if log_scale else 0.2,
+                minor=dict(ticks="inside", ticklen=0, showgrid=True)
+            ),
+            shapes=[
+                dict(
+                    type='line',
+                    x0=0,
+                    y0=0,
+                    x1=1,
+                    y1=1,
+                    line=dict(dash='dash', color='black')
+                )
+            ]
+        ))
+
+        if ci:
+            fig.add_trace(go.Scatter(
+                x=fpr_range,
+                y=bootstrap_result.confidence_interval.low[1:],
+                fill=None,
+                mode='lines',
+                line=dict(width=0),
+                showlegend=False
+            ))
+            fig.add_trace(go.Scatter(
+                x=fpr_range,
+                y=bootstrap_result.confidence_interval.high[1:],
+                fill='tonexty',
+                mode='lines',
+                line=dict(width=0),
+                fillcolor='rgba(255, 165, 0, 0.1)',
+                showlegend=False
+            ))     
+
+    if save_name is not None:
+        fig.write_image(save_name + "_roc_plotly.png", scale=5)
+        fig.write_image(save_name + "_roc_plotly.pdf", scale=5)
+        fig.write_html(save_name + "_roc_plotly.html")
+        if ci:
+            df = pd.DataFrame([roc_auc,auc_se,tpr_at_fprs,tpr_se]).T
+            df = df.rename(columns={0:"AUC",1:"AUC_SE"})
+            df[[f'TPR@{fpr_val}' for fpr_val in fprs]] = pd.DataFrame(df[2].tolist(), index=df.index)
+            df[[f'TPR@{fpr_val}_SE' for fpr_val in fprs]] = pd.DataFrame(df[3].tolist(), index=df.index)
+            df = df.drop(columns=[2,3])
+        else:
+            df = pd.DataFrame([roc_auc,tpr_at_fprs]).T
+            df = df.rename(columns={0:"AUC"})
+            df[[f'TPR@{fpr_val}' for fpr_val in fprs]] = pd.DataFrame(df[2].tolist(), index=df.index)
+            df = df.drop(columns=[1])
+        output = io.StringIO()
+        df.to_csv(output,sep="\t")
+        print(output.getvalue())
+        df.to_csv(save_name+"_roc_plotly.csv")
+    if show_plot:
+        fig.show()
+    del fig
     if ci:
         return roc_auc, tpr_at_fprs, auc_se, tpr_se
     else:
