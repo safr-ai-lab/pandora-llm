@@ -886,6 +886,13 @@ def unique(x, dim=0, sort_index=False):
     return unique, inverse, counts, index
 
 def compute_error_recalls(prefix_index,correct):
+    """
+    Computes number of errors and extractino recalls given prefix_index and correct columns
+
+    Args:
+        prefix_index (list[int]): list of integers denoting which prefix the corresponding suffix belongs to
+        correct (list[float]): list of integers denoting the correctness of the suffix
+    """
     errors = torch.cumsum(~(correct.bool()),dim=0)
     recall_indices = unique(prefix_index[correct],sort_index=True)[-1]
     indices = torch.searchsorted(recall_indices, torch.arange(len(errors)), right=True) - 1
@@ -908,7 +915,25 @@ def compute_error_recalls(prefix_index,correct):
 #     return errors, recalls
 
 # Error-recall
-def plot_error_recall(prefix_index, correct, plot_title, recall_at=100, ci=True, num_bootstraps=1000, log_scale=False, show_plot=True, save_name=None):
+def plot_error_recall(prefix_index, correct, plot_title, recall_at=[100], ci=True, num_bootstraps=1000, log_scale=False, show_plot=True, save_name=None):
+    '''
+    Plots error-recall curve.
+    
+    Args:
+        prefix_index (list[int]): list of integers denoting which prefix the corresponding suffix belongs to
+        correct (list[float]): list of integers denoting the correctness of the suffix
+        plot_title (str): title of the plot
+        recall_at (list[int]): draw lines at these number of errors
+        ci (bool): compute confidence intervals. Default: True
+        num_bootstraps (int): number of bootstraps for confidence interval
+        log_scale (bool): whether to plot on log-log scale
+        show_plot (bool): whether to show the plot
+        save_name (str): save path for plot and scores (without extension); does not save unless save_name is specified
+    
+    Returns:
+        recalls_per_error (list[float]): the recall at each number of errors
+        recalls_per_error_se (list[float]): the associated standard errors
+    '''
     errors, recalls = compute_error_recalls(prefix_index,correct)
     recall_at_indices = torch.cat(((torch.searchsorted(errors, torch.arange(len(errors)), right=True)-1)[1:],torch.tensor([len(errors)-1])))
     recalls_per_error = recalls[recall_at_indices].numpy()
@@ -924,7 +949,7 @@ def plot_error_recall(prefix_index, correct, plot_title, recall_at=100, ci=True,
         bootstrap_result = bootstrap((data,), error_recall_statistic, confidence_level=0.95, n_resamples=num_bootstraps, batch=1, method='percentile', axis=0)
 
     plt.figure(dpi=300)
-    plt.plot(errors, recalls, label=f"Error-Recall (Recall@{recall_at}={recalls_per_error[recall_at]:.4f})")
+    plt.plot(errors, recalls, label=f"Error-Recall (Recall@{recall_at[0]}={recalls_per_error[recall_at[0]]:.4f})")
     if ci:
         plt.fill_between(errors, bootstrap_result.confidence_interval.low, bootstrap_result.confidence_interval.high, alpha=0.1, color='darkorange')
     plt.axvline(recall_at, alpha=0.5, c="red")
@@ -941,14 +966,14 @@ def plot_error_recall(prefix_index, correct, plot_title, recall_at=100, ci=True,
         plt.savefig(save_name+"_error_recall.png", bbox_inches="tight")
         plt.savefig(save_name+"_error_recall.pdf", bbox_inches="tight")
         if ci:
-            df = pd.DataFrame([recalls_per_error,bootstrap_result.standard_error]).T
-            df[[f'Recall@{error}_Errors' for error in range(len(errors))]] = pd.DataFrame(df[0].tolist(), index=df.index)
-            df[[f'Recall@{error}_Errors_SE' for error in range(len(errors))]] = pd.DataFrame(df[1].tolist(), index=df.index)
-            df = df.drop(columns=[0,1])
+            df = pd.DataFrame([0,recalls_per_error[recall_at],bootstrap_result.standard_error[recall_at]]).T
+            df[[f'Recall@{error}_Errors' for error in recall_at]] = pd.DataFrame(df[1].tolist(), index=df.index)
+            df[[f'Recall@{error}_Errors_SE' for error in recall_at]] = pd.DataFrame(df[2].tolist(), index=df.index)
+            df = df.drop(columns=[0,1,2])
         else:
-            df = pd.DataFrame([recalls_per_error]).T
-            df[[f'Recall@{error}_Errors' for error in range(len(errors))]] = pd.DataFrame(df[0].tolist(), index=df.index)
-            df = df.drop(columns=[0])
+            df = pd.DataFrame([0,recalls_per_error]).T
+            df[[f'Recall@{error}_Errors' for error in recall_at]] = pd.DataFrame(df[1].tolist(), index=df.index)
+            df = df.drop(columns=[0,1])
         output = io.StringIO()
         df.to_csv(output,sep="\t")
         print(output.getvalue())
@@ -961,7 +986,25 @@ def plot_error_recall(prefix_index, correct, plot_title, recall_at=100, ci=True,
     else:
         return recalls_per_error
 
-def plot_error_recall_plotly(prefix_index, correct, plot_title, recall_at=100, ci=True, num_bootstraps=1000, log_scale=False, show_plot=True, save_name=None):
+def plot_error_recall_plotly(prefix_index, correct, plot_title, recall_at=[100], ci=True, num_bootstraps=1000, log_scale=False, show_plot=True, save_name=None):
+    '''
+    Plots error-recall curve using plotly.
+    
+    Args:
+        prefix_index (list[int]): list of integers denoting which prefix the corresponding suffix belongs to
+        correct (list[float]): list of integers denoting the correctness of the suffix
+        plot_title (str): title of the plot
+        recall_at (list[int]): draw lines at these number of errors
+        ci (bool): compute confidence intervals. Default: True
+        num_bootstraps (int): number of bootstraps for confidence interval
+        log_scale (bool): whether to plot on log-log scale
+        show_plot (bool): whether to show the plot
+        save_name (str): save path for plot and scores (without extension); does not save unless save_name is specified
+    
+    Returns:
+        recalls_per_error (list[float]): the recall at each number of errors
+        recalls_per_error_se (list[float]): the associated standard errors
+    '''
     errors, recalls = compute_error_recalls(prefix_index,correct)
     recall_at_indices = torch.cat(((torch.searchsorted(errors, torch.arange(len(errors)), right=True)-1)[1:],torch.tensor([len(errors)-1])))
     recalls_per_error = recalls[recall_at_indices].numpy()
@@ -980,7 +1023,7 @@ def plot_error_recall_plotly(prefix_index, correct, plot_title, recall_at=100, c
         x=errors,
         y=recalls,
         mode='lines',
-        name=f"Error-Recall (Recall@{recall_at}={recalls_per_error[recall_at]:.4f})"
+        name=f"Error-Recall (Recall@{recall_at[0]}={recalls_per_error[recall_at[0]]:.4f})"
     )])
 
     fig.update_layout(dict(
@@ -1023,14 +1066,14 @@ def plot_error_recall_plotly(prefix_index, correct, plot_title, recall_at=100, c
         fig.write_image(save_name + "_error_recall_plotly.pdf", scale=5)
         fig.write_html(save_name + "_error_recall_plotly.html")
         if ci:
-            df = pd.DataFrame([recalls_per_error,bootstrap_result.standard_error]).T
-            df[[f'Recall@{error}_Errors' for error in range(len(errors))]] = pd.DataFrame(df[0].tolist(), index=df.index)
-            df[[f'Recall@{error}_Errors_SE' for error in range(len(errors))]] = pd.DataFrame(df[1].tolist(), index=df.index)
-            df = df.drop(columns=[0,1])
+            df = pd.DataFrame([0,recalls_per_error[recall_at],bootstrap_result.standard_error[recall_at]]).T
+            df[[f'Recall@{error}_Errors' for error in recall_at]] = pd.DataFrame(df[1].tolist(), index=df.index)
+            df[[f'Recall@{error}_Errors_SE' for error in recall_at]] = pd.DataFrame(df[2].tolist(), index=df.index)
+            df = df.drop(columns=[0,1,2])
         else:
-            df = pd.DataFrame([recalls_per_error]).T
-            df[[f'Recall@{error}_Errors' for error in range(len(errors))]] = pd.DataFrame(df[0].tolist(), index=df.index)
-            df = df.drop(columns=[0])
+            df = pd.DataFrame([0,recalls_per_error]).T
+            df[[f'Recall@{error}_Errors' for error in recall_at]] = pd.DataFrame(df[1].tolist(), index=df.index)
+            df = df.drop(columns=[0,1])
         output = io.StringIO()
         df.to_csv(output,sep="\t")
         print(output.getvalue())
@@ -1048,6 +1091,26 @@ def plot_error_recall_plotly(prefix_index, correct, plot_title, recall_at=100, c
 ####################################################################################################
 
 def plot_precision_recall(ground_truth,predictions,plot_title,ci=True,num_bootstraps=1000,recalls=None,log_scale=False, show_plot=True, save_name=None, lims=None, color='darkorange'):
+    '''
+    Plots precision-recall curve.
+    
+    Args:
+        ground_truth (list[float]): ground truth class
+        predictions (list[float]): predicted statistics
+        plot_title (str): title of the plot
+        ci (bool): compute confidence intervals. Default: True
+        num_bootstraps (int): number of bootstraps for confidence interval
+        recalls (list[float]): list of recalls to report precision at
+        log_scale (bool): whether to plot on log-log scale
+        show_plot (bool): whether to show the plot
+        save_name (str): save path for plot and scores (without extension); does not save unless save_name is specified
+        lims (list): argument to xlim and ylim
+        color (str): color
+    
+    Returns:
+        average_precision (float): the average precision
+        precision_at_recalls (list[float]): the precision at the given recalls
+    '''
     n_points = len(ground_truth)
 
     precision, recall, thresholds = precision_recall_curve(ground_truth, predictions)
@@ -1116,6 +1179,26 @@ def plot_precision_recall(ground_truth,predictions,plot_title,ci=True,num_bootst
         return average_precision, precision_at_recalls
 
 def plot_precision_recall_plotly(ground_truth,predictions,plot_title,ci=True,num_bootstraps=1000,recalls=None,log_scale=False, show_plot=True, save_name=None, lims=None, color='darkorange'):
+    '''
+    Plots precision-recall curve using plotly
+    
+    Args:
+        ground_truth (list[float]): ground truth class
+        predictions (list[float]): predicted statistics
+        plot_title (str): title of the plot
+        ci (bool): compute confidence intervals. Default: True
+        num_bootstraps (int): number of bootstraps for confidence interval
+        recalls (list[float]): list of recalls to report precision at
+        log_scale (bool): whether to plot on log-log scale
+        show_plot (bool): whether to show the plot
+        save_name (str): save path for plot and scores (without extension); does not save unless save_name is specified
+        lims (list): argument to xlim and ylim
+        color (str): color
+    
+    Returns:
+        average_precision (float): the average precision
+        precision_at_recalls (list[float]): the precision at the given recalls
+    '''
     n_points = len(ground_truth)
 
     precision, recall, thresholds = precision_recall_curve(ground_truth, predictions)
@@ -1205,6 +1288,27 @@ def plot_precision_recall_plotly(ground_truth,predictions,plot_title,ci=True,num
 ####################################################################################################
 
 def plot_ROC_single(ground_truth, predictions, plot_title, keep_first=None, ci=True, num_bootstraps=1000, fprs=None, log_scale=False, show_plot=True, save_name=None, lims=None, color='darkorange'):
+    '''
+    Plots ROC curve with ground truth and predictions. Also saves TPRs at FPRs.
+
+    Args:
+        ground_truth (list[float]): ground truth class
+        predictions (list[float]): predicted statistics
+        plot_title (str): title of the plot
+        ci (bool): compute confidence intervals. Default: True
+        num_bootstraps (int): number of bootstraps for confidence interval
+        keep_first (int): compute only for the first keep_first number of samples
+        show_plot (bool): whether to show the plot
+        save_name (str): save path for plot and scores (without extension); does not save unless save_name is specified
+        log_scale (bool): whether to plot on log-log scale
+        lims (list): argument to xlim and ylim
+        fprs (list[float]): return TPRs at given FPRs. If unspecified, calculates at every 0.1 increment
+        color (str): color
+    
+    Returns:
+        auc (float): the ROC-AUC score
+        tpr_at_fprs (list[float]): the tprs at the given fprs
+    '''
     n_points = len(ground_truth)
     fpr, tpr, thresholds = roc_curve(ground_truth,predictions)
     roc_auc = auc(fpr, tpr)
@@ -1277,6 +1381,27 @@ def plot_ROC_single(ground_truth, predictions, plot_title, keep_first=None, ci=T
         return roc_auc, tpr_at_fprs
 
 def plot_ROC_single_plotly(ground_truth, predictions, plot_title, keep_first=None, ci=True, num_bootstraps=1000, fprs=None, log_scale=False, show_plot=True, save_name=None, lims=None, color='darkorange'):
+    '''
+    Plots ROC curve with ground truth and predictions using plotly. Also saves TPRs at FPRs.
+
+    Args:
+        ground_truth (list[float]): ground truth class
+        predictions (list[float]): predicted statistics
+        plot_title (str): title of the plot
+        ci (bool): compute confidence intervals. Default: True
+        num_bootstraps (int): number of bootstraps for confidence interval
+        keep_first (int): compute only for the first keep_first number of samples
+        show_plot (bool): whether to show the plot
+        save_name (str): save path for plot and scores (without extension); does not save unless save_name is specified
+        log_scale (bool): whether to plot on log-log scale
+        lims (list): argument to xlim and ylim
+        fprs (list[float]): return TPRs at given FPRs. If unspecified, calculates at every 0.1 increment
+        color (str): color
+    
+    Returns:
+        auc (float): the ROC-AUC score
+        tpr_at_fprs (list[float]): the tprs at the given fprs
+    '''
     n_points = len(ground_truth)
     fpr, tpr, thresholds = roc_curve(ground_truth,predictions)
     roc_auc = auc(fpr, tpr)
