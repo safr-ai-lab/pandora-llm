@@ -538,6 +538,8 @@ def plot_ROC_multiple(train_statistics_list, val_statistics_list, plot_title, la
     plt.grid(which="major",alpha=0.2)
     plt.grid(which="minor",alpha=0.1)
     texts = plt.legend().get_texts()
+    for idx in bold_labels:
+        texts[idx].set_fontweight('bold')
     if save_name is not None:
         plt.savefig(save_name+"_roc.png", bbox_inches="tight")
         plt.savefig(save_name+"_roc.pdf", bbox_inches="tight")
@@ -633,6 +635,7 @@ def plot_ROC_multiple_plotly(train_statistics_list, val_statistics_list, plot_ti
                 line=dict(color=colors[i], width=0),
                 showlegend=False,
                 legendgroup=i,
+                name=f'{label} (Lower CI)' ,
             ))
             fig.add_trace(go.Scatter(
                 x=fpr_range,
@@ -642,6 +645,7 @@ def plot_ROC_multiple_plotly(train_statistics_list, val_statistics_list, plot_ti
                 line=dict(color=colors[i], width=0),
                 showlegend=False,
                 legendgroup=i,
+                name=f'{label} (Upper CI)' ,
                 fillcolor=f'rgba({int(colors[i][1:3], 16)}, {int(colors[i][3:5], 16)}, {int(colors[i][5:], 16)}, 0.1)'
             ))
             auc_se_map[label] = bootstrap_result.standard_error[0]

@@ -45,7 +45,7 @@ def collate_fn(batch, tokenizer, max_length):
 
     """
     tokens = [tokenizer.encode(example, return_tensors="pt", truncation=True, max_length=max_length) for example in batch]
-    max_length = max([t.size(1) for t in tokens])
+    # max_length = max([t.size(1) for t in tokens])
     tokens_padded = [torch.cat([t, t.new_zeros(t.size(0), max_length-t.size(1))], dim=1) for t in tokens]
     tokens_padded = torch.cat(tokens_padded, dim=0)
     return {

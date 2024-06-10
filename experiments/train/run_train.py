@@ -1,17 +1,15 @@
 import os
 import time
 import json
-import math
+import subprocess
 import argparse
 import torch
 from torch.utils.data import DataLoader
-from transformers import AutoTokenizer, AutoConfig
+from transformers import AutoModelForCausalLM, AutoTokenizer, AutoConfig, TrainingArguments, Trainer
 from accelerate import Accelerator
 from accelerate.utils import set_seed
-from llmprivacy.utils.dataset_utils import collate_fn
+from llmprivacy.utils.dataset_utils import collate_fn, load_val_pile
 from llmprivacy.utils.log_utils import get_my_logger
-from llmprivacy.attacks.LOSS import LOSS
-from llmprivacy.utils.extraction_utils import compute_extraction_metrics
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 """
@@ -33,14 +31,15 @@ def main():
     parser.add_argument('--model_revision', action="store", type=str, required=False, help='Model revision. If not specified, uses main.')
     parser.add_argument('--model_cache_dir', action="store", type=str, required=False, help='Model cache directory. If not specified, uses main.')
     # Dataset Arguments
-    parser.add_argument('--ground_truth', action="store", type=str, required=False, help='.pt file of ground truth input_ids')
-    parser.add_argument('--generations', action="store", type=str, required=False, help='.pt file of generated input_ids')
-    parser.add_argument('--ground_truth_probabilities', action="store", type=str, required=False, help='.pt file of generated input_ids')
-    parser.add_argument('--prefix_length', action="store", type=int, required=False, help='Prefix length')
-    parser.add_argument('--suffix_length', action="store", type=int, required=False, help='Suffix length')
     parser.add_argument('--num_samples', action="store", type=int, required=True, help='Dataset size')
     parser.add_argument('--start_index', action="store", type=int, required=False, default=0, help='Slice dataset starting from this index')
     parser.add_argument('--bs', action="store", type=int, required=False, default=1, help='Batch size')
+    parser.add_argument('--pack', action="store_true", required=False, help='Pack validation set')
+    # Fine-tuning 
+    parser.add_argument('--train_pt', action="store", type=str, required=False, help='pt file of train string array (for fine-tuning attacks)')
+    parser.add_argument('--val_pt', action="store", type=str, required=False, help='pt file of val string array (for fine-tuning attacks)')
+    parser.add_argument('--num_epochs', action="store", type=int, required=False, default=1, help='Num train epochs for fine-tuning.')
+    parser.add_argument('--learning_rate', action="store", type=float, required=False, default=5e-5, help='Learning rate')
     # Device Arguments
     parser.add_argument('--seed', action="store", type=int, required=False, default=229, help='Seed')
     parser.add_argument('--accelerate', action="store_true", required=False, help='Use accelerate')
@@ -53,14 +52,12 @@ def main():
     args.model_cache_dir = args.model_cache_dir if args.model_cache_dir is not None else f"models/{args.model_name.replace('/','-')}"
     if args.experiment_name is None:
         args.experiment_name = (
-            (f"LOSS_{args.model_name.replace('/','-')}") +
+            (f"{args.model_name.replace('/','-')}") +
             (f"_{args.model_revision.replace('/','-')}" if args.model_revision is not None else "") +
-            # (f"_{args.ground_truth.replace('/','-')}_{args.generations.replace('/','-')}") +
             (f"_N={args.num_samples}_S={args.start_index}_seed={args.seed}") +
-            (f"_tag={args.tag}" if args.tag is not None else "") +
-            (f"_extract")
+            (f"_tag={args.tag}" if args.tag is not None else "")
         )
-        args.experiment_name = f"results/LOSS/{args.experiment_name}/{args.experiment_name}"
+        args.experiment_name = f"models/FineTune/{args.experiment_name}/{args.experiment_name}"
     os.makedirs(os.path.dirname(args.experiment_name), exist_ok=True)
     logger = get_my_logger(log_file=f"{args.experiment_name}.log")
     with open(f"{args.experiment_name}_args.json", "w") as f:
@@ -69,52 +66,69 @@ def main():
     # LOAD DATA
     ####################################################################################################
     start = time.perf_counter()
+
+    max_length = AutoConfig.from_pretrained(args.model_name).max_position_embeddings
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name)
     
     logger.info("Loading Data")    
-    ground_truth = torch.load(args.ground_truth)[args.start_index:args.start_index+args.num_samples]
-    generations = torch.load(args.generations)[args.start_index:args.start_index+args.num_samples]
-    ground_truth_dataloader = DataLoader(ground_truth, batch_size = args.bs)
-    generations_dataloader = DataLoader(generations.flatten(end_dim=1), batch_size = args.bs)
 
-    ground_truth_probabilities = torch.load(args.ground_truth_probabilities) if (args.ground_truth_probabilities is not None) else None
+    # Load data
+    if args.train_pt and args.val_pt:
+        logger.info("You are using a self-specified validation dataset...")
+        
+        fixed_input = args.train_pt + ".pt" if not args.train_pt.endswith(".pt") else args.train_pt
+        training_dataset = torch.load(fixed_input)[args.start_index:args.start_index+args.num_samples]
+        
+        fixed_input = args.val_pt + ".pt" if not args.val_pt.endswith(".pt") else args.val_pt
+        validation_dataset = torch.load(fixed_input)[args.start_index:args.start_index+args.num_samples]
+    else:
+        training_dataset, validation_dataset = load_val_pile(number=2*args.num_samples,start_index=args.start_index,seed=args.seed,num_splits=2,window=2048 if args.pack else 0)
 
     end = time.perf_counter()
     logger.info(f"- Dataset loading took {end-start} seconds.")
     ####################################################################################################
-    # RUN ATTACK
+    # FINE-TUNE MODEL
     ####################################################################################################
     start = time.perf_counter()
-    logger.info("Running Attack")
-
-    # Initialize attack
-    LOSSer = LOSS(args.model_name, model_revision=args.model_revision, model_cache_dir=args.model_cache_dir)
-    
-    # Compute statistics
-    LOSSer.load_model()
-    ground_truth_statistics = LOSSer.compute_statistic(ground_truth_dataloader,num_batches=math.ceil(args.num_samples/args.bs),device=device,model_half=args.model_half,accelerator=accelerator)
-    torch.save(ground_truth_statistics,f"{args.experiment_name}_true_statistics.pt")
-    generations_statistics = LOSSer.compute_statistic(generations_dataloader,device=device,model_half=args.model_half,accelerator=accelerator)
-    generations_statistics = generations_statistics.reshape(generations.shape[0],generations.shape[1])
-    torch.save(generations_statistics,f"{args.experiment_name}_gen_statistics.pt")
-    LOSSer.unload_model()
-
-    # Compute metrics
-    tokenizer = AutoTokenizer.from_pretrained(args.model_name)
-    compute_extraction_metrics(
-        ground_truth=ground_truth,
-        generations=generations,
-        ground_truth_statistics=ground_truth_statistics,
-        generations_statistics=generations_statistics,
-        ground_truth_probabilities=ground_truth_probabilities,
-        prefix_length=args.prefix_length,
-        suffix_length=args.suffix_length,
-        tokenizer=tokenizer,
-        title=args.experiment_name,
-        statistic_name="LOSS",
+    training_args = TrainingArguments(
+        output_dir=args.experiment_name,
+        do_train=True,
+        do_eval=True,
+        num_train_epochs=args.num_epochs,
+        per_device_train_batch_size=args.bs,
+        per_device_eval_batch_size=args.bs,
+        learning_rate=args.learning_rate,
+        evaluation_strategy="epoch",
+        logging_strategy="epoch",
+        save_strategy="epoch",
+        gradient_accumulation_steps=1,
+        gradient_checkpointing=False,
+        load_best_model_at_end=False,
+        fp16=False,
+        deepspeed='ds_config_zero3.json' if args.accelerate else None
     )
 
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name)
+    tokenizer.pad_token = tokenizer.eos_token
+    model = AutoModelForCausalLM.from_pretrained(args.model_name,revision=args.model_revision,cache_dir=args.model_cache_dir).to(device)
+    max_length = AutoConfig.from_pretrained(args.model_name).max_position_embeddings
+    trainer = Trainer(
+        model=model,
+        args=training_args,
+        train_dataset=training_dataset,
+        eval_dataset=validation_dataset,
+        tokenizer=tokenizer,
+        data_collator=lambda batch: collate_fn(batch, tokenizer=tokenizer, max_length=max_length),
+    )
+    trainer.train()
+    trainer.save_model(args.experiment_name)
+    tokenizer.save_pretrained(args.experiment_name)
+
     end = time.perf_counter()
-    logger.info(f"- Experiment {args.experiment_name} took {end-start} seconds.")
+    logger.info(f"- Fine-tuning took {end-start} seconds.")
 
 if __name__ == "__main__":
+    start_time = time.perf_counter()
     main()
+    end_time = time.perf_counter()
+    print(f"Total Elapsed Time: {end_time-start_time} seconds")
