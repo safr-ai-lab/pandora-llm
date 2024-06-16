@@ -14,8 +14,6 @@ from llmprivacy.attacks.ModelStealing import ModelStealing
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 """
-Sample command line prompt (no acceleration)
-python run_modelstealing.py --model_name EleutherAI/pythia-70m-deduped --model_revision step98000 --n_samples 1000 --pack --seed 229
 Sample command line prompt (with acceleration)
 accelerate launch run_modelstealing.py --accelerate --model_name EleutherAI/pythia-70m-deduped --model_revision step98000 --n_samples 1000 --pack --seed 229
 """
@@ -42,18 +40,18 @@ def main():
     parser.add_argument('--train_pt', action="store", required=False, help='.pt file of train dataset (not dataloader)')
     parser.add_argument('--val_pt', action="store", required=False, help='.pt file of val dataset (not dataloader)')
     # Attack Arguments
-    parser.add_argument('--modelstealing_method', action="store", type=str, required=False, default="one_sided_projection", help="Model stealing method")
+    parser.add_argument('--embedding_projection_file', action="store", type=str, required=False, default=None, help="Location of embedding projection file")
     ### Projection arguments
-    parser.add_argument('--proj_type', action="store", type=str, required=False, default="rademacher", help='type of projection (rademacher or normal)')
+    parser.add_argument('--project_type', action="store", type=str, required=False, default="rademacher", help='type of projection (rademacher or normal)')
     parser.add_argument('--proj_seed', action="store", type=int, required=False, default=229, help='Seed for random projection')
-    parser.add_argument('--proj_dim_last', action="store", type=int, required=False,default=4096, help='Dimension of projection of last layer gradients for model stealing. Default = 4096.')
+    parser.add_argument('--proj_dim_last', action="store", type=int, required=False,default=512, help='Dimension of projection of last layer gradients for model stealing. Default = 512.')
+    
     # Device Arguments
     parser.add_argument('--seed', action="store", type=int, required=False, default=229, help='Seed')
     parser.add_argument('--accelerate', action="store_true", required=False, help='Use accelerate. Not supported.')
     parser.add_argument('--model_half', action="store_true", required=False, help='Use half precision (fp16). 1 for use; 0 for not.')
     args = parser.parse_args()
     
-    accelerator = Accelerator() if args.accelerate else None
     set_seed(args.seed)
 
     args.model_cache_dir = args.model_cache_dir if args.model_cache_dir is not None else f"models/{args.model_name.replace('/','-')}"
@@ -62,7 +60,6 @@ def main():
             (f"ModelStealing_{args.model_name.replace('/','-')}") +
             (f"_{args.model_revision.replace('/','-')}" if args.model_revision is not None else "") +
             (f"_N={args.num_samples}_S={args.start_index}_seed={args.seed}") +
-            (f"_method={args.modelstealing_method}") +
             (f"_tag={args.tag}" if args.tag is not None else "")
         )
         args.experiment_name = f"results/ModelStealing/{args.experiment_name}/{args.experiment_name}"
@@ -100,7 +97,7 @@ def main():
         validation_dataset = torch.load(fixed_input)[args.start_index:args.start_index+args.num_samples]
         validation_dataloader = DataLoader(validation_dataset, batch_size = args.bs, collate_fn=lambda batch: collate_fn(batch, tokenizer=tokenizer, max_length=max_length))
     else:
-        validation_dataset = load_val_pile(number=args.num_samples,start_index=args.start_index,seed=args.seed,num_splits=1,window=2048 if args.pack else 0)[0]
+        validation_dataset = load_val_pile(number=args.num_samples,start_index=args.start_index,seed=args.seed,tokenizer=tokenizer,num_splits=1,window=2048 if args.pack else 0)[0]
         validation_dataloader = DataLoader(validation_dataset, batch_size = args.bs, collate_fn=lambda batch: collate_fn(batch, tokenizer=tokenizer, max_length=max_length))
 
     end = time.perf_counter()
@@ -116,21 +113,31 @@ def main():
     ModelStealer.load_model()
 
     # Load some random internet text
-    svd_dataset = load_val_pile(number=next(ModelStealer.model.parameters()).shape[1], seed=314159, num_splits=1, window=2048 if args.pack else 0)[0]
+    svd_dataset = load_val_pile(number=next(ModelStealer.model.parameters()).shape[1], seed=314159, num_splits=1, tokenizer=tokenizer, window=2048 if args.pack else 0)[0]
     svd_dataloader = DataLoader(svd_dataset, batch_size = 1, collate_fn=lambda batch: collate_fn(batch, tokenizer=tokenizer, max_length=max_length))
     
+    # Approximate embedding projection layer
+    projector = ModelStealer.compute_model_stealing(
+        svd_dataloader = svd_dataloader, 
+        project_file = args.embedding_projection_file,
+        proj_type = args.project_type,
+        proj_dim = args.proj_dim_last,
+        proj_seed = args.proj_seed,
+        saveas = f"{args.experiment_name}_projector.pt"
+    )
+
     # Compute statistics
     train_features = {}
     val_features = {}
-    train_features["model_stealing"] = ModelStealer.compute_model_stealing(
-        dataloader=training_dataloader,svd_dataloader=svd_dataloader,
-        method=args.modelstealing_method,proj_dim=args.proj_dim_last,proj_type=args.proj_type,proj_seed=args.proj_seed,
-        num_batches=math.ceil(args.num_samples/args.bs),device=device,model_half=args.model_half,accelerator=accelerator
+    train_features["model_stealing"] = ModelStealer.compute_dataloader_model_stealing(
+        dataloader=training_dataloader, projector=projector,
+        num_batches=math.ceil(args.num_samples/args.bs),device=device,
+        model_half=args.model_half
     )
-    val_features["model_stealing"] = ModelStealer.compute_model_stealing(
-        dataloader=validation_dataloader,svd_dataloader=svd_dataloader,
-        method=args.modelstealing_method,proj_dim=args.proj_dim_last,proj_type=args.proj_type,proj_seed=args.proj_seed,
-        num_batches=math.ceil(args.num_samples/args.bs),device=device,model_half=args.model_half,accelerator=accelerator
+    val_features["model_stealing"] = ModelStealer.compute_dataloader_model_stealing(
+        dataloader=validation_dataloader, projector=projector,
+        num_batches=math.ceil(args.num_samples/args.bs),device=device,
+        model_half=args.model_half
     )
     ModelStealer.unload_model()
 
@@ -143,3 +150,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+    
