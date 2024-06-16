@@ -123,6 +123,7 @@ def main():
         proj_type = args.project_type,
         proj_dim = args.proj_dim_last,
         proj_seed = args.proj_seed,
+        device=device,
         saveas = f"{args.experiment_name}_projector.pt"
     )
 

@@ -203,12 +203,12 @@ def compute_input_ids_logits(model, input_ids, device=None):
         torch.Tensor: logits of last token in input ids
     
     """
-    breakpoint()
+    print(device)
     with torch.no_grad():
-        breakpoint()
+        
         mask  = (input_ids > 0).detach()
         outputs = model(input_ids=input_ids.to(device), attention_mask = mask.to(device),output_hidden_states=True)
-        breakpoint()
+        
         return outputs.logits[0,-1,:]
 
 
@@ -244,7 +244,7 @@ def compute_dataloader_logits_embedding(model, dataloader, device=None, nbatches
 
         ## Compute features on input data
         print(data_x.shape)
-        breakpoint()
+        
         loss = compute_input_ids_logits(model, data_x, device=device).detach().cpu()
         losses.append(loss)
         print(loss.shape)
@@ -252,7 +252,7 @@ def compute_dataloader_logits_embedding(model, dataloader, device=None, nbatches
         del data_x, loss
         torch.cuda.empty_cache()
         torch.cuda.synchronize()
-        breakpoint()
+        
     
     return torch.stack(losses)
     

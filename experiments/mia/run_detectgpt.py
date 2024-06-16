@@ -96,7 +96,7 @@ def main():
         validation_dataset = torch.load(fixed_input)[args.start_index:args.start_index+args.num_samples]
         validation_dataloader = DataLoader(validation_dataset, batch_size = args.bs, collate_fn=lambda batch: collate_fn(batch, tokenizer=tokenizer, max_length=max_length))
     else:
-        validation_dataset = load_val_pile(number=args.num_samples,start_index=args.start_index,seed=args.seed,num_splits=1,window=2048 if args.pack else 0)[0]
+        validation_dataset = load_val_pile(number=args.num_samples,start_index=args.start_index,seed=args.seed,num_splits=1,tokenizer=tokenizer,window=2048 if args.pack else 0)[0]
         validation_dataloader = DataLoader(validation_dataset, batch_size = args.bs, collate_fn=lambda batch: collate_fn(batch, tokenizer=tokenizer, max_length=max_length))
 
     end = time.perf_counter()

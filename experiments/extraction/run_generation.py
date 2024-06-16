@@ -90,7 +90,7 @@ def main():
         dataset = torch.load(args.data)[args.start_index:args.start_index+args.num_samples]
         dataloader = DataLoader(dataset, batch_size = args.bs, collate_fn=lambda batch: collate_fn(batch, tokenizer=tokenizer, max_length=args.prefix_length+args.suffix_length))
     else:
-        dataset = load_val_pile(number=args.num_samples,start_index=args.start_index,seed=args.seed,num_splits=1,window=0)[0]
+        dataset = load_val_pile(number=args.num_samples,start_index=args.start_index,seed=args.seed,num_splits=1,tokenizer=tokenizer,window=0)[0]
         dataloader = DataLoader(dataset, batch_size = args.bs, collate_fn=lambda batch: collate_fn(batch, tokenizer=tokenizer, max_length=args.prefix_length+args.suffix_length))
 
     end = time.perf_counter()

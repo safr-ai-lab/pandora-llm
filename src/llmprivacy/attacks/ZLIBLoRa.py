@@ -32,7 +32,7 @@ class ZLIBLoRa(MIA):
         """
         self.model = None
 
-    def compute_statistic(self, dataloader, num_samples=None, device=None, model_half=None, accelerator=None):
+    def compute_statistic(self, dataloader, dataset, num_samples=None, device=None, model_half=None, accelerator=None):
         """
         Compute the ZLIBLoRa statistic for a given dataloader.
 
@@ -52,5 +52,5 @@ class ZLIBLoRa(MIA):
         if accelerator is not None:
             self.model, dataloader, = accelerator.prepare(self.model, dataloader)
         ft_loss = compute_dataloader_cross_entropy(model=self.model,dataloader=dataloader,num_batches=math.ceil(num_samples//dataloader.batch_size),device=device,model_half=model_half).cpu()
-        zlib_loss = compute_dataloader_cross_entropy_zlib(dataset=dataloader.dataset,num_samples=num_samples).cpu()
+        zlib_loss = compute_dataloader_cross_entropy_zlib(dataset=dataset,num_samples=num_samples).cpu()
         return ft_loss/zlib_loss

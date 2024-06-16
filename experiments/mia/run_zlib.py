@@ -79,7 +79,7 @@ def main():
         validation_dataset = torch.load(fixed_input)[args.start_index:args.start_index+args.num_samples]
     else:
         if args.dataset_name=="pile" or args.dataset_name=="pile-deduped":
-            validation_dataset = load_val_pile(number=args.num_samples,start_index=args.start_index,seed=args.seed,num_splits=1,window=2048 if args.pack else 0)[0]
+            validation_dataset = load_val_pile(number=args.num_samples,start_index=args.start_index,seed=args.seed,num_splits=1,tokenizer=tokenizer,window=2048 if args.pack else 0)[0]
         else:
             raise NotImplementedError(f"Dataset unsupported: {args.dataset_name}")
 

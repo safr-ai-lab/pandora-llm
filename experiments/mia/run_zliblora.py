@@ -151,9 +151,9 @@ def main():
     
     # Compute statistics
     ZLIBLoRaer.load_model()
-    train_statistics = ZLIBLoRaer.compute_statistic(training_dataloader,num_samples=args.num_samples,device=device,model_half=args.model_half,accelerator=accelerator)
+    train_statistics = ZLIBLoRaer.compute_statistic(training_dataloader,training_dataloader.dataset,num_samples=args.num_samples,device=device,model_half=args.model_half,accelerator=accelerator)
     torch.save(train_statistics,f"{args.experiment_name}_train.pt")    
-    val_statistics = ZLIBLoRaer.compute_statistic(validation_dataloader,num_samples=args.num_samples,device=device,model_half=args.model_half,accelerator=accelerator)
+    val_statistics = ZLIBLoRaer.compute_statistic(validation_dataloader,validation_dataloader.dataset,num_samples=args.num_samples,device=device,model_half=args.model_half,accelerator=accelerator)
     torch.save(val_statistics,f"{args.experiment_name}_val.pt")
     ZLIBLoRaer.unload_model()
 
