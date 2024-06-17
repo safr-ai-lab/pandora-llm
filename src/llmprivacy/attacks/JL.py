@@ -2,7 +2,7 @@ import subprocess
 import math
 from tqdm import tqdm
 import torch
-from torch.nn.functional import F
+import torch.nn.functional as F
 from torch.autograd import Variable
 from transformers import AutoModelForCausalLM
 from trak.projectors import CudaProjector, ProjectionType, BasicProjector

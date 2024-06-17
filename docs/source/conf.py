@@ -25,3 +25,5 @@ exclude_patterns = []
 
 html_theme = 'furo'
 html_static_path = ['_static']
+html_title = "Pandora's White-Box"
+html_logo = "assets/pandy.png"

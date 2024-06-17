@@ -44,10 +44,26 @@ llmprivacy.attacks.GradNorm module
    :undoc-members:
    :show-inheritance:
 
+llmprivacy.attacks.JL module
+----------------------------
+
+.. automodule:: llmprivacy.attacks.JL
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 llmprivacy.attacks.LOSS module
 ------------------------------
 
 .. automodule:: llmprivacy.attacks.LOSS
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+llmprivacy.attacks.LogReg module
+--------------------------------
+
+.. automodule:: llmprivacy.attacks.LogReg
    :members:
    :undoc-members:
    :show-inheritance:
@@ -64,6 +80,22 @@ llmprivacy.attacks.MoPe module
 ------------------------------
 
 .. automodule:: llmprivacy.attacks.MoPe
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+llmprivacy.attacks.ModelStealing module
+---------------------------------------
+
+.. automodule:: llmprivacy.attacks.ModelStealing
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+llmprivacy.attacks.NN module
+----------------------------
+
+.. automodule:: llmprivacy.attacks.NN
    :members:
    :undoc-members:
    :show-inheritance:

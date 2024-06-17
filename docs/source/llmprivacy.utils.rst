@@ -4,18 +4,18 @@ llmprivacy.utils package
 Submodules
 ----------
 
-llmprivacy.utils.attack\_utils module
--------------------------------------
-
-.. automodule:: llmprivacy.utils.attack_utils
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 llmprivacy.utils.dataset\_utils module
 --------------------------------------
 
 .. automodule:: llmprivacy.utils.dataset_utils
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+llmprivacy.utils.extraction\_utils module
+-----------------------------------------
+
+.. automodule:: llmprivacy.utils.extraction_utils
    :members:
    :undoc-members:
    :show-inheritance:
