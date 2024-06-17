@@ -33,6 +33,7 @@ def generate_suffixes(
                     inputs=input_ids if accelerate else input_ids.to(device),
                     generation_config=generation_config
                 ).cpu().detach()
+                generated_tokens = torch.cat([generated_tokens, torch.full((1, generation_config.min_length - generated_tokens.shape[1]), generation_config.pad_token_id, dtype=torch.long)], dim=1)
                 generations.extend(generated_tokens.numpy())    
     return np.array(generations).reshape(num_generations,len(dataloader.dataset),generation_config.max_length).transpose(1,0,2)
 

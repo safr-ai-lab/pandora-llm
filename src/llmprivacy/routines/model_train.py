@@ -29,7 +29,8 @@ def main():
     # TRAIN MODEL
     ####################################################################################################
     model = AutoModelForCausalLM.from_pretrained(args.model_path, revision=args.model_revision, cache_dir=args.cache_dir)
-    tokenizer = AutoTokenizer.from_pretrained(args.model_path)
+    tokenizer = AutoTokenizer.from_pretrained(args.model_path,padding_side="left")
+    tokenizer.pad_token = tokenizer.eos_token
     max_length = model.config.max_position_embeddings
     train_dataset = torch.load(args.train_pt)
     val_dataset = torch.load(args.val_pt)

@@ -108,7 +108,7 @@ def main():
         deepspeed='ds_config_zero3.json' if args.accelerate else None
     )
 
-    tokenizer = AutoTokenizer.from_pretrained(args.model_name)
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name,padding_side="left")
     tokenizer.pad_token = tokenizer.eos_token
     model = AutoModelForCausalLM.from_pretrained(args.model_name,revision=args.model_revision,cache_dir=args.model_cache_dir).to(device)
     max_length = AutoConfig.from_pretrained(args.model_name).max_position_embeddings
