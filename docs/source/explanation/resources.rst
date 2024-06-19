@@ -1,5 +1,5 @@
-Resources
-==========
+Additional Resources
+====================
 
 Suggested resources
 

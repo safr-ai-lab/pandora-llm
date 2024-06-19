@@ -22,19 +22,18 @@ We hope that our package serves to guide LLM providers to safety-check their mod
 
 Installation
 ------------
-From pip:
-
-.. code-block:: bash
-
-   pip install pandora-llm
-
 From source:
 
 .. code-block:: bash
 
    git clone https://github.com/safr-ai-lab/llm-mi.git
-   
    pip install -e .
+
+From pip:
+
+.. code-block:: bash
+
+   pip install pandora-llm
 
 Quickstart
 ----------

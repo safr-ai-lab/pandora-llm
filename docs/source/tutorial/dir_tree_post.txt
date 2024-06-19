@@ -1,0 +1,26 @@
+.
+├── docs/
+│   ├── make.bat
+│   ├── Makefile
+│   └── source/
+├── experiments/
+│   ├── extraction/
+│   ├── mia/
+│   └── run_train.py
+├── models/
+│   ├── EleutherAI-pythia-70m-deduped/
+│   ├── ...
+│   └── EleutherAI-pythia-12b-deduped/
+├── results/
+│   ├── LOSS/
+│   ├── ...
+│   └── NN/
+├── scripts/
+│   ├── finetune_extraction.sh
+│   ├── ...
+│   └── pretrain_mia_modelstealing.sh
+├── src/llmprivacy/
+│   ├── attacks/
+│   ├── routines/
+│   └── utils/
+└── README.md
