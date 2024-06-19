@@ -60,9 +60,6 @@ We welcome contributions! Please submit pull requests in our `GitHub <https://gi
    :hidden:
 
    self
-   quickstart
-   organization
    tutorial/index
-   api/index
-   genindex
-   modindex
+   howto/index
+   explanation/index

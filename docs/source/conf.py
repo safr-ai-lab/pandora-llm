@@ -21,6 +21,7 @@ extensions = [
     "sphinx.ext.todo",
     "sphinx.ext.viewcode",
     "sphinx_autodoc_typehints",
+    "autoapi.extension",
 ]
 
 templates_path = ['_templates']
@@ -35,4 +36,4 @@ html_title = "Pandora's White-Box"
 html_logo = "assets/pandora.png"
 
 # -- Options for extensions ---------------------------------------------------
-autosummary_generate = True
+autoapi_dirs = ['../../src']

@@ -27,6 +27,7 @@ pip install myst-parser==3.0.1
 pip install furo==2024.5.6
 pip install sphinx-autobuild==2024.4.16
 pip install sphinx-autodoc-typehints-2.2.0
+pip install sphinx-autoapi-3.1.1
 pip install einops==0.7.0
 pip install traker==0.3.2
 pip install -e .
@@ -44,6 +45,8 @@ cd docs
 sphinx-autobuild source build/html
 ```
 Then the docs will be available under `docs/build/`.
+
+Docs are split up into tutorials, how-tos, explanation, and reference as per the Diataxis framework.
 
 ## Licenses and Citations
 
