@@ -45,8 +45,6 @@ def main():
     parser.add_argument('--mia_num_samples', action="store", type=int, required=False, help='Dataset size')
     parser.add_argument('--mia_train_features',  action="store", type=str, nargs="+", required=True, help='Location of .pt files with train white-box features')
     parser.add_argument('--mia_val_features',  action="store", type=str, nargs="+", required=True, help='Location of .pt files with val white-box features')
-    # Include tag to filename
-    parser.add_argument('--tag', action="store", type=str, required=False, help='Information to include in filename')
     # Device Arguments
     parser.add_argument('--seed', action="store", type=int, required=False, default=229, help='Seed')
     args = parser.parse_args()

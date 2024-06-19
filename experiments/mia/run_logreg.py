@@ -41,8 +41,6 @@ def main():
     parser.add_argument('--mia_num_samples', action="store", type=int, required=False, help='Dataset size')
     parser.add_argument('--mia_train_features',  action="store", type=str, nargs="+", required=True, help='Location of .pt files with train white-box features')
     parser.add_argument('--mia_val_features',  action="store", type=str, nargs="+", required=True, help='Location of .pt files with val white-box features')
-    # Include tag to filename
-    parser.add_argument('--tag', action="store", type=str, required=False, help='Information to include in filename')
     # Device Arguments
     parser.add_argument('--seed', action="store", type=int, required=False, default=229, help='Seed')
     args = parser.parse_args()
@@ -75,7 +73,6 @@ def main():
     # TRAIN CLASSIFIER
     ####################################################################################################
     start = time.perf_counter()
-
     if args.use_existing:
         clf, feature_set = torch.load(args.clf_path)
         if feature_set!=args.feature_set:
@@ -106,14 +103,12 @@ def main():
         LogReger.attack_plot_ROC(train_predictions[train_labels==1], train_predictions[train_labels==0], title=f"{args.experiment_name}_train", log_scale=True, show_plot=False)
         LogReger.attack_plot_ROC(test_predictions[test_labels==1], test_predictions[test_labels==0], title=f"{args.experiment_name}_test", log_scale=False, show_plot=False)
         LogReger.attack_plot_ROC(test_predictions[test_labels==1], test_predictions[test_labels==0], title=f"{args.experiment_name}_test", log_scale=True, show_plot=False)
-
     end = time.perf_counter()
     logger.info(f"- Classifier training took {end-start} seconds.")
     ####################################################################################################
     # RUN ATTACK
     ####################################################################################################
     start = time.perf_counter()
-
     # Load data
     train_features = load_dict_data(args.mia_train_features)
     val_features = load_dict_data(args.mia_val_features)

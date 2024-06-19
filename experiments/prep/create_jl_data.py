@@ -128,7 +128,7 @@ def main():
         validation_dataset = torch.load(fixed_input)[:args.num_samples]
         validation_dataloader = DataLoader(validation_dataset, batch_size = args.bs, collate_fn=lambda batch: collate_fn(batch, tokenizer=tokenizer, max_length=max_length))
     else:
-        validation_dataset = load_val_pile(number=args.num_samples,start_index=args.start_index,seed=args.seed,num_splits=1,window=2048 if args.pack else 0,compensation_factor=args.pack_factor)[0]
+        validation_dataset = load_val_pile(number=args.num_samples,start_index=args.start_index,seed=args.seed,num_splits=1,tokenizer=tokenizer,window=2048 if args.pack else 0,compensation_factor=args.pack_factor)[0]
         validation_dataloader = DataLoader(validation_dataset, batch_size = args.bs, collate_fn=lambda batch: collate_fn(batch, tokenizer=tokenizer, max_length=max_length))
         if accelerator is not None: # for subprocess call
             args.val_pt = "Data/JL/val_dataset.pt"

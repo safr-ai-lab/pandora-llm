@@ -7,13 +7,21 @@
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
 project = 'llmprivacy'
-copyright = '2024, Jason Wang, Jeffrey Wang, Marvin Li, Seth Neel'
 author = 'Jason Wang, Jeffrey Wang, Marvin Li, Seth Neel'
+copyright = f'2024 {author}'
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
-extensions = ["myst_parser","sphinx.ext.napoleon","sphinx.ext.autodoc","sphinx.ext.autosummary","sphinx.ext.todo","sphinx.ext.viewcode"]
+extensions = [
+    "myst_parser",
+    "sphinx.ext.autodoc",
+    "sphinx.ext.napoleon",
+    "sphinx.ext.autosummary",
+    "sphinx.ext.todo",
+    "sphinx.ext.viewcode",
+    "sphinx_autodoc_typehints",
+]
 
 templates_path = ['_templates']
 exclude_patterns = []
@@ -25,3 +33,6 @@ html_theme = 'furo'
 html_static_path = ['_static']
 html_title = "Pandora's White-Box"
 html_logo = "assets/pandora.png"
+
+# -- Options for extensions ---------------------------------------------------
+autosummary_generate = True

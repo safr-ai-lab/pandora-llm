@@ -85,8 +85,8 @@ def main():
     logger.info("Loading Data")    
     ground_truth = torch.load(args.ground_truth)[args.start_index:args.start_index+args.num_samples]
     generations = torch.load(args.generations)[args.start_index:args.start_index+args.num_samples]
-    ground_truth_features = load_dict_data(args.mia_train_features)
-    generations_features = load_dict_data(args.mia_train_features)
+    ground_truth_features = load_dict_data(args.ground_truth_features)
+    generations_features = load_dict_data(args.generations_features)
     ground_truth_dataloader = DataLoader(ground_truth_features, batch_size = args.bs)
     generations_dataloader = DataLoader(generations_features.flatten(end_dim=1), batch_size = args.bs)
 

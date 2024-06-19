@@ -19,12 +19,14 @@ pip install accelerate==0.30.1
 pip install scikit-learn==1.5.0
 pip install matplotlib==3.9.0
 pip install plotly==5.22.0
-pip install kaleido==0.2.1
+pip install kaleido==0.1.0
 pip install sentencepiece==0.2.0
 pip install setuptools==70.0.0
 pip install sphinx==7.3.7
 pip install myst-parser==3.0.1
 pip install furo==2024.5.6
+pip install sphinx-autobuild==2024.4.16
+pip install sphinx-autodoc-typehints-2.2.0
 pip install einops==0.7.0
 pip install traker==0.3.2
 pip install -e .
@@ -32,9 +34,14 @@ pip install -e .
 
 Make docs:
 ```
+STATIC:
 sphinx-apidoc -f -o docs/source src/llmprivacy
 cd docs
 make html
+
+DYNAMIC:
+cd docs
+sphinx-autobuild source build/html
 ```
 Then the docs will be available under `docs/build/`.
 

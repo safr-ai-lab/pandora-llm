@@ -55,13 +55,14 @@ Contributing
 We welcome contributions! Please submit pull requests in our `GitHub <https://github.com/safr-ai-lab/llm-mi>`_.
 
 
-Contents
---------
 .. toctree::
    :maxdepth: 2
+   :hidden:
 
-   index
+   self
+   quickstart
    organization
-   scripts
+   tutorial/index
+   api/index
    genindex
    modindex
