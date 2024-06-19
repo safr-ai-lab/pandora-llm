@@ -1,4 +1,4 @@
-Tutorial A
-==========
+Setup
+=====
 
 Content for Tutorial A.

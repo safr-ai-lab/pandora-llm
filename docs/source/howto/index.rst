@@ -4,5 +4,6 @@ How-To Guides
 .. toctree::
    :maxdepth: 1
 
-   howto_a
-   howto_b
+   add_model
+   add_data
+   add_attack

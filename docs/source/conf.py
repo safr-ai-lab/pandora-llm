@@ -37,3 +37,5 @@ html_logo = "assets/pandora.png"
 
 # -- Options for extensions ---------------------------------------------------
 autoapi_dirs = ['../../src']
+autoapi_keep_files = True
+autodoc_typehints = 'description'

@@ -2,6 +2,7 @@ models/
 results/
 *.DS_Store
 docs/build
+docs/source/autoapi
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

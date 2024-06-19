@@ -4,5 +4,5 @@ Tutorials
 .. toctree::
    :maxdepth: 1
 
-   tutorial_a
-   tutorial_b
+   setup
+   starter_scripts
