@@ -100,12 +100,12 @@ class GradNorm(MIA):
         val_statistics = []
         labels = []
         for grad_type in train_gradients.keys():
-            print(grad_type)
             train_stats = train_gradients[grad_type]
             val_stats = val_gradients[grad_type]
-            train_statistics.append(train_stats)
-            val_statistics.append(val_stats)
-            labels.append(grad_type)
+            if train_stats.ndim==1:
+                train_statistics.append(train_stats)
+                val_statistics.append(val_stats)
+                labels.append(grad_type)
         plot_ROC_multiple(train_statistics, val_statistics, title, labels, log_scale=log_scale, show_plot=show_plot, save_name=save_name)
         plot_ROC_multiple_plotly(train_statistics, val_statistics, title, labels, log_scale=log_scale, show_plot=show_plot, save_name=save_name)
 
@@ -257,8 +257,8 @@ def compute_dataloader_all_norms(model, embedding_layer, dataloader, norms, devi
         ## Get predictions on data 
         if type(data_x) is dict:
             data_x = data_x["input_ids"]
-        else:
-            data_x = data_x[None,:]
+        # else:
+        #     data_x = data_x[None,:]
         if samplelength is None:
             data_x = data_x.detach()                
         else:

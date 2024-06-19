@@ -11,8 +11,8 @@ def compute_extraction_metrics(ground_truth,generations,ground_truth_statistics,
     Args:
         ground_truth (list[list[int]]): list of input ids for each ground truth (N x L)
         generations (list[list[list[int]]]): list of input ids for each generation (N x G x L)
-        ground_truth (list[float]): list of statistics for each ground truth (N)
-        generations (list[list[float]]): list of statistics for each generation (N x G)
+        ground_truth_statistics (list[float]): list of statistics for each ground truth (N)
+        generations_statistics (list[list[float]]): list of statistics for each generation (N x G)
         prefix_length (int): number of prefix input ids
         suffix_length (int): number of suffix input_ids
         tokenizer (AutoTokenizer): tokenizer used to create the input ids

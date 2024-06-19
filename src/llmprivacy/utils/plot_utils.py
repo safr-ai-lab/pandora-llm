@@ -454,7 +454,7 @@ def plot_ROC_plotly(train_statistics, val_statistics, plot_title, keep_first=Non
     else:
         return roc_auc, tpr_at_fprs
 
-def plot_ROC_multiple(train_statistics_list, val_statistics_list, plot_title, labels, keep_first=None, ci=True, num_bootstraps=1000, fprs=None, log_scale=False, show_plot=True, save_name=None, lims=None, colors=None, bold_labels=None):
+def plot_ROC_multiple(train_statistics_list, val_statistics_list, plot_title, labels, keep_first=None, ci=True, num_bootstraps=1000, fprs=None, log_scale=False, show_plot=True, save_name=None, lims=None, colors=None, bold_labels=[]):
     '''
     Plots multiple ROC curves in a single plot
 

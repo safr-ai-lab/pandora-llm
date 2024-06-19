@@ -26,7 +26,7 @@ From pip:
 
 .. code-block:: bash
 
-   pip install pandora
+   pip install pandora-llm
 
 From source:
 
@@ -54,15 +54,14 @@ Contributing
 ------------
 We welcome contributions! Please submit pull requests in our `GitHub <https://github.com/safr-ai-lab/llm-mi>`_.
 
-.. Contents
-.. --------
 
-.. .. toctree::
-..    :maxdepth: 2
-..    :caption: Contents:
+Contents
+--------
+.. toctree::
+   :maxdepth: 2
 
-.. Index
-.. -----
-
-.. * :ref:`genindex`
-.. * :ref:`modindex`
+   index
+   organization
+   scripts
+   genindex
+   modindex

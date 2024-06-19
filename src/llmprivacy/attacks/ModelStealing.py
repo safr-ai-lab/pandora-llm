@@ -203,7 +203,6 @@ def compute_input_ids_logits(model, input_ids, device=None):
         torch.Tensor: logits of last token in input ids
     
     """
-    print(device)
     with torch.no_grad():
         
         mask  = (input_ids > 0).detach()
@@ -243,11 +242,9 @@ def compute_dataloader_logits_embedding(model, dataloader, device=None, nbatches
         data_x = data_x.detach()                
 
         ## Compute features on input data
-        print(data_x.shape)
         
         loss = compute_input_ids_logits(model, data_x, device=device).detach().cpu()
-        losses.append(loss)
-        print(loss.shape)
+        losses.append(loss)        
 
         del data_x, loss
         torch.cuda.empty_cache()
