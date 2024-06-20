@@ -61,4 +61,4 @@ We welcome contributions! Please submit pull requests in our `GitHub <https://gi
    self
    tutorial/index
    howto/index
-   explanation/index
+   Background Blog <https://jeffreygwang.quarto.pub/pandora/blog.html>

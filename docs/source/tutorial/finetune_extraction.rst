@@ -12,6 +12,6 @@ First, we finetune a model, then call ``run_generation.py`` to obtain our genera
 
 We have a strong finetuned loss ratio attack which we apply in this script. We can also vary the prefix and suffix lengths to observe how extraction becomes more difficult with less context.
 
-.. image:: ../assets/pretrain_extraction.png
+.. image:: ../assets/finetune_extraction.png
    :width: 400
-   :alt: Pretrain Extraction Pipeline
+   :alt: Finetune Extraction Pipeline
