@@ -26,7 +26,7 @@ We have offered preliminary directions for multi-gpu distributed training and in
 
 This is not yet supported on all modules—please adapt to your own setup.
 
-Understanding the Directory
+Understanding the File Tree
 ---------------------------
 
 If you installed from source, you will see the following directory structure:
