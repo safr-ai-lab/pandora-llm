@@ -898,10 +898,13 @@ def compute_error_recalls(prefix_index,correct):
         correct (list[float]): list of integers denoting the correctness of the suffix
     """
     errors = torch.cumsum(~(correct.bool()),dim=0)
-    recall_indices = unique(prefix_index[correct],sort_index=True)[-1]
-    indices = torch.searchsorted(recall_indices, torch.arange(len(errors)), right=True) - 1
-    recalls = recall_indices[indices]/len(torch.unique(prefix_index))
-    return errors, recalls
+    if len(prefix_index[correct])==0:
+        return errors, torch.zeros_like(errors)
+    else:
+        recall_indices = unique(prefix_index[correct],sort_index=True)[-1]
+        indices = torch.searchsorted(recall_indices, torch.arange(len(errors)), right=True) - 1
+        recalls = recall_indices[indices]/len(torch.unique(prefix_index))
+        return errors, recalls
 
 # def compute_error_recalls(prefix_index,correct):
 #     did_solve = set()
