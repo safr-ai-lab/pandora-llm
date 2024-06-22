@@ -88,9 +88,9 @@ class ModelStealing(MIA):
         Args:
             dataloader (torch.utils.data.dataloader.DataLoader): DataLoader of samples.
             projector (dict): dictionary of dimensionality reduction functions        
-            num_batches (int): Number of batches to consider
-            device (str): CPU or GPU 
-            model_half (bool): use half precision floats for model
+            num_batches (int, optional): Number of batches to consider
+            device (str, optional): CPU or GPU 
+            model_half (bool, optional): use half precision floats for model
 
         Returns:
             torch.Tensor or list: data for input IDs
@@ -115,7 +115,7 @@ def compute_basis_change(model, input_ids, projector, device=None):
         model (transformers.AutoModelForCausalLM): HuggingFace model.
         input_ids (torch.Tensor): tensor of input IDs.
         projector (dict): dictionary of dimensionality reduction functions
-        device (str): CPU or GPU 
+        device (str, optional): CPU or GPU 
     
     Returns:
         torch.Tensor or list: data from input IDs
@@ -145,9 +145,9 @@ def compute_dataloader_basis_changes(model, dataloader, projector, device=None, 
         model (transformers.AutoModelForCausalLM): HuggingFace model.
         dataloader (torch.utils.data.dataloader.DataLoader): DataLoader of samples.
         projector (dict): dictionary of dimensionality reduction functions        
-        device (str): CPU or GPU 
-        nbatches (int): Number of batches to consider
-        half (bool): use half precision floats for model
+        device (str, optional): CPU or GPU 
+        nbatches (int, optional): Number of batches to consider
+        half (bool, optional): use half precision floats for model
 
     Returns:
         torch.Tensor or list: data for input IDs
@@ -197,7 +197,7 @@ def compute_input_ids_logits(model, input_ids, device=None):
     Args:
         model (transformers.AutoModelForCausalLM): HuggingFace model.
         input_ids (torch.Tensor): tensor of input IDs.
-        device (str): CPU or GPU
+        device (str, optional): CPU or GPU
 
     Returns:
         torch.Tensor: logits of last token in input ids
@@ -218,9 +218,9 @@ def compute_dataloader_logits_embedding(model, dataloader, device=None, nbatches
     Args:
         model (transformers.AutoModelForCausalLM): HuggingFace model.
         dataloader (torch.utils.data.dataloader.DataLoader): DataLoader with tokens.
-        device (str): CPU or GPU 
-        nbatches (int): Number of batches to consider
-        half (bool): use half precision floats for model
+        device (str, optional): CPU or GPU 
+        nbatches (int, optional): Number of batches to consider
+        half (bool, optional): use half precision floats for model
 
     Returns:
         torch.Tensor or list: loss of input IDs

@@ -82,8 +82,8 @@ class GradNorm(MIA):
         shown directly, or saved to a file.
 
         Args:
-            train_statistics (dict[str,float]]): Gradients of the training set. Lower means more like train.
-            val_statistics (dict[str,float]]): Gradients of the training set. Lower means more like train.
+            train_gradients (dict[str,float]]): Gradients of the training set. Lower means more likely to be train.
+            val_gradients (dict[str,float]]): Gradients of the training set. Lower means more likely to be train.
             title (str): The title for the ROC plot.
             log_scale (bool, optional): Whether to plot the ROC curve on a logarithmic scale. 
                 Defaults to False.
@@ -116,8 +116,8 @@ class GradNorm(MIA):
         For GradNorm, this method plots each histogram in a separate image.
 
         Args:
-            train_statistics (dict[str,float]]): Gradients of the training set. Lower means more like train.
-            val_statistics (dict[str,float]]): Gradients of the training set. Lower means more like train.
+            train_gradients (dict[str,float]]): Gradients of the training set. Lower means more likely to be train.
+            val_gradients (dict[str,float]]): Gradients of the training set. Lower means more likely to be train.
             title (str): The title for the ROC plot.
             normalize (bool, optional): Whether to plot the histograms on a z-scored scale. 
                 Defaults to False.

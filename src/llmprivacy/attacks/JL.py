@@ -302,7 +302,7 @@ def compute_input_ids_grad_jl(model, embedding_layer, input_ids,  projector, dev
         embedding_layer (torch.nn.parameter.Parameter): computes embeddings from tokens, useful for taking grad wrt x
         input_ids (torch.Tensor): tensor of input IDs.
         projector (dict): dictionary of dimensionality reduction functions
-        device (str): CPU or GPU 
+        device (str, optional): CPU or GPU 
                 
     Returns:
         torch.Tensor or list: data from input IDs
@@ -355,8 +355,6 @@ def compute_dataloader_jl(model, embedding_layer, dataloader, projector, device=
         print("Not using model.half() ....")
     model.eval()
     model.to(device)
-    # if "random_basis_change" in projector:
-    #     projector["random_basis_change"] = projector["random_basis_change"].to(device).half()
 
     grads = []
     for batchno, data_x in tqdm(enumerate(dataloader),total=len(dataloader)):
