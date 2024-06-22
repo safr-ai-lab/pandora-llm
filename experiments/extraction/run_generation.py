@@ -9,7 +9,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer, AutoConfig
 from transformers.generation.utils import GenerationConfig
 from accelerate import Accelerator
 from accelerate.utils import set_seed
-from llmprivacy.utils.dataset_utils import collate_fn, load_val_pile
+from llmprivacy.utils.dataset_utils import collate_fn, load_val_pile, load_train_pile_random
 from llmprivacy.utils.generation_utils import generate_suffixes, compute_dataloader_suffix_probability
 from llmprivacy.utils.plot_utils import plot_probabilities, plot_probabilities_plotly
 from llmprivacy.utils.log_utils import get_my_logger
@@ -38,6 +38,7 @@ def main():
     parser.add_argument('--num_samples', action="store", type=int, required=True, help='Dataset size')
     parser.add_argument('--start_index', action="store", type=int, required=False, default=0, help='Slice dataset starting from this index')
     parser.add_argument('--bs', action="store", type=int, required=False, default=1, help='Batch size')
+    parser.add_argument('--pretrain', action="store_true", required=False, help='Load train Pile')
     # Generation Arguments
     parser.add_argument('--prefix_length', action="store", type=int, required=False, help='Prefix length')
     parser.add_argument('--suffix_length', action="store", type=int, required=False, help='Suffix length')
@@ -67,6 +68,7 @@ def main():
             (f"_k={args.prefix_length}_m={args.suffix_length}") +
             (f"_N={args.num_samples}_S={args.start_index}_seed={args.seed}") +
             (f"_tag={args.tag}" if args.tag is not None else "") +
+            (f"_pretrain" if args.pretrain else "") +
             (f"_extract")
         )
         args.experiment_name = f"results/Generations/{args.experiment_name}/{args.experiment_name}"
@@ -89,6 +91,9 @@ def main():
         logger.info("You are using a self-specified dataset...")
         dataset = torch.load(args.data)[args.start_index:args.start_index+args.num_samples]
         dataloader = DataLoader(dataset, batch_size = args.bs, collate_fn=lambda batch: collate_fn(batch, tokenizer=tokenizer, max_length=args.prefix_length+args.suffix_length))
+    elif args.pretrain:
+        dataset = load_train_pile_random(number=args.num_samples,start_index=args.start_index,seed=args.seed,num_splits=1,deduped=True)[0]
+        dataloader = DataLoader(dataset, batch_size = args.bs, collate_fn=lambda batch: collate_fn(batch, tokenizer=tokenizer, max_length=args.prefix_length+args.suffix_length))    
     else:
         dataset = load_val_pile(number=args.num_samples,start_index=args.start_index,seed=args.seed,num_splits=1,tokenizer=tokenizer,window=0)[0]
         dataloader = DataLoader(dataset, batch_size = args.bs, collate_fn=lambda batch: collate_fn(batch, tokenizer=tokenizer, max_length=args.prefix_length+args.suffix_length))
@@ -126,8 +131,8 @@ def main():
         torch.save(probabilities,f"{args.experiment_name}_probabilities.pt")
         plot_probabilities(probabilities, plot_title=args.experiment_name, log_scale=False, show_plot=False, save_name=args.experiment_name)
         plot_probabilities(probabilities, plot_title=args.experiment_name, log_scale=True, show_plot=False, save_name=args.experiment_name+"_log")
-        plot_probabilities_plotly(probabilities, plot_title=args.experiment_name, log_scale=False, show_plot=False, save_name=args.experiment_name)
-        plot_probabilities_plotly(probabilities, plot_title=args.experiment_name, log_scale=True, show_plot=False, save_name=args.experiment_name+"_log")
+        # plot_probabilities_plotly(probabilities, plot_title=args.experiment_name, log_scale=False, show_plot=False, save_name=args.experiment_name)
+        # plot_probabilities_plotly(probabilities, plot_title=args.experiment_name, log_scale=True, show_plot=False, save_name=args.experiment_name+"_log")
 
     if not args.skip_generation:
         logger.info("Generating Suffixes")

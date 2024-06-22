@@ -77,4 +77,4 @@ class MIA:
         if save_name is None:
             save_name = title + ("_z" if normalize else "")
         plot_histogram(train_statistics, val_statistics, title, normalize=normalize, show_plot=show_plot, save_name=save_name)
-        plot_histogram_plotly(train_statistics, val_statistics, title, normalize=normalize, show_plot=show_plot, save_name=save_name)
+        # plot_histogram_plotly(train_statistics, val_statistics, title, normalize=normalize, show_plot=show_plot, save_name=save_name)

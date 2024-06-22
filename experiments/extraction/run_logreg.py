@@ -35,8 +35,8 @@ def main():
     # Dataset Arguments
     parser.add_argument('--ground_truth', action="store", type=str, required=False, help='.pt file of ground truth input_ids')
     parser.add_argument('--generations', action="store", type=str, required=False, help='.pt file of generated input_ids')
-    parser.add_argument('--ground_truth_features', action="store", type=str, required=False, help='.pt file of ground truth features')
-    parser.add_argument('--generations_features', action="store", type=str, required=False, help='.pt file of generated features')
+    parser.add_argument('--ground_truth_features', action="store", type=str, nargs="+", required=False, help='.pt file of ground truth features')
+    parser.add_argument('--generations_features', action="store", type=str, nargs="+", required=False, help='.pt file of generated features')
     parser.add_argument('--ground_truth_probabilities', action="store", type=str, required=False, help='.pt file of generated input_ids')
     parser.add_argument('--prefix_length', action="store", type=int, required=False, help='Prefix length')
     parser.add_argument('--suffix_length', action="store", type=int, required=False, help='Suffix length')
@@ -51,6 +51,7 @@ def main():
     parser.add_argument('--clf_num_samples', action="store", type=int, required=False, help='Dataset size')
     parser.add_argument('--clf_pos_features', action="store", type=str, nargs="+", required=False, help='Location of .pt files with train white-box features to train classifier')
     parser.add_argument('--clf_neg_features', action="store", type=str, nargs="+", required=False, help='Location of .pt files with val white-box features to train classifier')
+    parser.add_argument('--clf_flatten_neg', action="store_true", required=False, help='Flatten neg_features')
     parser.add_argument('--clf_test_frac', action="store", type=float, required=False, default=0.1, help='Fraction of input train features to use to validate classifier performance')
     parser.add_argument('--clf_iter', action="store", type=int, required=False, default=1000, help='Maximum number of iterations for training logistic regression')
     # Device Arguments
@@ -59,10 +60,11 @@ def main():
     parser.add_argument('--model_half', action="store_true", required=False, help='Use half precision (fp16). 1 for use; 0 for not.')
     args = parser.parse_args()
     
-    accelerator = Accelerator() if args.accelerate else None
     set_seed(args.seed)
-    
+
+    args.feature_set = sorted(args.feature_set)
     args.model_cache_dir = args.model_cache_dir if args.model_cache_dir is not None else f"models/{args.model_name.replace('/','-')}"
+    args.clf_path = args.clf_path if args.clf_path is not None else f"models/LogReg/{'_'.join(args.feature_set)}_N={args.clf_num_samples}_M={args.model_name.replace('/','-')}_extract"
     if args.experiment_name is None:
         args.experiment_name = (
             (f"LogReg_{args.model_name.replace('/','-')}") +
@@ -77,23 +79,6 @@ def main():
     logger = get_my_logger(log_file=f"{args.experiment_name}.log")
     with open(f"{args.experiment_name}_args.json", "w") as f:
         json.dump(vars(args), f, indent=4)
-    ####################################################################################################
-    # LOAD DATA
-    ####################################################################################################
-    start = time.perf_counter()
-    
-    logger.info("Loading Data")    
-    ground_truth = torch.load(args.ground_truth)[args.start_index:args.start_index+args.num_samples]
-    generations = torch.load(args.generations)[args.start_index:args.start_index+args.num_samples]
-    ground_truth_features = load_dict_data(args.ground_truth_features)
-    generations_features = load_dict_data(args.generations_features)
-    ground_truth_dataloader = DataLoader(ground_truth_features, batch_size = args.bs)
-    generations_dataloader = DataLoader(generations_features.flatten(end_dim=1), batch_size = args.bs)
-
-    ground_truth_probabilities = torch.load(args.ground_truth_probabilities) if (args.ground_truth_probabilities is not None) else None
-
-    end = time.perf_counter()
-    logger.info(f"- Dataset loading took {end-start} seconds.")
     ####################################################################################################
     # TRAIN CLASSIFIER
     ####################################################################################################
@@ -110,6 +95,8 @@ def main():
         # Load features
         pos_features = load_dict_data(args.clf_pos_features)
         neg_features = load_dict_data(args.clf_neg_features)
+        if args.clf_flatten_neg:
+            neg_features = {feature:value.flatten(end_dim=1) for feature,value in neg_features.items()}
         # Combine features
         train_features = {}
         test_features = {}
@@ -134,19 +121,25 @@ def main():
     # RUN ATTACK
     ####################################################################################################
     start = time.perf_counter()
-    logger.info("Running Attack")
+    # Load data
+    ground_truth = torch.load(args.ground_truth)[args.start_index:args.start_index+args.num_samples]
+    generations = torch.load(args.generations)[args.start_index:args.start_index+args.num_samples]
+    ground_truth_probabilities = torch.load(args.ground_truth_probabilities)[args.start_index:args.start_index+args.num_samples] if (args.ground_truth_probabilities is not None) else None
 
-    # Initialize attack
-    LogReger = LogReg(args.model_name, model_revision=args.model_revision, model_cache_dir=args.model_cache_dir)
-    
+    ground_truth_features = load_dict_data(args.ground_truth_features)
+    generations_features = load_dict_data(args.generations_features)
+    ground_truth_features = {feature:value[args.start_index:args.start_index+args.num_samples] for feature,value in ground_truth_features.items()}
+    generations_features = {feature:value[args.start_index:args.start_index+args.num_samples].flatten(end_dim=1) for feature,value in generations_features.items()}
+
+    # Preprocess data
+    ground_truth_features = LogReger.preprocess_features(ground_truth_features,fit_scaler=False)
+    generations_features = LogReger.preprocess_features(generations_features,fit_scaler=False)
     # Compute statistics
-    LogReger.load_model()
-    ground_truth_statistics = LogReger.compute_statistic(ground_truth_dataloader,num_batches=math.ceil(args.num_samples/args.bs),device=device,model_half=args.model_half,accelerator=accelerator)
+    ground_truth_statistics = LogReger.compute_statistic(ground_truth_features,num_samples=args.num_samples)
     torch.save(ground_truth_statistics,f"{args.experiment_name}_true_statistics.pt")
-    generations_statistics = LogReger.compute_statistic(generations_dataloader,device=device,model_half=args.model_half,accelerator=accelerator)
+    generations_statistics = LogReger.compute_statistic(generations_features,num_samples=args.num_samples*generations.shape[1])
     generations_statistics = generations_statistics.reshape(generations.shape[0],generations.shape[1])
     torch.save(generations_statistics,f"{args.experiment_name}_gen_statistics.pt")
-    LogReger.unload_model()
 
     # Compute metrics
     tokenizer = AutoTokenizer.from_pretrained(args.model_name)

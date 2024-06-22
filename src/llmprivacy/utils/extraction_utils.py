@@ -134,18 +134,18 @@ def compute_extraction_metrics(ground_truth,generations,ground_truth_statistics,
     metrics["recalls@errors"] = metrics["recalls@errors"].tolist()
     metrics["recall@errors_SE"] = metrics["recall@errors_SE"].tolist()
     plot_error_recall(torch.from_numpy(flattened_df["original_index"].to_numpy()),torch.from_numpy(flattened_df["exact_match"].to_numpy()),plot_title=title,save_name=title+"_log",log_scale=True,show_plot=False)
-    plot_error_recall_plotly(torch.from_numpy(flattened_df["original_index"].to_numpy()),torch.from_numpy(flattened_df["exact_match"].to_numpy()),plot_title=title,save_name=title,log_scale=False,show_plot=False)
-    plot_error_recall_plotly(torch.from_numpy(flattened_df["original_index"].to_numpy()),torch.from_numpy(flattened_df["exact_match"].to_numpy()),plot_title=title,save_name=title+"_log",log_scale=True,show_plot=False)
+    # plot_error_recall_plotly(torch.from_numpy(flattened_df["original_index"].to_numpy()),torch.from_numpy(flattened_df["exact_match"].to_numpy()),plot_title=title,save_name=title,log_scale=False,show_plot=False)
+    # plot_error_recall_plotly(torch.from_numpy(flattened_df["original_index"].to_numpy()),torch.from_numpy(flattened_df["exact_match"].to_numpy()),plot_title=title,save_name=title+"_log",log_scale=True,show_plot=False)
 
     metrics["AP"], metrics["P@R"], metrics["AP_SE"], metrics["P@R_SE"] = plot_precision_recall(torch.from_numpy(flattened_df["exact_match"].to_numpy()),torch.from_numpy(flattened_df[f"generation_{statistic_name}"].to_numpy()),plot_title=title,save_name=title,log_scale=False,show_plot=False)
     plot_precision_recall(torch.from_numpy(flattened_df["exact_match"].to_numpy()),torch.from_numpy(flattened_df[f"generation_{statistic_name}"].to_numpy()),plot_title=title,save_name=title+"_log",log_scale=True,show_plot=False)
-    plot_precision_recall_plotly(torch.from_numpy(flattened_df["exact_match"].to_numpy()),torch.from_numpy(flattened_df[f"generation_{statistic_name}"].to_numpy()),plot_title=title,save_name=title,log_scale=False,show_plot=False)
-    plot_precision_recall_plotly(torch.from_numpy(flattened_df["exact_match"].to_numpy()),torch.from_numpy(flattened_df[f"generation_{statistic_name}"].to_numpy()),plot_title=title,save_name=title+"_log",log_scale=True,show_plot=False)
+    # plot_precision_recall_plotly(torch.from_numpy(flattened_df["exact_match"].to_numpy()),torch.from_numpy(flattened_df[f"generation_{statistic_name}"].to_numpy()),plot_title=title,save_name=title,log_scale=False,show_plot=False)
+    # plot_precision_recall_plotly(torch.from_numpy(flattened_df["exact_match"].to_numpy()),torch.from_numpy(flattened_df[f"generation_{statistic_name}"].to_numpy()),plot_title=title,save_name=title+"_log",log_scale=True,show_plot=False)
 
     metrics["AUC"], metrics["TPR@FPR"], metrics["AUC_SE"], metrics["TPR@FPR_SE"] = plot_ROC_single(torch.from_numpy(flattened_df["exact_match"].to_numpy()), torch.from_numpy(flattened_df[f"generation_{statistic_name}"].to_numpy()),plot_title=title,save_name=title,log_scale=False,show_plot=False)
     plot_ROC_single(torch.from_numpy(flattened_df["exact_match"].to_numpy()), torch.from_numpy(flattened_df[f"generation_{statistic_name}"].to_numpy()),plot_title=title,save_name=title+"_log",log_scale=True,show_plot=False)
-    plot_ROC_single_plotly(torch.from_numpy(flattened_df["exact_match"].to_numpy()), torch.from_numpy(flattened_df[f"generation_{statistic_name}"].to_numpy()),plot_title=title,save_name=title,log_scale=False,show_plot=False)
-    plot_ROC_single_plotly(torch.from_numpy(flattened_df["exact_match"].to_numpy()), torch.from_numpy(flattened_df[f"generation_{statistic_name}"].to_numpy()),plot_title=title,save_name=title+"_log",log_scale=True,show_plot=False)
+    # plot_ROC_single_plotly(torch.from_numpy(flattened_df["exact_match"].to_numpy()), torch.from_numpy(flattened_df[f"generation_{statistic_name}"].to_numpy()),plot_title=title,save_name=title,log_scale=False,show_plot=False)
+    # plot_ROC_single_plotly(torch.from_numpy(flattened_df["exact_match"].to_numpy()), torch.from_numpy(flattened_df[f"generation_{statistic_name}"].to_numpy()),plot_title=title,save_name=title+"_log",log_scale=True,show_plot=False)
 
     flattened_df_w_true = pd.DataFrame(rows_with_ground_truth).sort_values(by=f"generation_{statistic_name}")
     flattened_df_w_true.to_csv(f"{title}_flattened_w_true.csv",index=False)
@@ -160,18 +160,18 @@ def compute_extraction_metrics(ground_truth,generations,ground_truth_statistics,
     metrics["w_true_recalls@errors"] = metrics["w_true_recalls@errors"].tolist()
     metrics["w_true_recall@errors_SE"] = metrics["w_true_recall@errors_SE"].tolist()
     plot_error_recall(torch.from_numpy(flattened_df_w_true["original_index"].to_numpy()),torch.from_numpy(flattened_df_w_true["exact_match"].to_numpy()),plot_title=title+"_w_true",save_name=title+"_w_true"+"_log",log_scale=True,show_plot=False)
-    plot_error_recall_plotly(torch.from_numpy(flattened_df_w_true["original_index"].to_numpy()),torch.from_numpy(flattened_df_w_true["exact_match"].to_numpy()),plot_title=title+"_w_true",save_name=title+"_w_true",log_scale=False,show_plot=False)
-    plot_error_recall_plotly(torch.from_numpy(flattened_df_w_true["original_index"].to_numpy()),torch.from_numpy(flattened_df_w_true["exact_match"].to_numpy()),plot_title=title+"_w_true",save_name=title+"_w_true"+"_log",log_scale=True,show_plot=False)
+    # plot_error_recall_plotly(torch.from_numpy(flattened_df_w_true["original_index"].to_numpy()),torch.from_numpy(flattened_df_w_true["exact_match"].to_numpy()),plot_title=title+"_w_true",save_name=title+"_w_true",log_scale=False,show_plot=False)
+    # plot_error_recall_plotly(torch.from_numpy(flattened_df_w_true["original_index"].to_numpy()),torch.from_numpy(flattened_df_w_true["exact_match"].to_numpy()),plot_title=title+"_w_true",save_name=title+"_w_true"+"_log",log_scale=True,show_plot=False)
 
     metrics["w_true_AP"], metrics["w_true_P@R"], metrics["w_true_AP_SE"], metrics["w_true_P@R_SE"] = plot_precision_recall(torch.from_numpy(flattened_df_w_true["exact_match"].to_numpy()),torch.from_numpy(flattened_df_w_true[f"generation_{statistic_name}"].to_numpy()),plot_title=title+"_w_true",save_name=title+"_w_true",log_scale=False,show_plot=False)
     plot_precision_recall(torch.from_numpy(flattened_df_w_true["exact_match"].to_numpy()),torch.from_numpy(flattened_df_w_true[f"generation_{statistic_name}"].to_numpy()),plot_title=title+"_w_true",save_name=title+"_w_true"+"_log",log_scale=True,show_plot=False)
-    plot_precision_recall_plotly(torch.from_numpy(flattened_df_w_true["exact_match"].to_numpy()),torch.from_numpy(flattened_df_w_true[f"generation_{statistic_name}"].to_numpy()),plot_title=title+"_w_true",save_name=title+"_w_true",log_scale=False,show_plot=False)
-    plot_precision_recall_plotly(torch.from_numpy(flattened_df_w_true["exact_match"].to_numpy()),torch.from_numpy(flattened_df_w_true[f"generation_{statistic_name}"].to_numpy()),plot_title=title+"_w_true",save_name=title+"_w_true"+"_log",log_scale=True,show_plot=False)
+    # plot_precision_recall_plotly(torch.from_numpy(flattened_df_w_true["exact_match"].to_numpy()),torch.from_numpy(flattened_df_w_true[f"generation_{statistic_name}"].to_numpy()),plot_title=title+"_w_true",save_name=title+"_w_true",log_scale=False,show_plot=False)
+    # plot_precision_recall_plotly(torch.from_numpy(flattened_df_w_true["exact_match"].to_numpy()),torch.from_numpy(flattened_df_w_true[f"generation_{statistic_name}"].to_numpy()),plot_title=title+"_w_true",save_name=title+"_w_true"+"_log",log_scale=True,show_plot=False)
 
     metrics["w_true_AUC"], metrics["w_true_TPR@FPR"], metrics["w_true_AUC_SE"], metrics["w_true_TPR@FPR_SE"] = plot_ROC_single(torch.from_numpy(flattened_df_w_true["exact_match"].to_numpy()), torch.from_numpy(flattened_df_w_true[f"generation_{statistic_name}"].to_numpy()),plot_title=title+"_w_true",save_name=title+"_w_true",log_scale=False,show_plot=False)
     plot_ROC_single(torch.from_numpy(flattened_df_w_true["exact_match"].to_numpy()), torch.from_numpy(flattened_df_w_true[f"generation_{statistic_name}"].to_numpy()),plot_title=title+"_w_true",save_name=title+"_w_true"+"_log",log_scale=True,show_plot=False)
-    plot_ROC_single_plotly(torch.from_numpy(flattened_df_w_true["exact_match"].to_numpy()), torch.from_numpy(flattened_df_w_true[f"generation_{statistic_name}"].to_numpy()),plot_title=title+"_w_true",save_name=title+"_w_true",log_scale=False,show_plot=False)
-    plot_ROC_single_plotly(torch.from_numpy(flattened_df_w_true["exact_match"].to_numpy()), torch.from_numpy(flattened_df_w_true[f"generation_{statistic_name}"].to_numpy()),plot_title=title+"_w_true",save_name=title+"_w_true"+"_log",log_scale=True,show_plot=False)
+    # plot_ROC_single_plotly(torch.from_numpy(flattened_df_w_true["exact_match"].to_numpy()), torch.from_numpy(flattened_df_w_true[f"generation_{statistic_name}"].to_numpy()),plot_title=title+"_w_true",save_name=title+"_w_true",log_scale=False,show_plot=False)
+    # plot_ROC_single_plotly(torch.from_numpy(flattened_df_w_true["exact_match"].to_numpy()), torch.from_numpy(flattened_df_w_true[f"generation_{statistic_name}"].to_numpy()),plot_title=title+"_w_true",save_name=title+"_w_true"+"_log",log_scale=True,show_plot=False)
 
     ## Metrics json
     with open(f"{title}_metrics.json","w") as f:

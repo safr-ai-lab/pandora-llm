@@ -107,7 +107,7 @@ class GradNorm(MIA):
                 val_statistics.append(val_stats)
                 labels.append(grad_type)
         plot_ROC_multiple(train_statistics, val_statistics, title, labels, log_scale=log_scale, show_plot=show_plot, save_name=save_name)
-        plot_ROC_multiple_plotly(train_statistics, val_statistics, title, labels, log_scale=log_scale, show_plot=show_plot, save_name=save_name)
+        # plot_ROC_multiple_plotly(train_statistics, val_statistics, title, labels, log_scale=log_scale, show_plot=show_plot, save_name=save_name)
 
     def attack_plot_histogram(self, train_gradients, val_gradients, title, normalize=False, show_plot=False, save_name=None):
         """
@@ -134,7 +134,7 @@ class GradNorm(MIA):
             train_statistics = train_gradients[grad_type]
             val_statistics = val_gradients[grad_type]
             plot_histogram(train_statistics, val_statistics, title+f"_{grad_type}", normalize=normalize, show_plot=show_plot, save_name=save_name+f"_{grad_type}")
-            plot_histogram_plotly(train_statistics, val_statistics, title+f"_{grad_type}", normalize=normalize, show_plot=show_plot, save_name=save_name+f"_{grad_type}")
+            # plot_histogram_plotly(train_statistics, val_statistics, title+f"_{grad_type}", normalize=normalize, show_plot=show_plot, save_name=save_name+f"_{grad_type}")
 
 ####################################################################################################
 # HELPER FUNCTIONS

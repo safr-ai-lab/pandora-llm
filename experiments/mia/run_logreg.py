@@ -112,8 +112,8 @@ def main():
     # Load data
     train_features = load_dict_data(args.mia_train_features)
     val_features = load_dict_data(args.mia_val_features)
-    train_features = {feature:value[:args.clf_num_samples] for feature,value in train_features.items()}
-    val_features = {feature:value[:args.clf_num_samples] for feature,value in val_features.items()}
+    train_features = {feature:value[:args.mia_num_samples] for feature,value in train_features.items()}
+    val_features = {feature:value[:args.mia_num_samples] for feature,value in val_features.items()}
     # Preprocess data
     train_features = LogReger.preprocess_features(train_features,fit_scaler=False)
     val_features = LogReger.preprocess_features(val_features,fit_scaler=False)
