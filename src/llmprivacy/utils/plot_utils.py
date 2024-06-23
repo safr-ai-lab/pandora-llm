@@ -880,7 +880,7 @@ def plot_probabilities_plotly(probabilities, plot_title, keep_first=None, log_sc
 # ERROR-RECALL
 ####################################################################################################
 def unique(x, dim=0, sort_index=False):
-    # torch analog of np.unique from https://github.com/pytorch/pytorch/issues/16330
+    """torch analog of np.unique from https://github.com/pytorch/pytorch/issues/16330"""
     unique, inverse, counts = torch.unique(x, dim=dim, sorted=True, return_inverse=True, return_counts=True)
     inv_sorted = inverse.argsort(stable=True)
     tot_counts = torch.cat((counts.new_zeros(1), counts.cumsum(dim=0)))[:-1]

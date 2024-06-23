@@ -43,8 +43,7 @@ class ALoRa(MIA):
             model_half (Optional[bool]): whether to use model_half
             accelerator (Optional[Accelerator]): accelerator object
         Returns:
-            torch.Tensor: loss after the gradient descent step
-            torch.Tensor: loss before the gradient descent step
+            tuple[torch.Tensor,torch.Tensor]: loss after the gradient descent step and loss before the gradient descent step
         """
         if self.model is None:
             raise Exception("Please call .load_model() to load the model first.")

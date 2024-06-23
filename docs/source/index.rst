@@ -8,7 +8,7 @@ Overview
 ``Pandora`` is a red-teaming library against Large Language Models (LLMs) that assesses their vulnerability to train data leakage.
 It provides a unified `PyTorch <https://pytorch.org/>`_ API for evaluating **membership inference attacks (MIAs)** and **training data extraction**.
 
-You can read our `paper <https://arxiv.org/abs/2402.17012>`_ and `website <https://jeffreygwang.quarto.pub/pandora/>`_ for a technical introduction to the subject.
+You can read our `paper <https://arxiv.org/abs/2402.17012>`_ and `website <https://safr-ai.quarto.pub/pandora/>`_ for a technical introduction to the subject.
 
 ``Pandora`` abides by the following core principles:
 
@@ -61,4 +61,4 @@ We welcome contributions! Please submit pull requests in our `GitHub <https://gi
    self
    tutorial/index
    howto/index
-   Background Blog <https://jeffreygwang.quarto.pub/pandora/blog.html>
+   Background Blog <https://safr-ai.quarto.pub/pandora/blog.html>

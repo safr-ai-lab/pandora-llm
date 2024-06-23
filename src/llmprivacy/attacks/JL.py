@@ -251,6 +251,7 @@ def compute_input_ids_grad_jl_balanced(model, embedding_layer, input_ids, projec
 def compute_dataloader_jl_balanced(model, embedding_layer, dataloader, projector, indices, device=None, nbatches=None, half=True):
     '''
     Computes dataloader gradients with jl dimensionality reduction.
+
     Args:
         model (transformers.AutoModelForCausalLM): HuggingFace model.
         embedding_layer (torch.nn.parameter.Parameter): computes embeddings from tokens, useful for taking grad wrt x
@@ -297,6 +298,7 @@ def compute_dataloader_jl_balanced(model, embedding_layer, dataloader, projector
 def compute_input_ids_grad_jl(model, embedding_layer, input_ids,  projector, device=None):
     """
     Compute JL of gradients with respect x and/or theta
+
     Args:
         model (transformers.AutoModelForCausalLM): HuggingFace model.
         embedding_layer (torch.nn.parameter.Parameter): computes embeddings from tokens, useful for taking grad wrt x
@@ -336,6 +338,7 @@ def compute_input_ids_grad_jl(model, embedding_layer, input_ids,  projector, dev
 def compute_dataloader_jl(model, embedding_layer, dataloader, projector, device=None, nbatches=None, half=True):
     '''
     Computes dataloader gradients with jl dimensionality reduction.
+    
     Args:
         model (transformers.AutoModelForCausalLM): HuggingFace model.
         embedding_layer (torch.nn.parameter.Parameter): computes embeddings from tokens, useful for taking grad wrt x

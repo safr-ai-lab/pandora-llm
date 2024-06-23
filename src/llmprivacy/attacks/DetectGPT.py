@@ -47,7 +47,7 @@ class DetectGPT(MIA):
             device (Optional[str]): e.g. "cuda"
             model_half (Optional[bool]): whether to use model_half
             accelerator (Optional[Accelerator]): accelerator object
-            detect_args (dict): detectgpt args
+            detect_args (Optional[dict]): detectgpt args
         Returns:
             torch.Tensor or list: loss of input IDs
         """
@@ -64,6 +64,7 @@ class DetectGPT(MIA):
 def compute_input_ids_cross_entropy_batch(model, input_ids, return_pt=True):
     """
     Compute the cross entropy over an entire batch of inputs
+
     Args:
         model (transformers.AutoModelForCausalLM): HuggingFace model.
         input_ids (torch.Tensor): tensor of input IDs.
@@ -112,7 +113,9 @@ def compute_input_ids_cross_entropy_batch(model, input_ids, return_pt=True):
 def compute_dataloader_cross_entropy_batch(model, dataloader, device=None, num_batches=None, samplelength=None, accelerator=None, model_half=True, detect_args=None):    
     '''
     Computes dataloader cross entropy of different models for DetectGPT-based attack. 
+
     Warning: using samplelength is discouraged
+    
     Args:
         model (transformers.AutoModelForCausalLM): HuggingFace model.
         dataloader (torch.utils.data.dataloader.DataLoader): DataLoader with tokens.
@@ -336,12 +339,9 @@ def get_batch_outputs(flattened_texts, mask_tokenizer, mask_model, args, num_tex
 
 def replace_masks_extract_fills(texts, mask_tokenizer, mask_model, args, printflag=False):
     """
-    This function does ???
-
     texts: doubly nested list of texts that are chunked and masked (list of texts which are list of masked str)
     mask_tokenizer: tokenizer of model that will fill in mask (e.g., T5-small)
     mask_model: model that will fill in mask (e.g., T5-small)
-    args: 
 
     return: triply nested list of [list of texts which are lists of chunks which are lists of texts in between mask tokens]
     """
@@ -374,12 +374,8 @@ def replace_masks_extract_fills(texts, mask_tokenizer, mask_model, args, printfl
 
 def apply_extracted_fills(masked_texts, extracted_fills, printflag=False):
     """
-    This function does ???
-
     masked_texts: doubly nested list of texts that are chunked and masked (list of texts which are list of masked str)
     extracted_fills: triply nested list of [list of texts which are lists of chunks which are lists of texts in between mask tokens]
-
-    return:
     """
     # split masked text into tokens, only splitting on spaces (not newlines)
     texts = []

@@ -5,9 +5,12 @@ from ..utils.plot_utils import plot_ROC, plot_ROC_plotly, plot_histogram, plot_h
 # MAIN CLASS
 ####################################################################################################
 class MIA:
+    """
+    Base class for all membership inference attacks. 
+    """
     def __init__(self, model_name, model_revision=None, model_cache_dir=None):
         """
-        Base class for all membership inference attacks. Contains a "base" model image. 
+        Initialize with an attack for a particular model. 
 
         Args:
             model_name (str): path to the model to be attacked
@@ -21,6 +24,9 @@ class MIA:
     def get_model(self):
         """
         Returns the model that this MIA uses.
+
+        Returns:
+            AutoModelForCausalLM
         """
         return AutoModelForCausalLM.from_pretrained(self.model_name, revision=self.model_revision, cache_dir=self.model_cache_dir)
     
@@ -33,7 +39,7 @@ class MIA:
         """
         raise NotImplementedError()
 
-    def attack_plot_ROC(self, train_statistics, val_statistics, title, log_scale=False, show_plot=False, save_name=None):
+    def attack_plot_ROC(self, train_statistics, val_statistics, title, log_scale=False, show_plot=True, save_name=None):
         """
         Generates and displays or saves a plot of the ROC curve for the membership inference attack.
 
@@ -58,7 +64,7 @@ class MIA:
         plot_ROC(train_statistics, val_statistics, title, log_scale=log_scale, show_plot=show_plot, save_name=save_name)
         plot_ROC_plotly(train_statistics, val_statistics, title, log_scale=log_scale, show_plot=show_plot, save_name=save_name)
     
-    def attack_plot_histogram(self, train_statistics, val_statistics, title, normalize=False, show_plot=False, save_name=None):
+    def attack_plot_histogram(self, train_statistics, val_statistics, title, normalize=False, show_plot=True, save_name=None):
         """
         Generates and displays or saves a histogram of the statistics.
 

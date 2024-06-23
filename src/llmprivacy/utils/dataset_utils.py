@@ -174,38 +174,3 @@ def process_domain_specific_data(dataset, seed=229, num_splits=1,window=100):
     splits = [dataset[i * len(dataset)//num_splits : (i+1) * len(dataset) // num_splits] for i in range(num_splits)]
 
     return splits
-
-# TODO fix up
-def load_val_pile_for_ft(number=1000, percentage=None, start_index=0, seed=229, window=2048, compensation_factor=2.):
-    train_data, val_data = load_val_pile(number=number, percentage=percentage, start_index=start_index, seed=seed, num_splits=2, window=window, compensation_factor=compensation_factor)
-    # Filter to 1000-2000 characters
-    train_data = [x[:2000] for x in train_data if len(x)>=1000]
-    val_data = [x[:2000] for x in val_data if len(x)>=1000]
-    # Tokenize
-    tokenized = []
-    minlentokens = 100000
-
-    for a in train_arr:
-        rep = tokenizer(a)
-        tokenized.append(rep)
-        if len(rep['input_ids']) < minlentokens:
-            print(f"New Min: {len(rep['input_ids'])}") # ensure all > 100 tokens so splittable
-            minlentokens = min(minlentokens, len(rep['input_ids']))
-
-    print("This means that there are 100+ tokens in all of the strings!")
-
-    # Prefixes/Suffixes
-    prefixes = []
-    suffixes = []
-    for token_rep in tokenized:
-        first_50 = token_rep['input_ids'][:50]
-        next_50 = token_rep['input_ids'][50:100]
-        prefixes.append(first_50)
-        suffixes.append(next_50)
-
-    pre_var = np.array(prefixes).astype(np.int64)
-    suf_var = np.array(suffixes).astype(np.int64)
-
-    np.save("final_data/pile_val_ft/prefixes_pileval_train.npy", pre_var)
-    np.save("final_data/pile_val_ft/suffixes_pileval_train.npy", suf_var)
-

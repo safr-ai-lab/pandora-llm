@@ -7,7 +7,6 @@ from transformers import AutoModelForCausalLM
 from torch.utils.data import DataLoader
 from transformers.generation.utils import GenerationMixin, GenerationConfig
 from transformers.generation.logits_process import LogitsProcessorList
-device = "cuda" if torch.cuda.is_available() else "cpu"
 
 def generate_suffixes(
     model: AutoModelForCausalLM,
@@ -95,6 +94,7 @@ def compute_dataloader_suffix_probability(
     prefix_length: int,
     generation_config: GenerationConfig,
 ) -> np.ndarray:
+    device = next(model.parameters()).device
     probabilities = []
     for batch in tqdm(dataloader):
         with torch.no_grad():
