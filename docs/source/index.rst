@@ -26,7 +26,7 @@ From source:
 
 .. code-block:: bash
 
-   git clone https://github.com/safr-ai-lab/llm-mi.git
+   git clone https://github.com/safr-ai-lab/pandora-llm.git
    pip install -e .
 
 From pip:
@@ -51,7 +51,7 @@ You can reproduce the experiments described in our `paper <https://arxiv.org/abs
 
 Contributing
 ------------
-We welcome contributions! Please submit pull requests in our `GitHub <https://github.com/safr-ai-lab/llm-mi>`_.
+We welcome contributions! Please submit pull requests in our `GitHub <https://github.com/safr-ai-lab/pandora-llm>`_.
 
 .. toctree::
    :maxdepth: 2

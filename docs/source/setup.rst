@@ -7,7 +7,7 @@ We recommend installing from source so that you have access to the :ref:`starter
 
 .. code-block:: bash
 
-   git clone https://github.com/safr-ai-lab/llm-mi.git
+   git clone https://github.com/safr-ai-lab/pandora-llm.git
    pip install -e .
 
 However, if you just need the functions, we also provide a pip package that hosts our main module ``pandora-llm``.
