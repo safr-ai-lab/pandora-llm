@@ -13,7 +13,6 @@ class MoPe(MIA):
     """
     def __init__(self,*args,**kwargs):
         super().__init__(*args, **kwargs)
-        self.model = None
         self.new_model_paths = []
         
     def load_model(self,model_index):

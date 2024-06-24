@@ -2,7 +2,7 @@ Finetuned MIA
 =============
 The finetuned MIA setting is almost exactly the same as the pretrained setting, but we may have access to the base model.
 
-As found in :ref:`our paper <https://arxiv.org/abs/2402.17012>`, a simple unsupervised loss ratio works extraordinarily well, but supervised classifiers can also be easily applied without modifications.
+As found in `our paper <https://arxiv.org/abs/2402.17012>`_, a simple unsupervised loss ratio works extraordinarily well, but supervised classifiers can also be easily applied without modifications.
 
 We can see some of these simple attacks in ``scripts/finetune_mia.sh``:
 

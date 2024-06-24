@@ -19,22 +19,6 @@ class DetectGPT(MIA):
     """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.model = None
-
-    def load_model(self):
-        """
-        Loads model into memory
-        """
-        if self.model is None:
-            self.model = AutoModelForCausalLM.from_pretrained(self.model_name, revision=self.model_revision, cache_dir=self.model_cache_dir)
-        else:
-            raise Exception("Model has already been loaded; please call .unload_model() first!")
-
-    def unload_model(self):
-        """
-        Unloads model from memory
-        """
-        self.model = None
 
     def compute_statistic(self, dataloader, num_batches=None, device=None, model_half=None, accelerator=None, detect_args=None):
         """
@@ -296,7 +280,7 @@ def mask_text(text, args, ceil_pct=False):
 
 def count_masks(texts):
     """
-    Returns a list with the lengths of all <extra_id_ tokens
+    Returns a list with the lengths of all extra_id tokens
     """
     return [len([x for x in text.split() if x.startswith("<extra_id_")])-1 for text in texts]
 

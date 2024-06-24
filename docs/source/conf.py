@@ -6,9 +6,9 @@
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
-project = "llmprivacy"
-author = "Jason Wang, Jeffrey Wang, Marvin Li, Seth Neel"
-copyright = f"2024 {author}"
+project = "pandora_llm"
+author = "Jeffrey Wang, Jason Wang, Marvin Li, Seth Neel"
+copyright = f"2024 {author}. Docs written by Jason Wang."
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
@@ -18,7 +18,7 @@ extensions = [
     "sphinx.ext.intersphinx",
     "sphinx.ext.autodoc",
     "sphinx.ext.napoleon",
-    "sphinx.ext.autosectionlabel",
+    # "sphinx.ext.autosectionlabel",
     "sphinx.ext.todo",
     "sphinx.ext.viewcode",
     "sphinx_autodoc_typehints",
@@ -46,6 +46,9 @@ autoapi_options = [
     'undoc-members',
     'private-members',
     'show-inheritance',
+    # 'show-module-summary',
+    # 'special-members',
+    # 'imported-members',
 ]
 
 autoapi_ignore = ["*/routines/*.py"]

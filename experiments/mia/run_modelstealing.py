@@ -8,9 +8,9 @@ from torch.utils.data import DataLoader
 from transformers import AutoTokenizer, AutoConfig
 from accelerate import Accelerator
 from accelerate.utils import set_seed
-from llmprivacy.utils.dataset_utils import collate_fn, load_train_pile_random, load_val_pile
-from llmprivacy.utils.log_utils import get_my_logger
-from llmprivacy.attacks.ModelStealing import ModelStealing
+from pandora_llm.utils.dataset_utils import collate_fn, load_train_pile_random, load_val_pile
+from pandora_llm.utils.log_utils import get_my_logger
+from pandora_llm.attacks.ModelStealing import ModelStealing
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 """

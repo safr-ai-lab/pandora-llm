@@ -8,10 +8,10 @@ from torch.utils.data import DataLoader
 from transformers import AutoTokenizer, AutoConfig
 from accelerate import Accelerator
 from accelerate.utils import set_seed
-from llmprivacy.utils.dataset_utils import collate_fn
-from llmprivacy.utils.log_utils import get_my_logger
-from llmprivacy.attacks.GradNorm import GradNorm
-from llmprivacy.utils.extraction_utils import compute_extraction_metrics
+from pandora_llm.utils.dataset_utils import collate_fn
+from pandora_llm.utils.log_utils import get_my_logger
+from pandora_llm.attacks.GradNorm import GradNorm
+from pandora_llm.utils.extraction_utils import compute_extraction_metrics
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 """

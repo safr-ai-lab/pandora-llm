@@ -15,21 +15,6 @@ class LOSS(MIA):
         super().__init__(*args, **kwargs)
         self.model = None
 
-    def load_model(self):
-        """
-        Loads model into memory
-        """
-        if self.model is None:
-            self.model = AutoModelForCausalLM.from_pretrained(self.model_name, revision=self.model_revision, cache_dir=self.model_cache_dir)
-        else:
-            raise Exception("Model has already been loaded; please call .unload_model() first!")
-
-    def unload_model(self):
-        """
-        Unloads model from memory
-        """
-        self.model = None
-
     def compute_statistic(self, dataloader, num_batches=None, device=None, model_half=None, accelerator=None):
         """
         Compute the LOSS statistic for a given dataloader.

@@ -1,4 +1,4 @@
-from llmprivacy.utils.generation_utils import generate_suffixes, compute_actual_prob
+from pandora_llm.utils.generation_utils import generate_suffixes, compute_actual_prob
 import argparse
 from transformers.generation.utils import GenerationMixin, GenerationConfig
 from transformers import AutoModelForCausalLM, AutoTokenizer, AutoConfig, TrainingArguments, Trainer

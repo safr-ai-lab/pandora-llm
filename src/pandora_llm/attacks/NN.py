@@ -64,7 +64,7 @@ class NN(MIA):
         else:
             return processed_features
 
-    def train_clf(self, train_features, train_labels, test_features, test_labels, clf_size, epochs, batch_size, patience, min_delta=0., device="cuda" if torch.cuda.is_available() else "cpu"):
+    def train_clf(self, train_features, train_labels, test_features, test_labels, clf_size, epochs, batch_size, patience, min_delta=0., device=None):
         """
         Take train and validation data and train neural network as MIA.
 
@@ -82,6 +82,8 @@ class NN(MIA):
         Returns:
             tuple[torch.Tensor]: train predictions 
         """
+        if device is None:
+            device = "cuda" if torch.cuda.is_available() else "cpu"
 
         self.clf = NeuralNetwork(train_features.shape[1], clf_size).to(device)
 
@@ -158,7 +160,7 @@ class NN(MIA):
 
         return -torch.cat(all_probs), torch.cat(all_labels), -torch.cat(all_probs_val), torch.cat(all_labels_val)
 
-    def compute_statistic(self, dataset, batch_size, num_samples=None, device="cuda" if torch.cuda.is_available() else "cpu"):
+    def compute_statistic(self, dataset, batch_size, num_samples=None, device=None):
         """
         Compute the neural network statistic for a given dataloader.
 
@@ -171,6 +173,9 @@ class NN(MIA):
         Returns:
             torch.Tensor or list: loss of input IDs
         """
+        if device is None:
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+
         if self.clf is None:
             raise Exception("Please call .train_model() to train the classifier first.")
         

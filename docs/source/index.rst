@@ -5,18 +5,18 @@ Pandora's White-Box
 
 Overview
 --------
-``Pandora`` is a red-teaming library against Large Language Models (LLMs) that assesses their vulnerability to train data leakage.
+``pandora_llm`` is a red-teaming library against Large Language Models (LLMs) that assesses their vulnerability to train data leakage.
 It provides a unified `PyTorch <https://pytorch.org/>`_ API for evaluating **membership inference attacks (MIAs)** and **training data extraction**.
 
 You can read our `paper <https://arxiv.org/abs/2402.17012>`_ and `website <https://safr-ai.quarto.pub/pandora/>`_ for a technical introduction to the subject.
 
-``Pandora`` abides by the following core principles:
+``pandora_llm`` abides by the following core principles:
 
 - **Open Access** — Ensuring that these tools are open-source for all.
-- **Reproducibile** — Committing to providing all necessary code details to ensure replicability.
+- **Reproducible** — Committing to providing all necessary code details to ensure replicability.
 - **Self-Contained** — Designing attacks that are self-contained, making it transparent to understand the workings of the method without having to peer through the entire codebase or unnecessary levels of abstraction, and making it easy to contribute new code.
 - **Model-Agnostic** — Supporting any `HuggingFace <https://huggingface.co/>`_ model and dataset, making it easy to apply to any situation.
-- **Usability** — Prioritizing easy-to-use starter scripts and comprehensive documentation so anyone can effectively use ``Pandora`` regardless of prior background.
+- **Usability** — Prioritizing easy-to-use starter scripts and comprehensive documentation so anyone can effectively use ``pandora_llm`` regardless of prior background.
 
 We hope that our package serves to guide LLM providers to safety-check their models before release, and to empower the public to hold them accountable to their use of data.
 
@@ -53,12 +53,12 @@ Contributing
 ------------
 We welcome contributions! Please submit pull requests in our `GitHub <https://github.com/safr-ai-lab/llm-mi>`_.
 
-
 .. toctree::
    :maxdepth: 2
    :hidden:
 
    self
-   tutorial/index
-   howto/index
+   setup
+   extend/index
+   starter/index
    Background Blog <https://safr-ai.quarto.pub/pandora/blog.html>

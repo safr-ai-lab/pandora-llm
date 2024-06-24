@@ -5,7 +5,7 @@ import argparse
 from accelerate import Accelerator
 from accelerate.utils import set_seed
 import torch
-from llmprivacy.utils.dataset_utils import collate_fn
+from pandora_llm.utils.dataset_utils import collate_fn
 
 """
 Script to fine-tune a model on certain # of points, for certain # of epochs. 
