@@ -24,7 +24,7 @@ We hope that our package serves to guide LLM providers to safety-check their mod
 From source:
 
 ```bash
-git clone https://github.com/safr-ai-lab/llm-mi.git
+git clone https://github.com/safr-ai-lab/pandora-llm.git
 pip install -e .
 ```
 
@@ -47,7 +47,7 @@ bash scripts/pretrain_mia_baselines.sh
 ```
 
 ## Contributing
-We welcome contributions! Please submit pull requests in our [GitHub](https://github.com/safr-ai-lab/llm-mi).
+We welcome contributions! Please submit pull requests in our [GitHub](https://github.com/safr-ai-lab/pandora-llm).
 
 
 ## Licenses and Citations
