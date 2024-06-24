@@ -11,7 +11,7 @@ from itertools import groupby
 import os
 import numpy as np
 from transformers.generation.utils import GenerationMixin, GenerationConfig
-from llmprivacy.utils.generation_utils import *
+from pandora_llm.utils.generation_utils import *
 
 """
 Create data for non-supervised extraction attacks.

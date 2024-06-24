@@ -1,8 +1,8 @@
 from math import prod
 from sklearn import random_projection
 from joblib import dump, load
-from llmprivacy.utils.attack_utils import *
-from llmprivacy.utils.dataset_utils import *
+from pandora_llm.utils.attack_utils import *
+from pandora_llm.utils.dataset_utils import *
 from transformers import AutoTokenizer, AutoConfig, AutoModelForCausalLM
 from torch.utils.data import DataLoader
 import torch

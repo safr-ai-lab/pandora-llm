@@ -4,9 +4,9 @@ import json
 import argparse
 import torch
 from accelerate.utils import set_seed
-from llmprivacy.utils.dataset_utils import load_dict_data
-from llmprivacy.utils.log_utils import get_my_logger
-from llmprivacy.attacks.LogReg import LogReg
+from pandora_llm.utils.dataset_utils import load_dict_data
+from pandora_llm.utils.log_utils import get_my_logger
+from pandora_llm.attacks.LogReg import LogReg
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 """

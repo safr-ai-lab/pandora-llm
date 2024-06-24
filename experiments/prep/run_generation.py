@@ -31,10 +31,10 @@ bsub -q gpu -gpu "num=1:aff=yes:mode=exclusive_process:mps=no" -W 14:00 -M 55000
 bsub -q gpu -gpu "num=2:aff=yes:mode=exclusive_process:mps=no" -W 14:00 -M 55000 -hl accelerate launch run_generation.py --prefixes prefixes_pileval_train.npy --suffixes suffixes_pileval_train.npy --mod_size 2.8b --checkpoint step98000 --deduped --n_samples 25 --suffix_length 50 --bs 1 --attack LoRa --train_pt pileval_train_1000_dl.pt --val_pt pileval_val_1000_dl.pt --n_iterations 10 --top_k 24 --top_p 0.8 --typical_p 0.9 --temperature 0.58 --repetition_penalty 1.04 --n_train_epochs 3 --ft_bs 1 --accelerate 
 
 Using existing model (--load_model + --do_gen) and running only generations, No DS, Batch
-bsub -q gpu -gpu "num=1:aff=yes:mode=exclusive_process:mps=no" -W 14:00 -M 30000 -hl python run_generation.py --prefixes prefixes_pileval_train.npy --suffixes suffixes_pileval_train.npy --mod_size 1b --checkpoint step98000 --deduped --n_samples 100 --suffix_length 50 --bs 1 --attack LoRa --train_pt pileval_train_1000_dl.pt --val_pt pileval_val_1000_dl.pt --n_iterations 100 --top_k 24 --top_p 0.8 --typical_p 0.9 --temperature 0.9 --repetition_penalty 1.04 --ft_bs 1 --load_model /export/projects4/sneel_llmprivacyteam/1b_pileval_500_samp_25/FineTune/pythia-1b-deduped-ft/checkpoint-2000 --do_gen 
+bsub -q gpu -gpu "num=1:aff=yes:mode=exclusive_process:mps=no" -W 14:00 -M 30000 -hl python run_generation.py --prefixes prefixes_pileval_train.npy --suffixes suffixes_pileval_train.npy --mod_size 1b --checkpoint step98000 --deduped --n_samples 100 --suffix_length 50 --bs 1 --attack LoRa --train_pt pileval_train_1000_dl.pt --val_pt pileval_val_1000_dl.pt --n_iterations 100 --top_k 24 --top_p 0.8 --typical_p 0.9 --temperature 0.9 --repetition_penalty 1.04 --ft_bs 1 --load_model /export/projects4/sneel_pandora_llmteam/1b_pileval_500_samp_25/FineTune/pythia-1b-deduped-ft/checkpoint-2000 --do_gen 
 
 Using existing model + training another epoch + running results, No DS, Batch
-bsub -q gpu -gpu "num=1:aff=yes:mode=exclusive_process:mps=no" -R "rusage[mem=30000]" -W 24:00 -M 30000 -hl python run_generation.py --prefixes prefixes_pm_train_last_500.npy --suffixes suffixes_pm_train_last_500.npy --mod_size 1b --checkpoint step98000 --deduped --n_samples 25 --suffix_length 50 --bs 1 --attack LoRa --n_iterations 500 --top_k 24 --top_p 0.8 --typical_p 0.9 --temperature 0.58 --repetition_penalty 1.04 --n_train_epochs 1 --ft_bs 1 --load_model /export/projects4/sneel_llmprivacyteam/1b_Generation_Testing/FineTune/pythia-1b-deduped-ft/checkpoint-1000 --train_pt pubmed_train_1000_dl.pt --val_pt pubmed_val_1000_dl.pt
+bsub -q gpu -gpu "num=1:aff=yes:mode=exclusive_process:mps=no" -R "rusage[mem=30000]" -W 24:00 -M 30000 -hl python run_generation.py --prefixes prefixes_pm_train_last_500.npy --suffixes suffixes_pm_train_last_500.npy --mod_size 1b --checkpoint step98000 --deduped --n_samples 25 --suffix_length 50 --bs 1 --attack LoRa --n_iterations 500 --top_k 24 --top_p 0.8 --typical_p 0.9 --temperature 0.58 --repetition_penalty 1.04 --n_train_epochs 1 --ft_bs 1 --load_model /export/projects4/sneel_pandora_llmteam/1b_Generation_Testing/FineTune/pythia-1b-deduped-ft/checkpoint-1000 --train_pt pubmed_train_1000_dl.pt --val_pt pubmed_val_1000_dl.pt
 
 
 Sample command line prompts:
@@ -86,7 +86,7 @@ python run_generation.py \
 --mod_size 1b --checkpoint step98000 --deduped \
 --n_samples 100 --suffix_length 50 --bs 1 --attack LoRa \
 --n_iterations 3 --p_threshold 0.05 --top_k 24 --top_p 0.8 --typical_p 0.9 --temperature 0.58 --repetition_penalty 1.04 \
---compute_actual_prob --do_generation --load_model /export/projects4/sneel_llmprivacyteam/OldExtractionCode/1b_4by4_experiments/pileval_1000_4/FineTune/pythia-1b-deduped-ft/checkpoint-4000/ \
+--compute_actual_prob --do_generation --load_model /export/projects4/sneel_pandora_llmteam/OldExtractionCode/1b_4by4_experiments/pileval_1000_4/FineTune/pythia-1b-deduped-ft/checkpoint-4000/ \
 --accelerate
 """
 

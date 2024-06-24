@@ -11,7 +11,7 @@
 │   ├── finetune_extraction.sh
 │   ├── ...
 │   └── pretrain_mia_modelstealing.sh
-├── src/llmprivacy/
+├── src/pandora_llm/
 │   ├── attacks/
 │   ├── routines/
 │   └── utils/

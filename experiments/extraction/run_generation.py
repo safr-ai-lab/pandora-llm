@@ -9,10 +9,10 @@ from transformers import AutoModelForCausalLM, AutoTokenizer, AutoConfig
 from transformers.generation.utils import GenerationConfig
 from accelerate import Accelerator
 from accelerate.utils import set_seed
-from llmprivacy.utils.dataset_utils import collate_fn, load_val_pile, load_train_pile_random
-from llmprivacy.utils.generation_utils import generate_suffixes, compute_dataloader_suffix_probability
-from llmprivacy.utils.plot_utils import plot_probabilities, plot_probabilities_plotly
-from llmprivacy.utils.log_utils import get_my_logger
+from pandora_llm.utils.dataset_utils import collate_fn, load_val_pile, load_train_pile_random
+from pandora_llm.utils.generation_utils import generate_suffixes, compute_dataloader_suffix_probability
+from pandora_llm.utils.plot_utils import plot_probabilities, plot_probabilities_plotly
+from pandora_llm.utils.log_utils import get_my_logger
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 """

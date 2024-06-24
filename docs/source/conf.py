@@ -6,7 +6,7 @@
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
-project = "llmprivacy"
+project = "pandora_llm"
 author = "Jeffrey Wang, Jason Wang Marvin Li, Seth Neel"
 copyright = f"2024 {author}. Docs written by Jason Wang."
 
