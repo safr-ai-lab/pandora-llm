@@ -280,7 +280,7 @@ def mask_text(text, args, ceil_pct=False):
 
 def count_masks(texts):
     """
-    Returns a list with the lengths of all <extra_id_ tokens
+    Returns a list with the lengths of all extra_id tokens
     """
     return [len([x for x in text.split() if x.startswith("<extra_id_")])-1 for text in texts]
 

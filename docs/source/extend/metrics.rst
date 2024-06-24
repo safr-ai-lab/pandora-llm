@@ -3,7 +3,7 @@ Metrics
 
 You may also wish to include a new metric or evlauation plot that allows you to measure different dimensions of privacy leakage.
 
-1. Add the function to compute the metric in ``pandora_llm.utils.plot_utils``
+**1. Add the function to compute the metric in pandora_llm.utils.plot_utils**
 
 .. code:: python
     
@@ -13,7 +13,8 @@ You may also wish to include a new metric or evlauation plot that allows you to 
         
         return metric
 
-2. It is good practice to include the option of computing the 95% confidence interval.
+**2. It is good practice to include the option of computing the 95% confidence interval.**
+
 This is a template that will enable you to compute the bootstrapped confidence interval for potentially multiple statistics at the same time.
 
 .. code:: python
@@ -37,7 +38,7 @@ This is a template that will enable you to compute the bootstrapped confidence i
 
         return metric, metric_se
 
-3. Plotting can be done with the plotting library of your choice. Here is an example in ``matplotlib`` for ROC.
+**3. Plotting can be done with the plotting library of your choice. Here is an example in ``matplotlib`` for ROC.**
 
 .. code:: python
     
@@ -68,7 +69,7 @@ This is a template that will enable you to compute the bootstrapped confidence i
     
         ...
 
-4. Recommended: add a route to call the plotting utility through the ``MIA`` base class.
+**4. Recommended: add a route to call the plotting utility through the ``MIA`` base class.**
 
 See for instance, the ROC curve function (shown below).
 

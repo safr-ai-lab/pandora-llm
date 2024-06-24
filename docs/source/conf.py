@@ -18,7 +18,7 @@ extensions = [
     "sphinx.ext.intersphinx",
     "sphinx.ext.autodoc",
     "sphinx.ext.napoleon",
-    "sphinx.ext.autosectionlabel",
+    # "sphinx.ext.autosectionlabel",
     "sphinx.ext.todo",
     "sphinx.ext.viewcode",
     "sphinx_autodoc_typehints",
@@ -43,10 +43,12 @@ autodoc_typehints = "description"
 
 autoapi_options = [
     'members',
-    'inherited-members',
     'undoc-members',
     'private-members',
     'show-inheritance',
+    # 'show-module-summary',
+    # 'special-members',
+    # 'imported-members',
 ]
 
 autoapi_ignore = ["*/routines/*.py"]

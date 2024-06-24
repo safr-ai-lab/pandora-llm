@@ -15,18 +15,9 @@ Here is an example, where ``args.model_name`` would be the model name from the H
 
 .. code:: python
 
-    # Initialize attack
     LOSSer = LOSS(args.model_name, model_revision=args.model_revision, model_cache_dir=args.model_cache_dir)
-    
-    # Compute statistics
-    LOSSer.load_model()
-    train_statistics = LOSSer.compute_statistic(training_dataloader,num_batches=math.ceil(args.num_samples/args.bs),device=device,model_half=args.model_half,accelerator=accelerator)
-    torch.save(train_statistics,f"{args.experiment_name}_train.pt")
-    val_statistics = LOSSer.compute_statistic(validation_dataloader,num_batches=math.ceil(args.num_samples/args.bs),device=device,model_half=args.model_half,accelerator=accelerator)
-    torch.save(val_statistics,f"{args.experiment_name}_val.pt")
-    LOSSer.unload_model()
 
-Additionally, all of our :ref:`starter scripts <Starter Scripts>` take the ``--model_name`` flag (the above code snippet was taken from one of these starter scripts).
+Additionally, all of our :ref:`starter scripts <start_scripts>` take the ``--model_name`` flag (the above code snippet was taken from one of these starter scripts).
 
 Note that to rigorously test your LLM, you will need to add your own data source containing the training samples that your LLM was trained on.
 The next page guides you through how to do this.

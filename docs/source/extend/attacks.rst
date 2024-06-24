@@ -3,9 +3,8 @@ Attacks
 
 You may add a new attack in ``pandora_llm.attacks``, which should inherit from the base ``MIA`` class.
 Let us walkthrough ``LOSS`` as an example.
-Typically, we expect at minimum that the attack be a class containing the ``load_model``, ``unload_model``, and ``compute_statistic`` methods.
 
-**1. Create the following file initializing an attack class**
+**1. Create the following file initializing an attack class inheriting from MIA**
 
 .. code-block:: python
 
@@ -19,26 +18,36 @@ Typically, we expect at minimum that the attack be a class containing the ``load
        """
        def __init__(self, *args, **kwargs):
            super().__init__(*args, **kwargs)
-           self.model = None
 
-Most attacks will need to interact with an LLM.
-The base ``MIA`` class already has arguments for loading a model name.
-If you need to load multiple models, or have other arguments, you can reference ``src/pandora_llm/attacks/FLoRa.py`` whose constructor takes in two model names.
+What does the base ``MIA`` class give you?
 
-**2. Add the load_model and unload_model function**
+.. code:: python
 
-Since loading and storing an LLM is an expensive operation, we encourage attacks to be explicit about when a model is needed in memory or not.
-This is conveyed by calling ``load_model`` and ``unload_model`` where appropriate.
-Usually, you can write the two functions like this:
+    class MIA:
+        """
+        Base class for all membership inference attacks. 
 
-.. code-block:: python
+        Attributes:
+            model (AutoModelForCausalLM or None): the model to be attacked
+            model_name (str): path to the model to be attacked
+            model_revision (str, optional): revision of the model to be attacked
+            cache_dir (str, optional): directory to cache the model
 
-    # src/pandora_llm/attacks/LOSS.py
+        """
+        def __init__(self, model_name, model_revision=None, model_cache_dir=None):
+            """
+            Initialize with an attack for a particular model. 
 
-    class LOSS(MIA):
+            Args:
+                model_name (str): path to the model to be attacked
+                model_revision (Optional[str]): revision of the model to be attacked
+                cache_dir (Optional[str]): directory to cache the model
+            """
+            self.model           = None
+            self.model_name      = model_name
+            self.model_revision  = model_revision
+            self.model_cache_dir = model_cache_dir
         
-        ...
-
         def load_model(self):
             """
             Loads model into memory
@@ -54,7 +63,28 @@ Usually, you can write the two functions like this:
             """
             self.model = None
 
-**3. Write your own compute_statistic method.**
+        def compute_statistic(self, dataloader, num_batches=None, **kwargs):
+            """
+            This method should be implemented by subclasses to compute the attack statistic for the given dataloader.
+
+            Args:
+                dataloader (DataLoader): input data to compute statistic over
+                num_batches (Optional[int]): number of batches of the dataloader to compute over.
+                    If None, then comptues over whole dataloader
+            Returns:
+                torch.Tensor or list: attack statistics computed on the input dataloader
+            """
+            raise NotImplementedError()
+        
+        ...
+
+Most attacks will need to interact with an LLM.
+Since loading and storing an LLM is an expensive operation, we encourage attacks to be explicit about when a model is needed in memory or not.
+Thus, the base ``MIA`` constructor just takes in the model name, and contains ``load_model`` and ``unload_model`` functions to load/unload the model object from the model name.
+
+If you need to load multiple models, or have other arguments, you can reference ``src/pandora_llm/attacks/FLoRa.py`` whose constructor takes in two model names.
+
+**3. Write your own compute_statistic method**
 
 .. code-block:: python
 
@@ -92,3 +122,22 @@ You can import basic utilities such as computing loss from the ``LOSS`` class or
 
 .. note::
     Our library assumes that a lower statistic indicates greater confidence to be train data.
+
+**3. Using your new attack class**
+
+To use your new attack class, simply create an instance of the class with the model name, load the model into memory, compute the statistic, and unload the model when done. It's that easy!
+
+.. code:: python
+
+    # Initialize attack
+    LOSSer = LOSS(args.model_name, model_revision=args.model_revision, model_cache_dir=args.model_cache_dir)
+    
+    # Load the model into memory
+    LOSSer.load_model()
+
+    # Compute the statistic
+    train_statistics = LOSSer.compute_statistic(training_dataloader,num_batches=math.ceil(args.num_samples/args.bs),device=device,model_half=args.model_half,accelerator=accelerator)
+    val_statistics = LOSSer.compute_statistic(validation_dataloader,num_batches=math.ceil(args.num_samples/args.bs),device=device,model_half=args.model_half,accelerator=accelerator)
+    
+    # Unload when done
+    LOSSer.unload_model()

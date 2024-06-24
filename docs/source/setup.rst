@@ -3,7 +3,7 @@ Setup Guide
 
 Installation
 ------------
-We recommend installing from source so that you have access to the :ref:`starter scripts<Starter Scripts>`.
+We recommend installing from source so that you have access to the :ref:`starter scripts <start_scripts>`.
 
 .. code-block:: bash
 
@@ -31,11 +31,11 @@ Understanding the File Tree
 
 If you installed from source, you will see the following directory structure:
 
-.. literalinclude:: dir_tree_pre.txt
+.. literalinclude:: starter/dir_tree_pre.txt
 
-Running a starter script will create a ``results/`` and ``models/` folder.
+Running a starter script will create a ``results/`` and ``models/`` folder.
 
-.. literalinclude:: dir_tree_post.txt
+.. literalinclude:: starter/dir_tree_post.txt
 
 .. note:: Large models tend to fill up disk space quickly. Clean your ``results/`` and ``models/`` folders periodically, or specify the ``--experiment_name`` and ``--model_cache_dir`` flag with your desired save location.
 
