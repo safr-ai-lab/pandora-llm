@@ -7,8 +7,8 @@
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
 project = "llmprivacy"
-author = "Jason Wang, Jeffrey Wang, Marvin Li, Seth Neel"
-copyright = f"2024 {author}"
+author = "Jeffrey Wang, Jason Wang Marvin Li, Seth Neel"
+copyright = f"2024 {author}. Docs written by Jason Wang."
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
@@ -43,6 +43,7 @@ autodoc_typehints = "description"
 
 autoapi_options = [
     'members',
+    'inherited-members',
     'undoc-members',
     'private-members',
     'show-inheritance',

@@ -10,7 +10,7 @@ We recommend installing from source so that you have access to the :ref:`starter
    git clone https://github.com/safr-ai-lab/llm-mi.git
    pip install -e .
 
-However, if you just need the functions, we also provide a pip package that hosts our main module ``Pandora``.
+However, if you just need the functions, we also provide a pip package that hosts our main module ``pandora-llm``.
 
 .. code-block:: bash
    
@@ -58,5 +58,3 @@ To live preview the docs:
    sphinx-autobuild source build/html
 
 Then the docs will be available under ``docs/build/html/index.html``.
-
-Docs are split up into tutorials, how-tos, explanation, and reference as per the Diataxis framework.

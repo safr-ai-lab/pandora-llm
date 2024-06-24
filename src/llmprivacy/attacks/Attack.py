@@ -7,6 +7,13 @@ from ..utils.plot_utils import plot_ROC, plot_ROC_plotly, plot_histogram, plot_h
 class MIA:
     """
     Base class for all membership inference attacks. 
+
+    Attributes:
+        model (AutoModelForCausalLM or None): the model to be attacked
+        model_name (str): path to the model to be attacked
+        model_revision (str, optional): revision of the model to be attacked
+        cache_dir (str, optional): directory to cache the model
+
     """
     def __init__(self, model_name, model_revision=None, model_cache_dir=None):
         """
@@ -17,25 +24,36 @@ class MIA:
             model_revision (Optional[str]): revision of the model to be attacked
             cache_dir (Optional[str]): directory to cache the model
         """
+        self.model           = None
         self.model_name      = model_name
         self.model_revision  = model_revision
         self.model_cache_dir = model_cache_dir
     
-    def get_model(self):
+    def load_model(self):
         """
-        Returns the model that this MIA uses.
+        Loads model into memory
+        """
+        if self.model is None:
+            self.model = AutoModelForCausalLM.from_pretrained(self.model_name, revision=self.model_revision, cache_dir=self.model_cache_dir)
+        else:
+            raise Exception("Model has already been loaded; please call .unload_model() first!")
 
+    def unload_model(self):
+        """
+        Unloads model from memory
+        """
+        self.model = None
+
+    def compute_statistic(self, dataloader, num_batches=None, **kwargs):
+        """
+        This method should be implemented by subclasses to compute the attack statistic for the given dataloader.
+
+        Args:
+            dataloader (DataLoader): input data to compute statistic over
+            num_batches (Optional[int]): number of batches of the dataloader to compute over.
+                If None, then comptues over whole dataloader
         Returns:
-            AutoModelForCausalLM
-        """
-        return AutoModelForCausalLM.from_pretrained(self.model_name, revision=self.model_revision, cache_dir=self.model_cache_dir)
-    
-    def get_statistics(self):
-        """
-        Abstract method to get the statistics used for ROC plotting.
-
-        This method should be implemented by subclasses to return the training and validation
-        statistics necessary for plotting the ROC curve.
+            torch.Tensor or list: attack statistics computed on the input dataloader
         """
         raise NotImplementedError()
 
