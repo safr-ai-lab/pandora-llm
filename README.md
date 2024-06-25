@@ -1,7 +1,9 @@
 # Pandora’s White-Box
 
 **Precise Training Data Detection and Extraction from Large Language Models**
-by Jeffrey G. Wang, Jason Wang, Marvin Li, and Seth Neel.
+
+By Jeffrey G. Wang, Jason Wang, Marvin Li, and Seth Neel
+
 ## Overview
 
 `pandora_llm` is a red-teaming library against Large Language Models (LLMs) that assesses their vulnerability to train data leakage.
