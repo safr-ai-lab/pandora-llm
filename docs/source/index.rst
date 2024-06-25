@@ -55,6 +55,19 @@ Contributing
 ------------
 We welcome contributions! Please submit pull requests in our `GitHub <https://github.com/safr-ai-lab/pandora-llm>`_.
 
+Citation
+--------
+If you use our code or otherwise find this library useful, please cite our paper:
+
+.. code-block:: text
+
+   @article{wang2024pandora,
+     title={Pandora's White-Box: Increased Training Data Leakage in Open LLMs},
+     author={Wang, Jeffrey G and Wang, Jason and Li, Marvin and Neel, Seth},
+     journal={arXiv preprint arXiv:2402.17012},
+     year={2024}
+   }
+
 .. toctree::
    :maxdepth: 2
    :hidden:

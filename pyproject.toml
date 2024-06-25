@@ -41,5 +41,5 @@ classifiers = [
 
 [project.urls]
 Homepage = "https://safr-ai.quarto.pub/pandora/"
-Documentation = "https://readthedocs.org/projects/pandora-llm/"
+Documentation = "https://pandora-llm.readthedocs.io/en/latest/"
 Repository = "https://github.com/safr-ai-lab/pandora-llm"

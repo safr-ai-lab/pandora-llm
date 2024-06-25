@@ -9,7 +9,7 @@ By Jeffrey G. Wang, Jason Wang, Marvin Li, and Seth Neel
 `pandora_llm` is a red-teaming library against Large Language Models (LLMs) that assesses their vulnerability to train data leakage.
 It provides a unified [PyTorch](https://pytorch.org/) API for evaluating **membership inference attacks (MIAs)** and **training data extraction**.
 
-You can read our [paper](https://arxiv.org/abs/2402.17012) and [website](https://safr-ai.quarto.pub/pandora/) for a technical introduction to the subject.
+You can read our [paper](https://arxiv.org/abs/2402.17012) and [website](https://safr-ai.quarto.pub/pandora/) for a technical introduction to the subject. Please refer to the [documentation](https://pandora-llm.readthedocs.io/en/latest/) for the API reference as well as tutorials on how to use this codebase.
 
 `pandora_llm` abides by the following core principles:
 
@@ -52,23 +52,15 @@ bash scripts/pretrain_mia_baselines.sh
 We welcome contributions! Please submit pull requests in our [GitHub](https://github.com/safr-ai-lab/pandora-llm).
 
 
-## Licenses and Citations
+## Citation
 
-Models: We use the open-source [Pythia](https://github.com/EleutherAI/pythia) (Apache License, Version 2.0) and [Llama-2](https://llama.meta.com/llama2/) ([License](https://ai.meta.com/llama/license/)) large language models for our experiments.
-```
-Biderman, Stella, et al. "Pythia: A suite for analyzing large language models across training and scaling." International Conference on Machine Learning. PMLR, 2023.
+If you use our code or otherwise find this library useful, please cite our paper:
 
-Touvron, Hugo, et al. "Llama 2: Open foundation and fine-tuned chat models." arXiv preprint arXiv:2307.09288 (2023).
 ```
-
-Datasets: We use EleutherAI's [Pile](https://github.com/EleutherAI/the-pile) Dataset (MIT License).
-```
-Gao, Leo, et al. "The pile: An 800gb dataset of diverse text for language modeling." arXiv preprint arXiv:2101.00027 (2020).
-```
-
-Code: Our code is open-source and uses all open-source libraries such as [PyTorch](https://pytorch.org/) ([License](https://github.com/pytorch/pytorch/blob/main/LICENSE)) and [Huggingface](https://huggingface.co/) (Apache License 2.0).
-```
-Ansel, Jason, et al. "PyTorch 2: Faster Machine Learning Through Dynamic Python Bytecode Transformation and Graph Compilation." Proceedings of the 29th ACM International Conference on Architectural Support for Programming Languages and Operating Systems, Volume 2. 2024.
-
-Wolf, Thomas, et al. "Huggingface's transformers: State-of-the-art natural language processing." arXiv preprint arXiv:1910.03771 (2019).
+@article{wang2024pandora,
+  title={Pandora's White-Box: Increased Training Data Leakage in Open LLMs},
+  author={Wang, Jeffrey G and Wang, Jason and Li, Marvin and Neel, Seth},
+  journal={arXiv preprint arXiv:2402.17012},
+  year={2024}
+}
 ```
