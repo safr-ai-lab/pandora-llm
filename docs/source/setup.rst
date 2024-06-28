@@ -18,12 +18,6 @@ However, if you just need the functions, we also provide a pip package that host
 
 Our library has been tested on Python 3.10 on Linux with GCC 11.2.0.
 
-.. note::
-
-   Working with large language models, whether it be inference or training, requires a large amount of computational resources.
-
-   We have offered preliminary directions for multi-gpu distributed training and inference through `DeepSpeed ZeRO <https://www.deepspeed.ai/tutorials/zero/>`_ provided via Huggingface `Accelerate <https://huggingface.co/docs/accelerate/index>`_.
-
 Understanding the File Tree
 ---------------------------
 

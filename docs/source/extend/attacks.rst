@@ -114,7 +114,7 @@ If you need to load multiple models, or have other arguments, you can reference 
                 self.model, dataloader, = accelerator.prepare(self.model, dataloader)
             return compute_dataloader_cross_entropy(model=self.model,dataloader=dataloader,num_batches=num_batches,device=device,model_half=model_half).cpu()
 
-We recommend using the same function signature of computing the attack statistic for a single dataloader for a given number of batches.
+We recommend using the same function signature of computing the attack statistic for a single dataloader for a given number of batches. [#]_
 
 Outside the class (but in the same file), you can define ``compute_dataloader_cross_entropy`` or whatever helper functions are necessary to compute your attack statistic.
 
@@ -141,3 +141,7 @@ To use your new attack class, simply create an instance of the class with the mo
     
     # Unload when done
     LOSSer.unload_model()
+
+.. rubric:: Footnotes
+
+.. [#] Working with large language models, whether it be inference or training, requires a large amount of computational resources. In this example, we support passing in an ``accelerator`` object from Huggingface `Accelerate <https://huggingface.co/docs/accelerate/index>`_ to automatically handle multi-gpu distributed setups.
