@@ -18,13 +18,11 @@ However, if you just need the functions, we also provide a pip package that host
 
 Our library has been tested on Python 3.10 on Linux with GCC 11.2.0.
 
-Multi-GPU Distributed Computing with ``Accelerate``
----------------------------------------------------
-Working with large language models, whether it be inference or training, requires a large amount of computational resources.
+.. note::
 
-We have offered preliminary directions for multi-gpu distributed training and inference through `DeepSpeed ZeRO <https://www.deepspeed.ai/tutorials/zero/>`_ provided via Huggingface `Accelerate <https://huggingface.co/docs/accelerate/index>`_.
+   Working with large language models, whether it be inference or training, requires a large amount of computational resources.
 
-This is not yet supported on all modules—please adapt to your own setup.
+   We have offered preliminary directions for multi-gpu distributed training and inference through `DeepSpeed ZeRO <https://www.deepspeed.ai/tutorials/zero/>`_ provided via Huggingface `Accelerate <https://huggingface.co/docs/accelerate/index>`_.
 
 Understanding the File Tree
 ---------------------------
